@@ -24,10 +24,19 @@
                 out)
               (.toByteArray out))
         buf (doto (java.nio.ByteBuffer/allocateDirect (alength arr))
-              (.put arr))
-        info (STBTTFontinfo/create)]
-    (println (.capacity buf))
-    (STBTruetype/stbtt_InitFont info buf)))
+              (.put arr)
+              .flip)
+        info (STBTTFontinfo/create)
+        _ (STBTruetype/stbtt_InitFont info buf)
+        codepoint->glyph (reduce
+                           (fn [m codepoint]
+                             (let [glyph-index (STBTruetype/stbtt_FindGlyphIndex info (int codepoint))]
+                               (if (pos? glyph-index)
+                                 (assoc m codepoint glyph-index)
+                                 m)))
+                           {}
+                           (range 0x0000 0xFFFF))]
+    (println codepoint->glyph)))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
