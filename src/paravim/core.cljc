@@ -88,11 +88,11 @@
                             [:uniforms 'u_image]
                             assoc
                             :opts {:mip-level 0
-                                   :internal-fmt (gl game ALPHA)
+                                   :internal-fmt (gl game RED)
                                    :width bitmap-size
                                    :height bitmap-size
                                    :border 0
-                                   :src-fmt (gl game ALPHA)
+                                   :src-fmt (gl game RED)
                                    :src-type (gl game UNSIGNED_BYTE)}
                             :params {(gl game TEXTURE_MAG_FILTER)
                                      (gl game LINEAR)
