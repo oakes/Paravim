@@ -9,7 +9,8 @@
   (:import [org.lwjgl.stb STBTruetype STBTTFontinfo STBTTBakedChar]
            [java.nio.file Files Paths]
            [java.nio.channels Channels]
-           [org.lwjgl BufferUtils]))
+           [org.lwjgl BufferUtils]
+           [org.lwjgl.system MemoryStack]))
 
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
@@ -58,6 +59,15 @@
         info (STBTTFontinfo/create)
         _ (or (STBTruetype/stbtt_InitFont info ttf)
               (throw (IllegalStateException. "Failed to initialize font information.")))
+        stack (MemoryStack/stackPush)
+        p-ascent (.mallocInt stack 1)
+        p-descent (.mallocInt stack 1)
+        p-line-gap (.mallocInt stack 1)
+        _ (STBTruetype/stbtt_GetFontVMetrics info p-ascent p-descent p-line-gap)
+        ascent (.get p-ascent 0)
+        descent (.get p-descent 0)
+        line-gap (.get p-line-gap 0)
+        #_#_
         codepoint->glyph (reduce
                            (fn [m codepoint]
                              (let [glyph-index (STBTruetype/stbtt_FindGlyphIndex info (int codepoint))]
@@ -66,9 +76,11 @@
                                  m)))
                            {}
                            (range 0x0000 0xFFFF))
+        #_#_
         bitmap (doto (java.nio.ByteBuffer/allocateDirect (* bitmap-size bitmap-size))
                  (.order (java.nio.ByteOrder/nativeOrder)))
-        cdata (STBTTBakedChar/malloc 96)]
+        cdata (STBTTBakedChar/malloc 96)
+        bitmap (BufferUtils/createByteBuffer (* bitmap-size bitmap-size))]
     (STBTruetype/stbtt_BakeFontBitmap ttf font-height bitmap bitmap-size bitmap-size 32 cdata)
     (swap! *state assoc :font
       (c/compile game (-> (e/->image-entity game bitmap bitmap-size bitmap-size)
