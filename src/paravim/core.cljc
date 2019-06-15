@@ -79,11 +79,18 @@
         #_#_
         bitmap (doto (java.nio.ByteBuffer/allocateDirect (* bitmap-size bitmap-size))
                  (.order (java.nio.ByteOrder/nativeOrder)))
-        cdata (STBTTBakedChar/malloc 96)
+        cdata (STBTTBakedChar/malloc 2048)
         bitmap (BufferUtils/createByteBuffer (* bitmap-size bitmap-size))]
     (STBTruetype/stbtt_BakeFontBitmap ttf font-height bitmap bitmap-size bitmap-size 32 cdata)
     (swap! *state assoc :font
       (c/compile game (-> (e/->image-entity game bitmap bitmap-size bitmap-size)
+                          (assoc-in
+                            [:fragment :functions 'main]
+                            '([]
+                              (= outColor (texture u_image v_texCoord))
+                              (if (== (.rgb outColor) (vec3 "0.0" "0.0" "0.0"))
+                                "discard"
+                                (= outColor (vec4 "0.0" "0.0" "0.0" "1.0")))))
                           (update-in
                             [:uniforms 'u_image]
                             assoc
