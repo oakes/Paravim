@@ -88,8 +88,9 @@
                             [:fragment :functions 'main]
                             '([]
                               (= outColor (texture u_image v_texCoord))
-                              (if (== (.rgb outColor) (vec3 "0.0" "0.0" "0.0"))
-                                "discard"
+                              ("if" (== (.rgb outColor) (vec3 "0.0" "0.0" "0.0"))
+                                "discard")
+                              ("else"
                                 (= outColor (vec4 "0.0" "0.0" "0.0" "1.0")))))
                           (update-in
                             [:uniforms 'u_image]
