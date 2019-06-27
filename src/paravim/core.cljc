@@ -7,8 +7,6 @@
             #?(:clj  [play-cljc.macros-java :refer [gl math]]
                :cljs [play-cljc.macros-js :refer-macros [gl math]]))
   (:import [org.lwjgl.stb STBTruetype STBTTFontinfo STBTTBakedChar]
-           [java.nio.file Files Paths]
-           [java.nio.channels Channels]
            [org.lwjgl BufferUtils]))
 
 (defonce *state (atom {:mouse-x 0
@@ -18,55 +16,24 @@
 (def bitmap-size 512)
 (def font-height 128)
 
-(defn resize-buffer [buffer new-capacity]
-  (let [new-buffer (BufferUtils/createByteBuffer new-capacity)]
-    (.flip buffer)
-    (.put buffer new-buffer)
-    new-buffer))
-
 (defn init [game]
   ;; allow transparency in images
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
   ;; load font
-  (let [#_#_
-        arr (with-open [out (java.io.ByteArrayOutputStream.)]
+  (let [arr (with-open [out (java.io.ByteArrayOutputStream.)]
               (io/copy (-> "ttf/FiraCode-Regular.ttf"
                            io/resource
                            io/input-stream)
                 out)
               (.toByteArray out))
-        #_#_
         ttf (doto (java.nio.ByteBuffer/allocateDirect (alength arr))
               (.order (java.nio.ByteOrder/nativeOrder))
               (.put arr)
               .flip)
-        source (-> "ttf/FiraCode-Regular.ttf"
-                   io/resource
-                   io/input-stream)
-        rbc (Channels/newChannel source)
-        ttf (loop [buffer (BufferUtils/createByteBuffer (* 512 1024))]
-              (let [bs (.read rbc buffer)]
-                (cond
-                  (= bs -1)
-                  buffer
-                  (= 0 (.remaining buffer))
-                  (recur (resize-buffer buffer (-> buffer .capacity (* 3) (/ 2))))
-                  :else
-                  (recur buffer))))
-        _ (.flip ttf)
         info (STBTTFontinfo/create)
         _ (or (STBTruetype/stbtt_InitFont info ttf)
               (throw (IllegalStateException. "Failed to initialize font information.")))
-        #_#_
-        codepoint->glyph (reduce
-                           (fn [m codepoint]
-                             (let [glyph-index (STBTruetype/stbtt_FindGlyphIndex info (int codepoint))]
-                               (if (pos? glyph-index)
-                                 (assoc m codepoint glyph-index)
-                                 m)))
-                           {}
-                           (range 0x0000 0xFFFF))
         #_#_
         bitmap (doto (java.nio.ByteBuffer/allocateDirect (* bitmap-size bitmap-size))
                  (.order (java.nio.ByteOrder/nativeOrder)))
