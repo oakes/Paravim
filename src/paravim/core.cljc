@@ -14,7 +14,7 @@
                        :pressed-keys #{}}))
 
 (def bitmap-size 512)
-(def font-height 128)
+(def font-height 64)
 
 (defn init [game]
   ;; allow transparency in images
@@ -39,17 +39,18 @@
                  (.order (java.nio.ByteOrder/nativeOrder)))
         cdata (STBTTBakedChar/malloc 2048)
         bitmap (BufferUtils/createByteBuffer (* bitmap-size bitmap-size))
-        _ (STBTruetype/stbtt_BakeFontBitmap ttf font-height bitmap bitmap-size bitmap-size 33 cdata)
-        cseq (->> cdata .iterator iterator-seq (take 30) vec)
-        i (-> cseq count rand-int)
-        q (nth cseq i)
-        x (.x0 q)
-        y (.y0 q)
-        w (- (.x1 q) (.x0 q))
-        h (- (.y1 q) (.y0 q))]
-    (println i)
+        _ (STBTruetype/stbtt_BakeFontBitmap ttf font-height bitmap bitmap-size bitmap-size 32 cdata)
+        chars (->> cdata .iterator iterator-seq
+                   (mapv (fn [q]
+                           {:x (.x0 q)
+                            :y (.y0 q)
+                            :w (- (.x1 q) (.x0 q))
+                            :h (- (.y1 q) (.y0 q))
+                            :x-off (.xoff q)
+                            :y-off (.yoff q)
+                            :x-adv (.xadvance q)})))]
     (swap! *state assoc
-      :x x :y y :w w :h h
+      :chars chars
       :font
       (c/compile game (-> (e/->image-entity game bitmap bitmap-size bitmap-size)
                           (assoc-in
@@ -73,25 +74,33 @@
                             :params {(gl game TEXTURE_MAG_FILTER)
                                      (gl game LINEAR)
                                      (gl game TEXTURE_MIN_FILTER)
-                                     (gl game LINEAR)})
-                          (t/crop x y w h))))))
+                                     (gl game LINEAR)}))))))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
    :clear {:color [(/ 173 255) (/ 216 255) (/ 230 255) 1] :depth 1}})
 
+(def text (vec (seq "Hello, world!")))
+(def baseline 100)
+
 (defn run [game]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
-        {:keys [font x y w h]} @*state]
+        {:keys [font chars]} @*state]
     ;; render the blue background
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
     ;; render the font
-    (c/render game (-> font
-                       (t/project game-width game-height)
-                       (t/translate x y)
-                       (t/scale w h))))
+    (loop [i 0
+           total 0]
+      (when-let [ch (get text i)]
+        (let [{:keys [x y w h x-off y-off x-adv]} (nth chars (- (int ch) 32))]
+          (c/render game (-> font
+                             (t/project game-width game-height)
+                             (t/crop x y w h)
+                             (t/translate (+ total x-off) (+ baseline y-off))
+                             (t/scale w h)))
+          (recur (inc i) (+ total x-adv))))))
   ;; return the game map
   game)
 
