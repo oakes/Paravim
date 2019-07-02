@@ -3,6 +3,7 @@
             [play-cljc.gl.core :as c]
             [play-cljc.gl.entities-2d :as e]
             [play-cljc.transforms :as t]
+            [play-cljc.math :as m]
             [clojure.java.io :as io]
             #?(:clj  [play-cljc.macros-java :refer [gl math]]
                :cljs [play-cljc.macros-js :refer-macros [gl math]]))
@@ -15,6 +16,13 @@
 
 (def bitmap-size 512)
 (def font-height 64)
+
+(def text (vec (seq "Hello, world!")))
+
+(def flip-y-matrix
+  [1  0  0
+   0 -1  0
+   0  0  1])
 
 (defn init [game]
   ;; allow transparency in images
@@ -48,59 +56,73 @@
                             :h (- (.y1 q) (.y0 q))
                             :x-off (.xoff q)
                             :y-off (.yoff q)
-                            :x-adv (.xadvance q)})))]
-    (swap! *state assoc
-      :chars chars
-      :font
-      (c/compile game (-> (e/->image-entity game bitmap bitmap-size bitmap-size)
-                          (assoc-in
-                            [:fragment :functions 'main]
-                            '([]
-                              (= outColor (texture u_image v_texCoord))
-                              ("if" (== (.rgb outColor) (vec3 "0.0" "0.0" "0.0"))
-                                "discard")
-                              ("else"
-                                (= outColor (vec4 "0.0" "0.0" "0.0" "1.0")))))
-                          (update-in
-                            [:uniforms 'u_image]
-                            assoc
-                            :opts {:mip-level 0
-                                   :internal-fmt (gl game RED)
-                                   :width bitmap-size
-                                   :height bitmap-size
-                                   :border 0
-                                   :src-fmt (gl game RED)
-                                   :src-type (gl game UNSIGNED_BYTE)}
-                            :params {(gl game TEXTURE_MAG_FILTER)
-                                     (gl game LINEAR)
-                                     (gl game TEXTURE_MIN_FILTER)
-                                     (gl game LINEAR)}))))))
+                            :x-adv (.xadvance q)})))
+        font (c/compile game (-> (e/->image-entity game bitmap bitmap-size bitmap-size)
+                                 (assoc-in
+                                   [:fragment :functions 'main]
+                                   '([]
+                                     (= outColor (texture u_image v_texCoord))
+                                     ("if" (== (.rgb outColor) (vec3 "0.0" "0.0" "0.0"))
+                                       "discard")
+                                     ("else"
+                                       (= outColor (vec4 "0.0" "0.0" "0.0" "1.0")))))
+                                 (update-in
+                                   [:uniforms 'u_image]
+                                   assoc
+                                   :opts {:mip-level 0
+                                          :internal-fmt (gl game RED)
+                                          :width bitmap-size
+                                          :height bitmap-size
+                                          :border 0
+                                          :src-fmt (gl game RED)
+                                          :src-type (gl game UNSIGNED_BYTE)}
+                                   :params {(gl game TEXTURE_MAG_FILTER)
+                                            (gl game LINEAR)
+                                            (gl game TEXTURE_MIN_FILTER)
+                                            (gl game LINEAR)})))
+        entity (loop [i 0
+                      total 0
+                      inner-entities []]
+                 (if-let [ch (get text i)]
+                   (let [{:keys [x y w h x-off y-off x-adv]} (nth chars (- (int ch) 32))]
+                     (recur (inc i)
+                            (+ total x-adv)
+                            (conj inner-entities
+                                  (-> font
+                                      (t/project bitmap-size bitmap-size)
+                                      (t/crop x y w h)
+                                      (t/translate (+ total x-off) (+ font-height y-off))
+                                      (t/scale w h)))))
+                   ;inner-entities #_
+                   (-> (e/->image-entity game nil bitmap-size bitmap-size)
+                       (assoc
+                         :width bitmap-size
+                         :height bitmap-size
+                         :render-to-texture {'u_image (mapv #(assoc % :viewport {:x 0 :y 0 :width bitmap-size :height bitmap-size})
+                                                            inner-entities)})
+                       (#(c/compile game %))
+                       (update-in [:uniforms 'u_matrix]
+                                  #(m/multiply-matrices 3 flip-y-matrix %)))))]
+    (swap! *state assoc :entity entity)))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
    :clear {:color [(/ 173 255) (/ 216 255) (/ 230 255) 1] :depth 1}})
 
-(def text (vec (seq "Hello, world!")))
-(def baseline 100)
-
 (defn run [game]
   (let [game-width (utils/get-width game)
-        game-height (utils/get-height game)
-        {:keys [font chars]} @*state]
+        game-height (utils/get-height game)]
     ;; render the blue background
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
     ;; render the font
-    (loop [i 0
-           total 0]
-      (when-let [ch (get text i)]
-        (let [{:keys [x y w h x-off y-off x-adv]} (nth chars (- (int ch) 32))]
-          (c/render game (-> font
-                             (t/project game-width game-height)
-                             (t/crop x y w h)
-                             (t/translate (+ total x-off) (+ baseline y-off))
-                             (t/scale w h)))
-          (recur (inc i) (+ total x-adv))))))
+    (let [{:keys [entity]} @*state]
+      (if (vector? entity)
+        (run! (partial c/render game) entity)
+        (c/render game (-> entity
+                           (t/project game-width game-height)
+                           (t/translate 0 0)
+                           (t/scale (:width entity) (:height entity)))))))
   ;; return the game map
   game)
 
