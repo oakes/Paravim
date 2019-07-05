@@ -94,11 +94,11 @@
                                       (t/translate (+ total x-off) (+ font-height y-off))
                                       (t/scale w h)))))
                    ;inner-entities #_
-                   (-> (e/->image-entity game nil bitmap-size bitmap-size)
+                   (-> (e/->image-entity game nil total font-height)
                        (assoc
-                         :width bitmap-size
-                         :height bitmap-size
-                         :render-to-texture {'u_image (mapv #(assoc % :viewport {:x 0 :y 0 :width bitmap-size :height bitmap-size})
+                         :width total
+                         :height font-height
+                         :render-to-texture {'u_image (mapv #(assoc % :viewport {:x 0 :y (- font-height bitmap-size) :width bitmap-size :height bitmap-size})
                                                             inner-entities)})
                        (#(c/compile game %))
                        (update-in [:uniforms 'u_matrix]
