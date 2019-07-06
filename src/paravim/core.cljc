@@ -8,7 +8,8 @@
             #?(:clj  [play-cljc.macros-java :refer [gl math]]
                :cljs [play-cljc.macros-js :refer-macros [gl math]]))
   (:import [org.lwjgl.stb STBTruetype STBTTFontinfo STBTTBakedChar]
-           [org.lwjgl BufferUtils]))
+           [org.lwjgl BufferUtils]
+           [org.lwjgl.system MemoryStack]))
 
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
@@ -48,6 +49,16 @@
         cdata (STBTTBakedChar/malloc 2048)
         bitmap (BufferUtils/createByteBuffer (* bitmap-size bitmap-size))
         _ (STBTruetype/stbtt_BakeFontBitmap ttf font-height bitmap bitmap-size bitmap-size 32 cdata)
+        stack (MemoryStack/stackPush)
+        *ascent (.callocInt stack 1)
+        *descent (.callocInt stack 1)
+        *line-gap (.callocInt stack 1)
+        _ (STBTruetype/stbtt_GetFontVMetrics info *ascent *descent *line-gap)
+        ascent (.get *ascent 0)
+        descent (.get *descent 0)
+        line-gap (.get *line-gap 0)
+        scale (STBTruetype/stbtt_ScaleForPixelHeight info font-height)
+        baseline (* ascent scale)
         chars (->> cdata .iterator iterator-seq
                    (mapv (fn [q]
                            {:x (.x0 q)
@@ -91,7 +102,7 @@
                                   (-> font
                                       (t/project bitmap-size bitmap-size)
                                       (t/crop x y w h)
-                                      (t/translate (+ total x-off) (+ font-height y-off))
+                                      (t/translate (+ total x-off) (+ baseline y-off))
                                       (t/scale w h)))))
                    ;inner-entities #_
                    (-> (e/->image-entity game nil total font-height)
