@@ -102,18 +102,17 @@
                                   (-> font
                                       (t/project bitmap-size bitmap-size)
                                       (t/crop x y w h)
-                                      (t/translate (+ total x-off) (+ baseline y-off))
-                                      (t/scale w h)))))
-                   ;inner-entities #_
+                                      (t/translate (+ total x-off) (- font-height baseline y-off))
+                                      (t/scale w h)
+                                      (update-in [:uniforms 'u_matrix]
+                                                 #(m/multiply-matrices 3 flip-y-matrix %))))))
                    (-> (e/->image-entity game nil total font-height)
                        (assoc
                          :width total
                          :height font-height
                          :render-to-texture {'u_image (mapv #(assoc % :viewport {:x 0 :y (- font-height bitmap-size) :width bitmap-size :height bitmap-size})
                                                             inner-entities)})
-                       (#(c/compile game %))
-                       (update-in [:uniforms 'u_matrix]
-                                  #(m/multiply-matrices 3 flip-y-matrix %)))))]
+                       (#(c/compile game %)))))]
     (swap! *state assoc :entity entity)))
 
 (def screen-entity
@@ -128,12 +127,10 @@
                            assoc :width game-width :height game-height))
     ;; render the font
     (let [{:keys [entity]} @*state]
-      (if (vector? entity)
-        (run! (partial c/render game) entity)
-        (c/render game (-> entity
-                           (t/project game-width game-height)
-                           (t/translate 0 0)
-                           (t/scale (:width entity) (:height entity)))))))
+      (c/render game (-> entity
+                         (t/project game-width game-height)
+                         (t/translate 0 0)
+                         (t/scale (:width entity) (:height entity))))))
   ;; return the game map
   game)
 
