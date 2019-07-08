@@ -20,7 +20,7 @@
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
   ;; load font
-  (let [baked-font (text/ttf->bitmap "ttf/FiraCode-Regular.ttf" font-height bitmap-size bitmap-size)
+  (let [baked-font (text/->baked-font "ttf/FiraCode-Regular.ttf" font-height bitmap-size bitmap-size)
         font (c/compile game (gl.text/->font-entity game baked-font))
         entity (c/compile game (gl.text/->text-entity game font text))]
     (swap! *state assoc :entity entity)))
