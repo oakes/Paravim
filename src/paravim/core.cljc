@@ -20,8 +20,8 @@
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
   ;; load font
   (#?(:clj load-bitmap-clj :cljs load-bitmap-cljs)
-     (fn [image width height]
-       (let [font-entity (c/compile game (text/->font-entity game image width height))
+     (fn [bitmap]
+       (let [font-entity (c/compile game (text/->font-entity game bitmap))
              text-entity (c/compile game (#?(:clj ->text-entity-clj :cljs ->text-entity-cljs) game font-entity text))]
          (swap! *state assoc :entity text-entity)))))
 
