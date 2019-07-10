@@ -2,17 +2,16 @@
   (:require [paravim.utils :as utils]
             [play-cljc.gl.core :as c]
             [play-cljc.transforms :as t]
-            [play-cljc.text :as text]
-            [play-cljc.gl.text :as gl.text]
+            [play-cljc.gl.text :as text]
             #?(:clj  [play-cljc.macros-java :refer [gl math]]
-               :cljs [play-cljc.macros-js :refer-macros [gl math]])))
+               :cljs [play-cljc.macros-js :refer-macros [gl math]])
+            #?(:clj [paravim.text :refer [load-bitmap-clj ->text-entity-clj]]))
+  #?(:cljs (:require-macros [paravim.text :refer [load-bitmap-cljs ->text-entity-cljs]])))
 
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
                        :pressed-keys #{}}))
 
-(def bitmap-size 512)
-(def font-height 64)
 (def text "Hello, world!")
 
 (defn init [game]
@@ -20,10 +19,11 @@
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
   ;; load font
-  (let [baked-font (text/->baked-font "ttf/FiraCode-Regular.ttf" font-height bitmap-size bitmap-size)
-        font (c/compile game (gl.text/->font-entity game baked-font))
-        entity (c/compile game (gl.text/->text-entity game font text))]
-    (swap! *state assoc :entity entity)))
+  (#?(:clj load-bitmap-clj :cljs load-bitmap-cljs)
+     (fn [image width height]
+       (let [font-entity (c/compile game (text/->font-entity game image width height))
+             text-entity (c/compile game (#?(:clj ->text-entity-clj :cljs ->text-entity-cljs) game font-entity text))]
+         (swap! *state assoc :entity text-entity)))))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
@@ -36,7 +36,7 @@
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
     ;; render the font
-    (let [{:keys [entity]} @*state]
+    (when-let [entity (:entity @*state)]
       (c/render game (-> entity
                          (t/project game-width game-height)
                          (t/translate 0 0)
