@@ -5,8 +5,8 @@
             [play-cljc.gl.text :as text]
             #?(:clj  [play-cljc.macros-java :refer [gl math]]
                :cljs [play-cljc.macros-js :refer-macros [gl math]])
-            #?(:clj [paravim.text :refer [load-bitmap-clj ->text-entity-clj]]))
-  #?(:cljs (:require-macros [paravim.text :refer [load-bitmap-cljs ->text-entity-cljs]])))
+            #?(:clj [paravim.text :refer [load-font-clj]]))
+  #?(:cljs (:require-macros [paravim.text :refer [load-font-cljs]])))
 
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
@@ -19,10 +19,10 @@
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
   ;; load font
-  (#?(:clj load-bitmap-clj :cljs load-bitmap-cljs)
-     (fn [{:keys [data width height]}]
+  (#?(:clj load-font-clj :cljs load-font-cljs)
+     (fn [{:keys [data width height]} baked-font]
        (let [font-entity (c/compile game (text/->font-entity game data width height))
-             text-entity (c/compile game (#?(:clj ->text-entity-clj :cljs ->text-entity-cljs) game font-entity text))]
+             text-entity (c/compile game (text/->text-entity game baked-font font-entity text))]
          (swap! *state assoc :entity text-entity)))))
 
 (def screen-entity

@@ -7,18 +7,13 @@
 (def font-height 64)
 (def baked-font (text/->baked-font "ttf/FiraCode-Regular.ttf" font-height bitmap))
 
-(defn load-bitmap-clj [callback]
-  (callback bitmap))
+(defn load-font-clj [callback]
+  (callback bitmap baked-font))
 
-(defmacro load-bitmap-cljs [callback]
+(defmacro load-font-cljs [callback]
   (let [{:keys [width height]} bitmap]
     `(let [image# (js/Image. ~width ~height)]
        (doto image#
          (-> .-src (set! ~(text/bitmap->data-uri bitmap)))
-         (-> .-onload (set! #(~callback {:data image# :width ~width :height ~height})))))))
+         (-> .-onload (set! #(~callback {:data image# :width ~width :height ~height} ~baked-font)))))))
 
-(defn ->text-entity-clj [game font-entity text]
-  (gl.text/->text-entity game baked-font font-entity text))
-
-(defmacro ->text-entity-cljs [game font-entity text]
-  `(gl.text/->text-entity ~game ~baked-font ~font-entity ~text))
