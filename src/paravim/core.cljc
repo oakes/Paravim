@@ -20,9 +20,9 @@
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
   ;; load font
   (#?(:clj load-font-clj :cljs load-font-cljs)
-     (fn [{:keys [data width height]} baked-font]
-       (let [font-entity (c/compile game (text/->font-entity game data width height))
-             text-entity (c/compile game (text/->text-entity game baked-font font-entity text))]
+     (fn [{:keys [data]} baked-font]
+       (let [font-entity (c/compile game (text/->font-entity game data baked-font))
+             text-entity (c/compile game (text/->text-entity game font-entity text))]
          (swap! *state assoc :entity text-entity)))))
 
 (def screen-entity
