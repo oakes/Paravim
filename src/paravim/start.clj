@@ -1,12 +1,11 @@
 (ns paravim.start
   (:require [paravim.core :as c]
+            [paravim.vim :as v]
             [play-cljc.gl.core :as pc])
   (:import  [org.lwjgl.glfw GLFW Callbacks GLFWCursorPosCallbackI GLFWKeyCallbackI]
             [org.lwjgl.opengl GL GL41]
             [org.lwjgl.system MemoryUtil]
-            [javax.sound.sampled AudioSystem Clip]
-            [org.lwjgl.system Library CallbackI$V]
-            [org.lwjgl.system.dyncall DynCall DynCallback])
+            [javax.sound.sampled AudioSystem Clip])
   (:gen-class))
 
 (defn listen-for-mouse [window]
@@ -53,46 +52,15 @@
             nil))))))
 
 (defn -main [& args]
-  (let [lib (Library/loadNative "libvim")
-        init (.getFunctionAddress lib "vimInit")
-        set-tab-size (.getFunctionAddress lib "vimOptionSetTabSize")
-        get-tab-size (.getFunctionAddress lib "vimOptionGetTabSize")
-        set-quit (.getFunctionAddress lib "vimSetQuitCallback")
-        exec (.getFunctionAddress lib "vimExecute")
-        vm (DynCall/dcNewCallVM 1024)
-        callback (reify CallbackI$V
-                   (callback [this args]
-                     (println "quit")
-                     (println (DynCallback/dcbArgPointer args))
-                     (println (DynCallback/dcbArgBool args)))
-                   (getSignature [this]
-                     "(pb)v"))]
-    (DynCall/dcMode vm DynCall/DC_CALL_C_DEFAULT)
-
-    (DynCall/dcReset vm)
-    (DynCall/dcCallVoid vm init)
-
-    (DynCall/dcReset vm)
-    (DynCall/dcArgInt vm 2)
-    (DynCall/dcCallVoid vm set-tab-size)
-
-    (DynCall/dcReset vm)
-    (println (DynCall/dcCallInt vm get-tab-size))
-
-    (DynCall/dcReset vm)
-    (DynCall/dcArgPointer vm (-> "set tabstop=4" MemoryUtil/memUTF8 MemoryUtil/memAddress))
-    (DynCall/dcCallVoid vm exec)
-
-    (DynCall/dcReset vm)
-    (println (DynCall/dcCallInt vm get-tab-size))
-
-    (DynCall/dcReset vm)
-    (DynCall/dcArgPointer vm (MemoryUtil/memAddressSafe callback))
-    (DynCall/dcCallVoid vm set-quit)
-
-    (DynCall/dcReset vm)
-    (DynCall/dcArgPointer vm (-> "q!" MemoryUtil/memUTF8 MemoryUtil/memAddress))
-    (DynCall/dcCallVoid vm exec))
+  (let [vim (v/->vim)]
+    (v/init vim)
+    (v/set-tab-size vim 2)
+    (println (v/get-tab-size vim))
+    (v/execute vim "set tabstop=4")
+    (println (v/get-tab-size vim))
+    (v/set-quit vim (fn [buffer force?]
+                      (println "quit" buffer force?)))
+    (v/execute vim "q!"))
   (when-not (GLFW/glfwInit)
     (throw (Exception. "Unable to initialize GLFW")))
   (GLFW/glfwWindowHint GLFW/GLFW_VISIBLE GLFW/GLFW_FALSE)
