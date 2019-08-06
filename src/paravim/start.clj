@@ -54,10 +54,8 @@
 (defn -main [& args]
   (let [vim (v/->vim)]
     (v/init vim)
-    (v/set-tab-size vim 2)
-    (println (v/get-tab-size vim))
-    (v/execute vim "set tabstop=4")
-    (println (v/get-tab-size vim))
+    (println (-> (v/open-buffer vim "resources/public/index.html")
+                 (v/get-line 1)))
     (v/set-quit vim (fn [buffer force?]
                       (println "quit" buffer force?)))
     (v/execute vim "q!"))

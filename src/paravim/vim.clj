@@ -3,19 +3,31 @@
            [org.lwjgl.system Library CallbackI$V]
            [org.lwjgl.system.dyncall DynCall DynCallback]))
 
+(defprotocol IBuffer
+  (get-line [this line-num]))
+
+(defn ->buffer [lib vm buffer-ptr]
+  (let [get-line (.getFunctionAddress lib "vimBufferGetLine")]
+    (reify IBuffer
+      (get-line [this line-num]
+        (DynCall/dcReset vm)
+        (DynCall/dcArgPointer vm buffer-ptr)
+        (DynCall/dcArgLong vm line-num)
+        (-> (DynCall/dcCallPointer vm get-line)
+            MemoryUtil/memUTF8)))))
+
 (defprotocol IVim
   (init [this])
-  ;; user input
+  (open-buffer [this file-name])
   (execute [this cmd])
-  ;; callbacks
   (set-quit [this callback])
-  ;; options
   (set-tab-size [this size])
   (get-tab-size [this]))
 
 (defn ->vim []
   (let [lib (Library/loadNative "libvim")
         init (.getFunctionAddress lib "vimInit")
+        open-buffer (.getFunctionAddress lib "vimBufferOpen")
         exec (.getFunctionAddress lib "vimExecute")
         set-quit (.getFunctionAddress lib "vimSetQuitCallback")
         set-tab-size (.getFunctionAddress lib "vimOptionSetTabSize")
@@ -26,12 +38,16 @@
         (DynCall/dcMode vm DynCall/DC_CALL_C_DEFAULT)
         (DynCall/dcReset vm)
         (DynCall/dcCallVoid vm init))
-      ;; user input
+      (open-buffer [this file-name]
+        (DynCall/dcReset vm)
+        (DynCall/dcArgPointer vm (-> file-name MemoryUtil/memUTF8 MemoryUtil/memAddress))
+        (DynCall/dcArgLong vm 1)
+        (DynCall/dcArgInt vm 0)
+        (->buffer lib vm (DynCall/dcCallPointer vm open-buffer)))
       (execute [this cmd]
         (DynCall/dcReset vm)
         (DynCall/dcArgPointer vm (-> cmd MemoryUtil/memUTF8 MemoryUtil/memAddress))
         (DynCall/dcCallVoid vm exec))
-      ;; callbacks
       (set-quit [this callback]
         (DynCall/dcReset vm)
         (DynCall/dcArgPointer vm (MemoryUtil/memAddressSafe
@@ -42,7 +58,6 @@
                                      (getSignature [this]
                                        "(pb)v"))))
         (DynCall/dcCallVoid vm set-quit))
-      ;; options
       (set-tab-size [this size]
         (DynCall/dcReset vm)
         (DynCall/dcArgInt vm size)
