@@ -38,6 +38,7 @@
         open-buffer* (.getFunctionAddress lib "vimBufferOpen")
         get-cursor-column* (.getFunctionAddress lib "vimCursorGetColumn")
         get-cursor-line* (.getFunctionAddress lib "vimCursorGetLine")
+        input* (.getFunctionAddress lib "vimInput")
         execute* (.getFunctionAddress lib "vimExecute")
         set-quit* (.getFunctionAddress lib "vimSetQuitCallback")
         set-tab-size* (.getFunctionAddress lib "vimOptionSetTabSize")
@@ -60,7 +61,10 @@
       (get-cursor-line [this]
         (DynCall/dcReset vm)
         (DynCall/dcCallLong vm get-cursor-line*))
-      (input [this input])
+      (input [this input]
+        (DynCall/dcReset vm)
+        (DynCall/dcArgPointer vm (-> input MemoryUtil/memUTF8 MemoryUtil/memAddress))
+        (DynCall/dcCallVoid vm input*))
       (execute [this cmd]
         (DynCall/dcReset vm)
         (DynCall/dcArgPointer vm (-> cmd MemoryUtil/memUTF8 MemoryUtil/memAddress))

@@ -57,7 +57,9 @@
         buf (v/open-buffer vim "resources/public/index.html")]
     (dotimes [i (v/get-line-count buf)]
       (swap! c/*state update :lines conj
-             (v/get-line buf (inc i)))))
+             (v/get-line buf (inc i))))
+    (v/input vim "l")
+    (println (v/get-cursor-line vim) (v/get-cursor-column vim)))
   (when-not (GLFW/glfwInit)
     (throw (Exception. "Unable to initialize GLFW")))
   (GLFW/glfwWindowHint GLFW/GLFW_VISIBLE GLFW/GLFW_FALSE)
