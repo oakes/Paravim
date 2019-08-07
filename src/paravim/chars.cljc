@@ -19,7 +19,7 @@
 (defn assoc-char
   ([text-entity index char-entity]
    (assoc-char text-entity 0 index char-entity))
-  ([{:keys [baked-font characters] :as text-entity} line-num index {:keys [baked-char] :as char-entity}]
+  ([{:keys [baked-font characters] :or {characters []} :as text-entity} line-num index {:keys [baked-char] :as char-entity}]
    (let [characters (loop [chars characters]
                       (if (<= (count chars) line-num)
                         (recur (conj chars []))
