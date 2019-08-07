@@ -1,7 +1,9 @@
 (ns paravim.core
   (:require [paravim.utils :as utils]
+            [paravim.chars :as chars]
             [play-cljc.gl.core :as c]
             [play-cljc.transforms :as t]
+            [play-cljc.instances :as i]
             [play-cljc.gl.text :as text]
             #?(:clj  [play-cljc.macros-java :refer [gl math]]
                :cljs [play-cljc.macros-js :refer-macros [gl math]])
@@ -10,9 +12,8 @@
 
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
-                       :pressed-keys #{}}))
-
-(def text "Hello, world!")
+                       :pressed-keys #{}
+                       :lines []}))
 
 (defn init [game]
   ;; allow transparency in images
@@ -21,9 +22,9 @@
   ;; load font
   (#?(:clj load-font-clj :cljs load-font-cljs)
      (fn [{:keys [data]} baked-font]
-       (let [font-entity (c/compile game (text/->font-entity game data baked-font))
-             text-entity (c/compile game (text/->text-entity game font-entity text))]
-         (swap! *state assoc :entity text-entity)))))
+       (let [font-entity (text/->font-entity game data baked-font)
+             text-entity (c/compile game (i/->instanced-entity font-entity))]
+         (swap! *state assoc :font-entity font-entity :text-entity text-entity)))))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
@@ -31,16 +32,22 @@
 
 (defn run [game]
   (let [game-width (utils/get-width game)
-        game-height (utils/get-height game)]
+        game-height (utils/get-height game)
+        {:keys [font-entity text-entity lines]} @*state]
     ;; render the blue background
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
     ;; render the font
-    (when-let [entity (:entity @*state)]
-      (c/render game (-> entity
+    (when text-entity
+      (c/render game (-> (reduce
+                           (partial apply chars/assoc-char)
+                           text-entity
+                           (for [line-num (range (count lines))
+                                 char-num (range (count (nth lines line-num)))
+                                 :let [ch (get-in lines [line-num char-num])]]
+                             [line-num char-num (chars/crop-char font-entity ch)]))
                          (t/project game-width game-height)
-                         (t/translate 0 0)
-                         (t/scale (:width entity) (:height entity))))))
+                         (t/translate 0 0)))))
   ;; return the game map
   game)
 
