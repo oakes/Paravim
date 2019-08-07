@@ -15,6 +15,8 @@
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
                        :pressed-keys #{}
+                       :line 1
+                       :column 0
                        :lines []}))
 
 (defn assoc-chars [text-entity font-entity lines]
@@ -50,11 +52,11 @@
 (defn run [game]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
-        {:keys [text-entity rect-entity rects-entity lines]} @*state]
+        {:keys [text-entity rect-entity rects-entity line column lines]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
     (when text-entity
-      (let [{:keys [left top width height]} (-> text-entity :characters (get-in [0 0]))
+      (let [{:keys [left top width height]} (-> text-entity :characters (get-in [(dec line) column]))
             rects-entity (i/assoc rects-entity 0 (-> rect-entity
                                                      (t/color [0 0 0 0.5])
                                                      (t/translate left top)

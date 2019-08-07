@@ -39,27 +39,27 @@
     GLFW/GLFW_KEY_LEFT :left
     GLFW/GLFW_KEY_RIGHT :right
     GLFW/GLFW_KEY_UP :up
+    GLFW/GLFW_KEY_H :h
+    GLFW/GLFW_KEY_J :j
+    GLFW/GLFW_KEY_K :k
+    GLFW/GLFW_KEY_L :l
     nil))
 
-(defn listen-for-keys [window]
+(defn listen-for-keys [window vim]
   (GLFW/glfwSetKeyCallback window
     (reify GLFWKeyCallbackI
       (invoke [this window keycode scancode action mods]
         (when-let [k (keycode->keyword keycode)]
+          (when (and (#{:h :j :k :l} k)
+                     (= action GLFW/GLFW_PRESS))
+            (v/input vim (name k))
+            (swap! c/*state assoc :line (v/get-cursor-line vim) :column (v/get-cursor-column vim)))
           (condp = action
             GLFW/GLFW_PRESS (swap! c/*state update :pressed-keys conj k)
             GLFW/GLFW_RELEASE (swap! c/*state update :pressed-keys disj k)
             nil))))))
 
 (defn -main [& args]
-  (let [vim (doto (v/->vim)
-              v/init)
-        buf (v/open-buffer vim "resources/public/index.html")]
-    (dotimes [i (v/get-line-count buf)]
-      (swap! c/*state update :lines conj
-             (v/get-line buf (inc i))))
-    (v/input vim "l")
-    (println (v/get-cursor-line vim) (v/get-cursor-column vim)))
   (when-not (GLFW/glfwInit)
     (throw (Exception. "Unable to initialize GLFW")))
   (GLFW/glfwWindowHint GLFW/GLFW_VISIBLE GLFW/GLFW_FALSE)
@@ -75,7 +75,13 @@
       (GLFW/glfwShowWindow window)
       (GL/createCapabilities)
       (listen-for-mouse window)
-      (listen-for-keys window)
+      (let [vim (doto (v/->vim)
+                  v/init)
+            buf (v/open-buffer vim "resources/public/index.html")]
+        (dotimes [i (v/get-line-count buf)]
+          (swap! c/*state update :lines conj
+                 (v/get-line buf (inc i))))
+        (listen-for-keys window vim))
       (let [initial-game (assoc (pc/->game window)
                                 :delta-time 0
                                 :total-time 0)]
