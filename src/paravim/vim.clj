@@ -4,17 +4,23 @@
            [org.lwjgl.system.dyncall DynCall DynCallback]))
 
 (defprotocol IBuffer
-  (get-line [this line-num]))
+  (get-line [this line-num])
+  (get-line-count [this]))
 
 (defn ->buffer [lib vm buffer-ptr]
-  (let [get-line (.getFunctionAddress lib "vimBufferGetLine")]
+  (let [get-line (.getFunctionAddress lib "vimBufferGetLine")
+        get-line-count (.getFunctionAddress lib "vimBufferGetLineCount")]
     (reify IBuffer
       (get-line [this line-num]
         (DynCall/dcReset vm)
         (DynCall/dcArgPointer vm buffer-ptr)
         (DynCall/dcArgLong vm line-num)
         (-> (DynCall/dcCallPointer vm get-line)
-            MemoryUtil/memUTF8)))))
+            MemoryUtil/memUTF8))
+      (get-line-count [this]
+        (DynCall/dcReset vm)
+        (DynCall/dcArgPointer vm buffer-ptr)
+        (DynCall/dcCallLong vm get-line-count)))))
 
 (defprotocol IVim
   (init [this])

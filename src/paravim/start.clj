@@ -52,13 +52,11 @@
             nil))))))
 
 (defn -main [& args]
-  (let [vim (v/->vim)]
-    (v/init vim)
-    (println (-> (v/open-buffer vim "resources/public/index.html")
-                 (v/get-line 1)))
-    (v/set-quit vim (fn [buffer force?]
-                      (println "quit" buffer force?)))
-    (v/execute vim "q!"))
+  (let [vim (doto (v/->vim)
+              v/init)
+        buf (v/open-buffer vim "resources/public/index.html")]
+    (dotimes [i (v/get-line-count buf)]
+      (println (v/get-line buf (inc i)))))
   (when-not (GLFW/glfwInit)
     (throw (Exception. "Unable to initialize GLFW")))
   (GLFW/glfwWindowHint GLFW/GLFW_VISIBLE GLFW/GLFW_FALSE)
