@@ -32,7 +32,12 @@
          prev-lines (subvec characters 0 line-num)
          prev-count (reduce + 0 (map count prev-lines))
          replaced-char (get line index)
-         line (assoc line index (assoc char-entity :x-total x-total))
+         line (assoc line index (-> char-entity
+                                    (assoc :x-total x-total
+                                           :left prev-xadv
+                                           :top y-total
+                                           :width (+ (:w baked-char) (:xoff baked-char))
+                                           :height (:font-height baked-font))))
          next-char (get line (inc index))]
      (-> text-entity
          (assoc :characters (assoc characters line-num line))
