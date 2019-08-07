@@ -40,6 +40,8 @@
              rect-entity (e/->entity game primitives/rect)
              rects-entity (c/compile game (i/->instanced-entity rect-entity))]
          (swap! *state assoc
+                :font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :w)
+                :font-height (:font-height baked-font)
                 :font-entity font-entity
                 :text-entity (assoc-chars text-entity font-entity (:lines @*state))
                 :rect-entity rect-entity
@@ -52,11 +54,18 @@
 (defn run [game]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
-        {:keys [text-entity rect-entity rects-entity line column lines]} @*state]
+        {:keys [text-entity rect-entity rects-entity line column lines
+                font-width font-height]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
     (when text-entity
-      (let [{:keys [left top width height]} (-> text-entity :characters (get-in [(dec line) column]))
+      (let [{:keys [left top width height]
+             :or {left (* column font-width)
+                  top (* (dec line) font-height)
+                  width font-width
+                  height font-height}}
+            (-> text-entity :characters (get-in [(dec line) column]))
+            width (if (== 0 width) font-width width)
             rects-entity (i/assoc rects-entity 0 (-> rect-entity
                                                      (t/color [0 0 0 0.5])
                                                      (t/translate left top)
