@@ -24,6 +24,7 @@
 (defprotocol IVim
   (init [this])
   (open-buffer [this file-name])
+  (set-buffer-update [this callback])
   (get-cursor-column [this])
   (get-cursor-line [this])
   (input [this input])
@@ -36,6 +37,7 @@
   (let [lib (Library/loadNative "libvim")
         init* (.getFunctionAddress lib "vimInit")
         open-buffer* (.getFunctionAddress lib "vimBufferOpen")
+        set-buffer-update* (.getFunctionAddress lib "vimSetDestructuredBufferUpdateCallback")
         get-cursor-column* (.getFunctionAddress lib "vimCursorGetColumn")
         get-cursor-line* (.getFunctionAddress lib "vimCursorGetLine")
         input* (.getFunctionAddress lib "vimInput")
@@ -55,6 +57,19 @@
         (DynCall/dcArgLong vm 1)
         (DynCall/dcArgInt vm 0)
         (->buffer lib vm (DynCall/dcCallPointer vm open-buffer*)))
+      (set-buffer-update [this callback]
+        (DynCall/dcReset vm)
+        (DynCall/dcArgPointer vm (MemoryUtil/memAddressSafe
+                                   (reify CallbackI$V
+                                     (callback [this args]
+                                       (let [buf (DynCallback/dcbArgPointer args)
+                                             start-line (DynCallback/dcbArgLong args)
+                                             end-line (DynCallback/dcbArgLong args)
+                                             line-count (DynCallback/dcbArgLong args)]
+                                         (callback start-line end-line line-count)))
+                                     (getSignature [this]
+                                       "(plll)v"))))
+        (DynCall/dcCallVoid vm set-buffer-update*))
       (get-cursor-column [this]
         (DynCall/dcReset vm)
         (DynCall/dcCallInt vm get-cursor-column*))
