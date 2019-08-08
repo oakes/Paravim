@@ -53,7 +53,7 @@
           (when (and (#{:h :j :k :l} k)
                      (= action GLFW/GLFW_PRESS))
             (v/input vim (name k))
-            (swap! c/*state assoc :line (v/get-cursor-line vim) :column (v/get-cursor-column vim)))
+            (swap! c/*state c/update-cursor (v/get-cursor-line vim) (v/get-cursor-column vim)))
           (condp = action
             GLFW/GLFW_PRESS (swap! c/*state update :pressed-keys conj k)
             GLFW/GLFW_RELEASE (swap! c/*state update :pressed-keys disj k)

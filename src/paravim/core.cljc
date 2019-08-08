@@ -15,8 +15,7 @@
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
                        :pressed-keys #{}
-                       :line 1
-                       :column 0
+                       :camera (e/->camera true)
                        :lines []}))
 
 (defn assoc-chars [text-entity font-entity lines]
@@ -27,6 +26,24 @@
           char-num (range (count (nth lines line-num)))
           :let [ch (get-in lines [line-num char-num])]]
       [line-num char-num (chars/crop-char font-entity ch)])))
+
+(defn update-cursor [{:keys [text-entity rect-entity baked-font] :as state} line column]
+  (if (and text-entity rect-entity baked-font)
+    (let [font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :w)
+          font-height (:font-height baked-font)
+          {:keys [left top width height]
+           :or {left (* column font-width)
+                top (* (dec line) font-height)
+                width font-width
+                height font-height}}
+          (-> text-entity :characters (get-in [(dec line) column]))
+          width (if (== 0 width) font-width width)]
+      (-> state
+          (assoc :cursor-entity (-> rect-entity
+                                    (t/color [0 0 0 0.5])
+                                    (t/translate left top)
+                                    (t/scale width height)))))
+    state))
 
 (defn init [game]
   ;; allow transparency in images
@@ -39,13 +56,16 @@
              text-entity (c/compile game (i/->instanced-entity font-entity))
              rect-entity (e/->entity game primitives/rect)
              rects-entity (c/compile game (i/->instanced-entity rect-entity))]
-         (swap! *state assoc
-                :font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :w)
-                :font-height (:font-height baked-font)
-                :font-entity font-entity
-                :text-entity (assoc-chars text-entity font-entity (:lines @*state))
-                :rect-entity rect-entity
-                :rects-entity rects-entity)))))
+         (swap! *state
+           (fn [state]
+             (-> state
+                 (assoc
+                   :baked-font baked-font
+                   :font-entity font-entity
+                   :text-entity (assoc-chars text-entity font-entity (:lines @*state))
+                   :rect-entity rect-entity
+                   :rects-entity rects-entity)
+                 (update-cursor 1 0))))))))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
@@ -54,28 +74,17 @@
 (defn run [game]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
-        {:keys [text-entity rect-entity rects-entity line column lines
-                font-width font-height]} @*state]
+        {:keys [text-entity rects-entity camera cursor-entity]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
+    (when cursor-entity
+      (c/render game (-> (i/assoc rects-entity 0 cursor-entity)
+                         (t/project game-width game-height)
+                         (t/camera camera))))
     (when text-entity
-      (let [{:keys [left top width height]
-             :or {left (* column font-width)
-                  top (* (dec line) font-height)
-                  width font-width
-                  height font-height}}
-            (-> text-entity :characters (get-in [(dec line) column]))
-            width (if (== 0 width) font-width width)
-            rects-entity (i/assoc rects-entity 0 (-> rect-entity
-                                                     (t/color [0 0 0 0.5])
-                                                     (t/translate left top)
-                                                     (t/scale width height)))]
-        (c/render game (-> rects-entity
-                           (t/project game-width game-height)
-                           (t/translate 0 0)))
-        (c/render game (-> text-entity
-                           (t/project game-width game-height)
-                           (t/translate 0 0))))))
+      (c/render game (-> text-entity
+                         (t/project game-width game-height)
+                         (t/camera camera)))))
   ;; return the game map
   game)
 
