@@ -87,3 +87,15 @@
         (DynCall/dcReset vm)
         (DynCall/dcCallInt vm get-tab-size*)))))
 
+;; https://vim.fandom.com/wiki/Mapping_keys_in_Vim_-_Tutorial_%28Part_2%29
+
+(def keyword->name
+  {:backspace "<BS>"
+   :tab "<Tab>"
+   :enter "<Enter>"
+   :escape "<Esc>"
+   :up "<Up>"
+   :down "<Down>"
+   :left "<Left>"
+   :right "<Right>"})
+

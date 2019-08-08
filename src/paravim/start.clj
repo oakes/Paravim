@@ -2,7 +2,7 @@
   (:require [paravim.core :as c]
             [paravim.vim :as v]
             [play-cljc.gl.core :as pc])
-  (:import  [org.lwjgl.glfw GLFW Callbacks GLFWCursorPosCallbackI GLFWKeyCallbackI]
+  (:import  [org.lwjgl.glfw GLFW Callbacks GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWCharCallbackI]
             [org.lwjgl.opengl GL GL41]
             [org.lwjgl.system MemoryUtil]
             [javax.sound.sampled AudioSystem Clip])
@@ -36,13 +36,14 @@
 
 (defn keycode->keyword [keycode]
   (condp = keycode
+    GLFW/GLFW_KEY_BACKSPACE :backspace
+    GLFW/GLFW_KEY_TAB :tab
+    GLFW/GLFW_KEY_ENTER :enter
+    GLFW/GLFW_KEY_ESCAPE :escape
+    GLFW/GLFW_KEY_UP :up
+    GLFW/GLFW_KEY_DOWN :down
     GLFW/GLFW_KEY_LEFT :left
     GLFW/GLFW_KEY_RIGHT :right
-    GLFW/GLFW_KEY_UP :up
-    GLFW/GLFW_KEY_H :h
-    GLFW/GLFW_KEY_J :j
-    GLFW/GLFW_KEY_K :k
-    GLFW/GLFW_KEY_L :l
     nil))
 
 (defn listen-for-keys [window vim game]
@@ -50,14 +51,17 @@
     (reify GLFWKeyCallbackI
       (invoke [this window keycode scancode action mods]
         (when-let [k (keycode->keyword keycode)]
-          (when (and (#{:h :j :k :l} k)
-                     (= action GLFW/GLFW_PRESS))
-            (v/input vim (name k))
-            (swap! c/*state c/update-cursor game (v/get-cursor-line vim) (v/get-cursor-column vim)))
-          (condp = action
-            GLFW/GLFW_PRESS (swap! c/*state update :pressed-keys conj k)
-            GLFW/GLFW_RELEASE (swap! c/*state update :pressed-keys disj k)
-            nil))))))
+          (when (= action GLFW/GLFW_PRESS)
+            (when-let [key-name (v/keyword->name k)]
+              (v/input vim key-name)
+              (swap! c/*state c/update-cursor game (v/get-cursor-line vim) (v/get-cursor-column vim)))))))))
+
+(defn listen-for-chars [window vim game]
+  (GLFW/glfwSetCharCallback window
+    (reify GLFWCharCallbackI
+      (invoke [this window codepoint]
+        (v/input vim (str (char codepoint)))
+        (swap! c/*state c/update-cursor game (v/get-cursor-line vim) (v/get-cursor-column vim))))))
 
 (defn -main [& args]
   (when-not (GLFW/glfwInit)
@@ -85,7 +89,8 @@
           (dotimes [i (v/get-line-count buf)]
             (swap! c/*state update :lines conj
                    (v/get-line buf (inc i))))
-          (listen-for-keys window vim initial-game))
+          (listen-for-keys window vim initial-game)
+          (listen-for-chars window vim initial-game))
         (c/init initial-game)
         (loop [game initial-game]
           (when-not (GLFW/glfwWindowShouldClose window)

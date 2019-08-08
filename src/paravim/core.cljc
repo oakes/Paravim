@@ -16,7 +16,6 @@
 
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
-                       :pressed-keys #{}
                        :camera (t/translate orig-camera 0 0)
                        :camera-y 0
                        :lines []}))
