@@ -45,7 +45,7 @@
     GLFW/GLFW_KEY_L :l
     nil))
 
-(defn listen-for-keys [window vim]
+(defn listen-for-keys [window vim game]
   (GLFW/glfwSetKeyCallback window
     (reify GLFWKeyCallbackI
       (invoke [this window keycode scancode action mods]
@@ -53,7 +53,7 @@
           (when (and (#{:h :j :k :l} k)
                      (= action GLFW/GLFW_PRESS))
             (v/input vim (name k))
-            (swap! c/*state c/update-cursor (v/get-cursor-line vim) (v/get-cursor-column vim)))
+            (swap! c/*state c/update-cursor game (v/get-cursor-line vim) (v/get-cursor-column vim)))
           (condp = action
             GLFW/GLFW_PRESS (swap! c/*state update :pressed-keys conj k)
             GLFW/GLFW_RELEASE (swap! c/*state update :pressed-keys disj k)
@@ -75,16 +75,16 @@
       (GLFW/glfwShowWindow window)
       (GL/createCapabilities)
       (listen-for-mouse window)
-      (let [vim (doto (v/->vim)
-                  v/init)
-            buf (v/open-buffer vim "resources/public/index.html")]
-        (dotimes [i (v/get-line-count buf)]
-          (swap! c/*state update :lines conj
-                 (v/get-line buf (inc i))))
-        (listen-for-keys window vim))
       (let [initial-game (assoc (pc/->game window)
                                 :delta-time 0
                                 :total-time 0)]
+        (let [vim (doto (v/->vim)
+                    v/init)
+              buf (v/open-buffer vim "resources/public/index.html")]
+          (dotimes [i (v/get-line-count buf)]
+            (swap! c/*state update :lines conj
+                   (v/get-line buf (inc i))))
+          (listen-for-keys window vim initial-game))
         (c/init initial-game)
         (loop [game initial-game]
           (when-not (GLFW/glfwWindowShouldClose window)

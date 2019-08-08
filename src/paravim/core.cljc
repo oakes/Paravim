@@ -12,10 +12,13 @@
             #?(:clj [paravim.text :refer [load-font-clj]]))
   #?(:cljs (:require-macros [paravim.text :refer [load-font-cljs]])))
 
+(def orig-camera (e/->camera true))
+
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
                        :pressed-keys #{}
-                       :camera (e/->camera true)
+                       :camera (t/translate orig-camera 0 0)
+                       :camera-y 0
                        :lines []}))
 
 (defn assoc-chars [text-entity font-entity lines]
@@ -27,7 +30,7 @@
           :let [ch (get-in lines [line-num char-num])]]
       [line-num char-num (chars/crop-char font-entity ch)])))
 
-(defn update-cursor [{:keys [text-entity rect-entity baked-font] :as state} line column]
+(defn update-cursor [{:keys [text-entity rect-entity baked-font] :as state} game line column]
   (if (and text-entity rect-entity baked-font)
     (let [font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :w)
           font-height (:font-height baked-font)
@@ -42,7 +45,22 @@
           (assoc :cursor-entity (-> rect-entity
                                     (t/color [0 0 0 0.5])
                                     (t/translate left top)
-                                    (t/scale width height)))))
+                                    (t/scale width height)))
+          (as-> state
+                (let [{:keys [camera camera-y]} state
+                      cursor-bottom (+ top font-height)
+                      game-height (utils/get-height game)
+                      camera-bottom (+ camera-y game-height)
+                      camera-y (cond
+                                 (< top camera-y)
+                                 top
+                                 (> cursor-bottom camera-bottom)
+                                 (- cursor-bottom game-height)
+                                 :else
+                                 camera-y)]
+                  (assoc state
+                    :camera (t/translate orig-camera 0 camera-y)
+                    :camera-y camera-y)))))
     state))
 
 (defn init [game]
@@ -65,7 +83,7 @@
                    :text-entity (assoc-chars text-entity font-entity (:lines @*state))
                    :rect-entity rect-entity
                    :rects-entity rects-entity)
-                 (update-cursor 1 0))))))))
+                 (update-cursor game 1 0))))))))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
