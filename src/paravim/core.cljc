@@ -43,7 +43,7 @@
           width (if (== 0 width) font-width width)]
       (-> state
           (assoc :cursor-entity (-> rect-entity
-                                    (t/color [0 0 0 0.5])
+                                    (t/color [(/ 112 255) (/ 128 255) (/ 144 255) 0.9])
                                     (t/translate left top)
                                     (t/scale width height)))
           (as-> state
@@ -70,7 +70,7 @@
   ;; load font
   (#?(:clj load-font-clj :cljs load-font-cljs)
      (fn [{:keys [data]} baked-font]
-       (let [font-entity (text/->font-entity game data baked-font)
+       (let [font-entity (t/color (text/->font-entity game data baked-font) [1 1 1 1])
              text-entity (c/compile game (i/->instanced-entity font-entity))
              rect-entity (e/->entity game primitives/rect)
              rects-entity (c/compile game (i/->instanced-entity rect-entity))]
@@ -87,7 +87,7 @@
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
-   :clear {:color [(/ 173 255) (/ 216 255) (/ 230 255) 1] :depth 1}})
+   :clear {:color [(/ 0 255) (/ 16 255) (/ 64 255) 0.9] :depth 1}})
 
 (defn run [game]
   (let [game-width (utils/get-width game)

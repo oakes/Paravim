@@ -68,7 +68,8 @@
   (GLFW/glfwWindowHint GLFW/GLFW_CONTEXT_VERSION_MINOR 1)
   (GLFW/glfwWindowHint GLFW/GLFW_OPENGL_FORWARD_COMPAT GL41/GL_TRUE)
   (GLFW/glfwWindowHint GLFW/GLFW_OPENGL_PROFILE GLFW/GLFW_OPENGL_CORE_PROFILE)
-  (if-let [window (GLFW/glfwCreateWindow 800 600 "Hello, world!" 0 0)]
+  (GLFW/glfwWindowHint GLFW/GLFW_TRANSPARENT_FRAMEBUFFER GLFW/GLFW_TRUE)
+  (if-let [window (GLFW/glfwCreateWindow 1024 768 "Paravim" 0 0)]
     (do
       (GLFW/glfwMakeContextCurrent window)
       (GLFW/glfwSwapInterval 1)
