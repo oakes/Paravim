@@ -17,6 +17,7 @@
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
                        :camera (t/translate orig-camera 0 0)
+                       :camera-x 0
                        :camera-y 0
                        :lines []}))
 
@@ -46,10 +47,20 @@
                                     (t/translate left top)
                                     (t/scale width height)))
           (as-> state
-                (let [{:keys [camera camera-y]} state
+                (let [{:keys [camera camera-x camera-y]} state
                       cursor-bottom (+ top font-height)
+                      cursor-right (+ left width)
+                      game-width (utils/get-width game)
                       game-height (utils/get-height game)
                       camera-bottom (+ camera-y game-height)
+                      camera-right (+ camera-x game-width)
+                      camera-x (cond
+                                 (< left camera-x)
+                                 left
+                                 (> cursor-right camera-right)
+                                 (- cursor-right game-width)
+                                 :else
+                                 camera-x)
                       camera-y (cond
                                  (< top camera-y)
                                  top
@@ -58,7 +69,8 @@
                                  :else
                                  camera-y)]
                   (assoc state
-                    :camera (t/translate orig-camera 0 camera-y)
+                    :camera (t/translate orig-camera camera-x camera-y)
+                    :camera-x camera-x
                     :camera-y camera-y)))))
     state))
 
