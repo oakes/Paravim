@@ -100,7 +100,7 @@
   {:viewport {:x 0 :y 0 :width 0 :height 0}
    :clear {:color [(/ 0 255) (/ 16 255) (/ 64 255) 0.9] :depth 1}})
 
-(defn run [game]
+(defn tick [game]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
         {:keys [text-entity rects-entity camera cursor-entity]} @*state]
