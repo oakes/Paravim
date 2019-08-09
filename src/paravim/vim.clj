@@ -108,6 +108,7 @@
 (defprotocol IVim
   (init [this])
   (open-buffer [this file-name])
+  (get-current-buffer [this])
   (get-line [this buffer-ptr line-num])
   (get-line-count [this buffer-ptr])
   (set-on-buffer-update [this callback])
@@ -124,6 +125,7 @@
   (let [lib (Library/loadNative "libvim")
         init* (.getFunctionAddress lib "vimInit")
         open-buffer* (.getFunctionAddress lib "vimBufferOpen")
+        get-current-buffer* (.getFunctionAddress lib "vimBufferGetCurrent")
         get-line* (.getFunctionAddress lib "vimBufferGetLine")
         get-line-count* (.getFunctionAddress lib "vimBufferGetLineCount")
         set-on-buffer-update* (.getFunctionAddress lib "vimSetDestructuredBufferUpdateCallback")
@@ -147,6 +149,9 @@
         (DynCall/dcArgLong vm 1)
         (DynCall/dcArgInt vm 0)
         (DynCall/dcCallPointer vm open-buffer*))
+      (get-current-buffer [this]
+        (DynCall/dcReset vm)
+        (DynCall/dcCallPointer vm get-current-buffer*))
       (get-line [this buffer-ptr line-num]
         (DynCall/dcReset vm)
         (DynCall/dcArgPointer vm buffer-ptr)
