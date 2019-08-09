@@ -18,8 +18,7 @@
                        :mouse-y 0
                        :camera (t/translate orig-camera 0 0)
                        :camera-x 0
-                       :camera-y 0
-                       :lines []}))
+                       :camera-y 0}))
 
 (defn assoc-chars [text-entity font-entity lines]
   (reduce
@@ -74,7 +73,7 @@
                     :camera-y camera-y)))))
     state))
 
-(defn init [game]
+(defn init [game lines]
   ;; allow transparency in images
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
@@ -91,7 +90,7 @@
                  (assoc
                    :baked-font baked-font
                    :font-entity font-entity
-                   :text-entity (assoc-chars text-entity font-entity (:lines @*state))
+                   :text-entity (assoc-chars text-entity font-entity lines)
                    :rect-entity rect-entity
                    :rects-entity rects-entity)
                  (update-cursor game 1 0))))))))

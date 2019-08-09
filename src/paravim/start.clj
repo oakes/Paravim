@@ -82,16 +82,15 @@
       (listen-for-mouse window)
       (let [initial-game (assoc (pc/->game window)
                                 :delta-time 0
-                                :total-time 0)]
-        (let [vim (doto (v/->vim)
-                    v/init)
-              buf (v/open-buffer vim "resources/public/index.html")]
-          (dotimes [i (v/get-line-count buf)]
-            (swap! c/*state update :lines conj
-                   (v/get-line buf (inc i))))
-          (listen-for-keys window vim initial-game)
-          (listen-for-chars window vim initial-game))
-        (c/init initial-game)
+                                :total-time 0)
+            vim (doto (v/->vim)
+                  v/init)
+            buf (v/open-buffer vim "resources/public/index.html")]
+        (listen-for-keys window vim initial-game)
+        (listen-for-chars window vim initial-game)
+        (c/init initial-game
+          (vec (for [i (range (v/get-line-count buf))]
+                 (v/get-line buf (inc i)))))
         (loop [game initial-game]
           (when-not (GLFW/glfwWindowShouldClose window)
             (let [ts (GLFW/glfwGetTime)
