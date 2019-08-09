@@ -28,9 +28,8 @@
           :let [ch (get-in lines [line-num char-num])]]
       [line-num char-num (chars/crop-char font-entity ch)])))
 
-(defn replace-lines [{:keys [characters] :as text-entity} font-entity new-lines start-line line-count-change]
-  (let [first-line (dec start-line)
-        chars-before (subvec characters 0 first-line)
+(defn replace-lines [{:keys [characters] :as text-entity} font-entity new-lines first-line line-count-change]
+  (let [chars-before (subvec characters 0 first-line)
         lines-to-remove (if (neg? line-count-change) (* -1 line-count-change) 0)
         lines-to-add (if (neg? line-count-change) 0 line-count-change)
         chars-after (subvec characters (+ (count new-lines) first-line lines-to-remove))
@@ -113,9 +112,9 @@
      :camera-y 0
      :lines lines}))
 
-(defn modify-buffer [{:keys [base-font-entity] :as state} game buffer-ptr lines start-line line-count-change]
+(defn modify-buffer [{:keys [base-font-entity] :as state} game buffer-ptr lines first-line line-count-change]
   (update-in state [:buffers buffer-ptr :text-entity]
-    replace-lines base-font-entity lines start-line line-count-change))
+    replace-lines base-font-entity lines first-line line-count-change))
 
 (defn init [game callback]
   ;; allow transparency in images

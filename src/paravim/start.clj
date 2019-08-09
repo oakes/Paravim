@@ -110,9 +110,12 @@
         (v/set-on-buffer-update vim (fn [buffer-ptr start-line end-line line-count-change]
                                       (swap! c/*state
                                         (fn [state]
-                                          (let [lines (vec (for [i (range (dec start-line) (dec end-line))]
+                                          (let [first-line (dec start-line)
+                                                last-line (+ first-line (- end-line start-line))
+                                                last-line (min last-line (v/get-line-count vim buffer-ptr))
+                                                lines (vec (for [i (range first-line last-line)]
                                                              (v/get-line vim buffer-ptr (inc i))))]
-                                            (c/modify-buffer state initial-game buffer-ptr lines start-line line-count-change))))))
+                                            (c/modify-buffer state initial-game buffer-ptr lines first-line line-count-change))))))
         (c/init initial-game (fn []
                                (v/open-buffer vim "resources/public/index.html")))
         (loop [game initial-game]
