@@ -89,8 +89,8 @@
         (listen-for-keys window vim initial-game)
         (listen-for-chars window vim initial-game)
         (c/init initial-game
-          (vec (for [i (range (v/get-line-count buf))]
-                 (v/get-line buf (inc i)))))
+          (vec (for [i (range (v/get-line-count vim buf))]
+                 (v/get-line vim buf (inc i)))))
         (loop [game initial-game]
           (when-not (GLFW/glfwWindowShouldClose window)
             (let [ts (GLFW/glfwGetTime)

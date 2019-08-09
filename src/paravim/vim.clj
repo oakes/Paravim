@@ -2,25 +2,6 @@
   (:import [org.lwjgl.system Library CallbackI$V MemoryUtil]
            [org.lwjgl.system.dyncall DynCall DynCallback]))
 
-(defprotocol IBuffer
-  (get-line [this line-num])
-  (get-line-count [this]))
-
-(defn ->buffer [lib vm buffer-ptr]
-  (let [get-line* (.getFunctionAddress lib "vimBufferGetLine")
-        get-line-count* (.getFunctionAddress lib "vimBufferGetLineCount")]
-    (reify IBuffer
-      (get-line [this line-num]
-        (DynCall/dcReset vm)
-        (DynCall/dcArgPointer vm buffer-ptr)
-        (DynCall/dcArgLong vm line-num)
-        (-> (DynCall/dcCallPointer vm get-line*)
-            MemoryUtil/memUTF8))
-      (get-line-count [this]
-        (DynCall/dcReset vm)
-        (DynCall/dcArgPointer vm buffer-ptr)
-        (DynCall/dcCallLong vm get-line-count*)))))
-
 (def auto-events
   '[EVENT_BUFADD,               ;; after adding a buffer to the buffer list
     EVENT_BUFDELETE,            ;; deleting a buffer from the buffer list
@@ -127,6 +108,8 @@
 (defprotocol IVim
   (init [this])
   (open-buffer [this file-name])
+  (get-line [this buffer-ptr line-num])
+  (get-line-count [this buffer-ptr])
   (set-on-buffer-update [this callback])
   (set-on-auto-command [this callback])
   (get-cursor-column [this])
@@ -141,6 +124,8 @@
   (let [lib (Library/loadNative "libvim")
         init* (.getFunctionAddress lib "vimInit")
         open-buffer* (.getFunctionAddress lib "vimBufferOpen")
+        get-line* (.getFunctionAddress lib "vimBufferGetLine")
+        get-line-count* (.getFunctionAddress lib "vimBufferGetLineCount")
         set-on-buffer-update* (.getFunctionAddress lib "vimSetDestructuredBufferUpdateCallback")
         set-on-auto-command* (.getFunctionAddress lib "vimSetAutoCommandCallback")
         get-cursor-column* (.getFunctionAddress lib "vimCursorGetColumn")
@@ -161,17 +146,27 @@
         (DynCall/dcArgPointer vm (-> file-name MemoryUtil/memUTF8 MemoryUtil/memAddress))
         (DynCall/dcArgLong vm 1)
         (DynCall/dcArgInt vm 0)
-        (->buffer lib vm (DynCall/dcCallPointer vm open-buffer*)))
+        (DynCall/dcCallPointer vm open-buffer*))
+      (get-line [this buffer-ptr line-num]
+        (DynCall/dcReset vm)
+        (DynCall/dcArgPointer vm buffer-ptr)
+        (DynCall/dcArgLong vm line-num)
+        (-> (DynCall/dcCallPointer vm get-line*)
+            MemoryUtil/memUTF8))
+      (get-line-count [this buffer-ptr]
+        (DynCall/dcReset vm)
+        (DynCall/dcArgPointer vm buffer-ptr)
+        (DynCall/dcCallLong vm get-line-count*))
       (set-on-buffer-update [this callback]
         (DynCall/dcReset vm)
         (DynCall/dcArgPointer vm (MemoryUtil/memAddressSafe
                                    (reify CallbackI$V
                                      (callback [this args]
-                                       (let [buf (DynCallback/dcbArgPointer args)
+                                       (let [buffer-ptr (DynCallback/dcbArgPointer args)
                                              start-line (DynCallback/dcbArgLong args)
                                              end-line (DynCallback/dcbArgLong args)
                                              line-count (DynCallback/dcbArgLong args)]
-                                         (callback start-line end-line line-count)))
+                                         (callback buffer-ptr start-line end-line line-count)))
                                      (getSignature [this]
                                        "(plll)v"))))
         (DynCall/dcCallVoid vm set-on-buffer-update*))
@@ -181,8 +176,8 @@
                                    (reify CallbackI$V
                                      (callback [this args]
                                        (let [event (DynCallback/dcbArgInt args)
-                                             buf (DynCallback/dcbArgPointer args)]
-                                         (callback (auto-events event))))
+                                             buffer-ptr (DynCallback/dcbArgPointer args)]
+                                         (callback buffer-ptr (auto-events event))))
                                      (getSignature [this]
                                        "(ip)v"))))
         (DynCall/dcCallVoid vm set-on-auto-command*))
@@ -205,8 +200,9 @@
         (DynCall/dcArgPointer vm (MemoryUtil/memAddressSafe
                                    (reify CallbackI$V
                                      (callback [this args]
-                                       (callback (DynCallback/dcbArgPointer args)
-                                                 (DynCallback/dcbArgBool args)))
+                                       (let [buffer-ptr (DynCallback/dcbArgPointer args)
+                                             force? (DynCallback/dcbArgBool args)]
+                                         (callback buffer-ptr force?)))
                                      (getSignature [this]
                                        "(pb)v"))))
         (DynCall/dcCallVoid vm set-on-quit*))
