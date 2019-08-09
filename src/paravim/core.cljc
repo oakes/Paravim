@@ -28,20 +28,36 @@
           :let [ch (get-in lines [line-num char-num])]]
       [line-num char-num (chars/crop-char font-entity ch)])))
 
-(defn replace-lines [{:keys [lines] :as buffer} text-entity font-entity new-lines start-line line-count-change]
+(defn replace-lines [{:keys [characters] :as text-entity} font-entity new-lines start-line line-count-change]
   (let [first-line (dec start-line)
-        lines-before (subvec lines 0 first-line)
+        chars-before (subvec characters 0 first-line)
         lines-to-remove (if (neg? line-count-change) (* -1 line-count-change) 0)
         lines-to-add (if (neg? line-count-change) 0 line-count-change)
-        lines-after (subvec lines (+ (count new-lines) first-line lines-to-remove))
-        new-lines (into new-lines (vec (repeat lines-to-add [])))
-        lines (->> lines-after
-                   (into new-lines)
-                   (into lines-before)
-                   (into []))]
-    (assoc buffer
-      :text-entity (assoc-lines text-entity font-entity lines)
-      :lines lines)))
+        chars-after (subvec characters (+ (count new-lines) first-line lines-to-remove))
+        new-chars (mapv
+                    (fn [line]
+                      (mapv
+                        (fn [ch]
+                          (chars/crop-char font-entity ch))
+                        line))
+                    new-lines)
+        new-chars (into new-chars (vec (repeat lines-to-add [])))
+        characters (->> chars-after
+                        (into new-chars)
+                        (into chars-before)
+                        (into []))
+        text-entity (assoc text-entity :characters characters)
+        text-entity (reduce
+                      (fn [entity line-num]
+                        (reduce-kv
+                          (fn [entity char-num char-entity]
+                            (chars/assoc-char entity line-num char-num char-entity))
+                          entity
+                          (nth characters line-num)))
+                      text-entity
+                      (range first-line (count characters)))
+        text-entity (i/resize text-entity (apply + (map count characters)))]
+    text-entity))
 
 (defn update-cursor [{:keys [font-width font-height base-rect-entity] :as state} game buffer-ptr line column]
   (update-in state [:buffers buffer-ptr]
@@ -97,9 +113,9 @@
      :camera-y 0
      :lines lines}))
 
-(defn modify-buffer [{:keys [base-font-entity base-text-entity] :as state} game buffer-ptr lines start-line line-count-change]
-  (update-in state [:buffers buffer-ptr]
-    replace-lines base-text-entity base-font-entity lines start-line line-count-change))
+(defn modify-buffer [{:keys [base-font-entity] :as state} game buffer-ptr lines start-line line-count-change]
+  (update-in state [:buffers buffer-ptr :text-entity]
+    replace-lines base-font-entity lines start-line line-count-change))
 
 (defn init [game callback]
   ;; allow transparency in images
