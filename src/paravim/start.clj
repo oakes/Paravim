@@ -100,12 +100,19 @@
                                            (-> state
                                                (assoc :current-buffer buffer-ptr)
                                                (cond-> (nil? (get-in state [:buffers buffer-ptr]))
-                                                       (c/assoc-buffer initial-game buffer-ptr
-                                                         (vec (for [i (range (v/get-line-count vim buffer-ptr))]
-                                                                (v/get-line vim buffer-ptr (inc i))))
-                                                         (v/get-cursor-line vim)
-                                                         (v/get-cursor-column vim))))))
+                                                       (-> (c/assoc-buffer buffer-ptr
+                                                             (vec (for [i (range (v/get-line-count vim buffer-ptr))]
+                                                                    (v/get-line vim buffer-ptr (inc i)))))
+                                                           (c/update-cursor initial-game buffer-ptr
+                                                             (v/get-cursor-line vim)
+                                                             (v/get-cursor-column vim)))))))
                                        nil)))
+        (v/set-on-buffer-update vim (fn [buffer-ptr start-line end-line line-count-change]
+                                      (swap! c/*state
+                                        (fn [state]
+                                          (let [lines (vec (for [i (range (dec start-line) (dec end-line))]
+                                                             (v/get-line vim buffer-ptr (inc i))))]
+                                            (c/modify-buffer state initial-game buffer-ptr lines start-line line-count-change))))))
         (c/init initial-game (fn []
                                (v/open-buffer vim "resources/public/index.html")))
         (loop [game initial-game]
