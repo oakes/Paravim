@@ -46,22 +46,20 @@
     GLFW/GLFW_KEY_RIGHT :right
     nil))
 
-(defn listen-for-keys [window vim game]
+(defn listen-for-keys [window callback]
   (GLFW/glfwSetKeyCallback window
     (reify GLFWKeyCallbackI
       (invoke [this window keycode scancode action mods]
         (when-let [k (keycode->keyword keycode)]
           (when (= action GLFW/GLFW_PRESS)
             (when-let [key-name (v/keyword->name k)]
-              (v/input vim key-name)
-              (swap! c/*state c/update-cursor game (v/get-cursor-line vim) (v/get-cursor-column vim)))))))))
+              (callback key-name))))))))
 
-(defn listen-for-chars [window vim game]
+(defn listen-for-chars [window callback]
   (GLFW/glfwSetCharCallback window
     (reify GLFWCharCallbackI
       (invoke [this window codepoint]
-        (v/input vim (str (char codepoint)))
-        (swap! c/*state c/update-cursor game (v/get-cursor-line vim) (v/get-cursor-column vim))))))
+        (callback (str (char codepoint)))))))
 
 (defn -main [& args]
   (when-not (GLFW/glfwInit)
@@ -85,10 +83,17 @@
                                 :total-time 0)
             vim (doto (v/->vim)
                   v/init)
-            buf (v/open-buffer vim "resources/public/index.html")]
-        (listen-for-keys window vim initial-game)
-        (listen-for-chars window vim initial-game)
-        (c/init initial-game
+            buf (v/open-buffer vim "resources/public/index.html")
+            on-input (fn [s]
+                       (v/input vim s)
+                       (swap! c/*state c/update-cursor
+                         initial-game
+                         (v/get-current-buffer vim)
+                         (v/get-cursor-line vim)
+                         (v/get-cursor-column vim)))]
+        (listen-for-keys window on-input)
+        (listen-for-chars window on-input)
+        (c/init initial-game buf
           (vec (for [i (range (v/get-line-count vim buf))]
                  (v/get-line vim buf (inc i)))))
         (loop [game initial-game]
