@@ -71,15 +71,17 @@
                       :camera-x camera-x
                       :camera-y camera-y))))))))
 
-(defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity] :as state} buffer-ptr lines]
-  (assoc-in state [:buffers buffer-ptr]
-    {:text-entity (assoc-chars base-text-entity base-font-entity lines)
-     :rects-entity base-rects-entity
-     :camera (t/translate orig-camera 0 0)
-     :camera-x 0
-     :camera-y 0}))
+(defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity] :as state} game buffer-ptr lines line column]
+  (-> state
+      (assoc-in [:buffers buffer-ptr]
+        {:text-entity (assoc-chars base-text-entity base-font-entity lines)
+         :rects-entity base-rects-entity
+         :camera (t/translate orig-camera 0 0)
+         :camera-x 0
+         :camera-y 0})
+      (update-cursor game buffer-ptr line column)))
 
-(defn init [game buffer-ptr lines]
+(defn init [game callback]
   ;; allow transparency in images
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
@@ -97,12 +99,7 @@
            :base-text-entity text-entity
            :base-rect-entity rect-entity
            :base-rects-entity rects-entity)
-         (swap! *state
-           (fn [state]
-             (-> state
-                 (assoc :current-buffer buffer-ptr)
-                 (assoc-buffer buffer-ptr lines)
-                 (update-cursor game buffer-ptr 1 0))))))))
+         (callback)))))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}

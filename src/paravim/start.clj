@@ -83,7 +83,6 @@
                                 :total-time 0)
             vim (doto (v/->vim)
                   v/init)
-            buf (v/open-buffer vim "resources/public/index.html")
             on-input (fn [s]
                        (v/input vim s)
                        (swap! c/*state c/update-cursor
@@ -93,9 +92,22 @@
                          (v/get-cursor-column vim)))]
         (listen-for-keys window on-input)
         (listen-for-chars window on-input)
-        (c/init initial-game buf
-          (vec (for [i (range (v/get-line-count vim buf))]
-                 (v/get-line vim buf (inc i)))))
+        (v/set-on-auto-command vim (fn [buffer-ptr event]
+                                     (case event
+                                       EVENT_BUFENTER
+                                       (swap! c/*state
+                                         (fn [state]
+                                           (-> state
+                                               (assoc :current-buffer buffer-ptr)
+                                               (cond-> (nil? (get-in state [:buffers buffer-ptr]))
+                                                       (c/assoc-buffer initial-game buffer-ptr
+                                                         (vec (for [i (range (v/get-line-count vim buffer-ptr))]
+                                                                (v/get-line vim buffer-ptr (inc i))))
+                                                         (v/get-cursor-line vim)
+                                                         (v/get-cursor-column vim))))))
+                                       nil)))
+        (c/init initial-game (fn []
+                               (v/open-buffer vim "resources/public/index.html")))
         (loop [game initial-game]
           (when-not (GLFW/glfwWindowShouldClose window)
             (let [ts (GLFW/glfwGetTime)
