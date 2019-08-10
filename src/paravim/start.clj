@@ -111,8 +111,7 @@
                                       (swap! c/*state
                                         (fn [state]
                                           (let [first-line (dec start-line)
-                                                last-line (+ first-line (- end-line start-line))
-                                                last-line (min last-line (v/get-line-count vim buffer-ptr))
+                                                last-line (+ (dec end-line) line-count-change)
                                                 lines (vec (for [i (range first-line last-line)]
                                                              (v/get-line vim buffer-ptr (inc i))))]
                                             (c/modify-buffer state initial-game buffer-ptr lines first-line line-count-change))))))

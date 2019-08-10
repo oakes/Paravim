@@ -30,9 +30,10 @@
 
 (defn replace-lines [{:keys [characters] :as text-entity} font-entity new-lines first-line line-count-change]
   (let [chars-before (subvec characters 0 first-line)
-        lines-to-remove (if (neg? line-count-change) (* -1 line-count-change) 0)
-        lines-to-add (if (neg? line-count-change) 0 line-count-change)
-        chars-after (subvec characters (+ (count new-lines) first-line lines-to-remove))
+        lines-to-remove (if (neg? line-count-change)
+                          (* -1 line-count-change)
+                          (- (count new-lines) line-count-change))
+        chars-after (subvec characters (+ first-line lines-to-remove))
         new-chars (mapv
                     (fn [line]
                       (mapv
@@ -40,7 +41,6 @@
                           (chars/crop-char font-entity ch))
                         line))
                     new-lines)
-        new-chars (into new-chars (vec (repeat lines-to-add [])))
         characters (->> chars-after
                         (into new-chars)
                         (into chars-before)
