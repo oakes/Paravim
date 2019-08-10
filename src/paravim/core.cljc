@@ -43,12 +43,18 @@
       (let [chars-before (subvec characters 0 first-line)
             lines-to-remove (if (neg? line-count-change)
                               (* -1 line-count-change)
-                              (- (count new-lines) line-count-change))
+                              0)
+            lines-to-add (vec (repeat line-count-change []))
             chars-after (subvec characters (+ first-line lines-to-remove))
             new-characters (->> chars-after
-                                (into new-chars)
+                                (into lines-to-add)
                                 (into chars-before)
-                                (into []))]
+                                (into []))
+            new-characters (reduce
+                             (fn [new-characters i]
+                               (assoc new-characters (+ first-line i) (nth new-chars i)))
+                             new-characters
+                             (range (count new-chars)))]
         (reduce
           (fn [entity line-num]
             (if-let [char-entity (get new-characters line-num)]
