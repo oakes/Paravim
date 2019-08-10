@@ -20,13 +20,11 @@
                        :buffers {}}))
 
 (defn assoc-lines [text-entity font-entity lines]
-  (reduce
-    (partial apply chars/assoc-char)
+  (reduce-kv
+    (fn [entity line-num line]
+      (chars/assoc-line entity line-num (mapv #(chars/crop-char font-entity %) line)))
     text-entity
-    (for [line-num (range (count lines))
-          char-num (range (count (nth lines line-num)))
-          :let [ch (get-in lines [line-num char-num])]]
-      [line-num char-num (chars/crop-char font-entity ch)])))
+    lines))
 
 (defn replace-lines [{:keys [characters] :as text-entity} font-entity new-lines first-line line-count-change]
   (let [chars-before (subvec characters 0 first-line)
@@ -44,19 +42,14 @@
         characters (->> chars-after
                         (into new-chars)
                         (into chars-before)
-                        (into []))
-        text-entity (assoc text-entity :characters characters)
-        text-entity (reduce
-                      (fn [entity line-num]
-                        (reduce-kv
-                          (fn [entity char-num char-entity]
-                            (chars/assoc-char entity line-num char-num char-entity))
-                          entity
-                          (nth characters line-num)))
-                      text-entity
-                      (range first-line (count characters)))
-        text-entity (i/resize text-entity (apply + (map count characters)))]
-    text-entity))
+                        (into []))]
+    (if (= 0 line-count-change)
+      (chars/assoc-line text-entity first-line (first new-chars))
+      (reduce
+        (fn [entity line-num]
+          (chars/assoc-line entity line-num (nth characters line-num)))
+        text-entity
+        (range first-line (count characters))))))
 
 (defn update-cursor [{:keys [font-width font-height base-rect-entity] :as state} game buffer-ptr line column]
   (update-in state [:buffers buffer-ptr]
