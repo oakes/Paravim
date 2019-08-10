@@ -71,7 +71,18 @@
          next-char (get line index)]
      (-> text-entity
          (assoc-in [:characters line-num] line)
-         (i/dissoc (+ index prev-count))
-         (cond-> next-char
-                 (assoc-char line-num index next-char))))))
+         (i/dissoc (+ index prev-count))))))
+
+(defn dissoc-line [text-entity line-num]
+  (-> (reduce
+        (fn [entity i]
+          (dissoc-char entity line-num 0))
+        text-entity
+        (range (count (get-in text-entity [:characters line-num]))))
+      (update :characters (fn [characters]
+                            (let [v1 (subvec characters 0 line-num)
+                                  v2 (subvec characters (inc line-num))]
+                              (->> v2
+                                   (into v1)
+                                   (into [])))))))
 

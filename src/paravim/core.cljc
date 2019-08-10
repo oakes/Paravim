@@ -27,29 +27,35 @@
     lines))
 
 (defn replace-lines [{:keys [characters] :as text-entity} font-entity new-lines first-line line-count-change]
-  (let [chars-before (subvec characters 0 first-line)
-        lines-to-remove (if (neg? line-count-change)
-                          (* -1 line-count-change)
-                          (- (count new-lines) line-count-change))
-        chars-after (subvec characters (+ first-line lines-to-remove))
-        new-chars (mapv
+  (let [new-chars (mapv
                     (fn [line]
                       (mapv
                         (fn [ch]
                           (chars/crop-char font-entity ch))
                         line))
-                    new-lines)
-        characters (->> chars-after
-                        (into new-chars)
-                        (into chars-before)
-                        (into []))]
+                    new-lines)]
     (if (= 0 line-count-change)
-      (chars/assoc-line text-entity first-line (first new-chars))
-      (reduce
-        (fn [entity line-num]
-          (chars/assoc-line entity line-num (nth characters line-num)))
+      (reduce-kv
+        (fn [entity line-offset char-entities]
+          (chars/assoc-line text-entity (+ first-line line-offset) char-entities))
         text-entity
-        (range first-line (count characters))))))
+        new-chars)
+      (let [chars-before (subvec characters 0 first-line)
+            lines-to-remove (if (neg? line-count-change)
+                              (* -1 line-count-change)
+                              (- (count new-lines) line-count-change))
+            chars-after (subvec characters (+ first-line lines-to-remove))
+            new-characters (->> chars-after
+                                (into new-chars)
+                                (into chars-before)
+                                (into []))]
+        (reduce
+          (fn [entity line-num]
+            (if-let [char-entity (get new-characters line-num)]
+              (chars/assoc-line entity line-num char-entity)
+              (chars/dissoc-line entity (count new-characters))))
+          text-entity
+          (range first-line (max (count new-characters) (count characters))))))))
 
 (defn update-cursor [{:keys [font-width font-height base-rect-entity] :as state} game buffer-ptr line column]
   (update-in state [:buffers buffer-ptr]
