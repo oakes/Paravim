@@ -13,6 +13,7 @@
   #?(:cljs (:require-macros [paravim.text :refer [load-font-cljs]])))
 
 (def orig-camera (e/->camera true))
+(def bg-color [(/ 0 255) (/ 16 255) (/ 64 255) 0.9])
 
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
@@ -86,7 +87,7 @@
                         cursor-bottom (+ top font-height)
                         cursor-right (+ left width)
                         game-width (utils/get-width game)
-                        game-height (utils/get-height game)
+                        game-height (- (utils/get-height game) font-height)
                         camera-bottom (+ camera-y game-height)
                         camera-right (+ camera-x game-width)
                         camera-x (cond
@@ -131,24 +132,26 @@
        (let [font-entity (t/color (text/->font-entity game data baked-font) [1 1 1 1])
              text-entity (c/compile game (i/->instanced-entity font-entity))
              rect-entity (e/->entity game primitives/rect)
-             rects-entity (c/compile game (i/->instanced-entity rect-entity))]
+             rects-entity (c/compile game (i/->instanced-entity rect-entity))
+             command-entity (c/compile game (t/color (e/->entity game primitives/rect) bg-color))]
          (swap! *state assoc
            :font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :w)
            :font-height (:font-height baked-font)
            :base-font-entity font-entity
            :base-text-entity text-entity
            :base-rect-entity rect-entity
-           :base-rects-entity rects-entity)
+           :base-rects-entity rects-entity
+           :command-entity command-entity)
          (callback)))))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
-   :clear {:color [(/ 0 255) (/ 16 255) (/ 64 255) 0.9] :depth 1}})
+   :clear {:color bg-color :depth 1}})
 
 (defn tick [game]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
-        {:keys [current-buffer buffers]} @*state]
+        {:keys [current-buffer buffers command-entity font-height]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
     (when-let [{:keys [rects-entity text-entity camera]} (get buffers current-buffer)]
@@ -157,7 +160,12 @@
                          (t/camera camera)))
       (c/render game (-> text-entity
                          (t/project game-width game-height)
-                         (t/camera camera)))))
+                         (t/camera camera))))
+    (when command-entity
+      (c/render game (-> command-entity
+                         (t/project game-width game-height)
+                         (t/translate 0 (- game-height font-height))
+                         (t/scale game-width font-height)))))
   ;; return the game map
   game)
 
