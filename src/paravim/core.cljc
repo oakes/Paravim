@@ -1,6 +1,7 @@
 (ns paravim.core
   (:require [paravim.utils :as utils]
             [paravim.chars :as chars]
+            [clojure.string :as str]
             [play-cljc.gl.core :as c]
             [play-cljc.transforms :as t]
             [play-cljc.instances :as i]
@@ -110,7 +111,9 @@
                       :camera-y camera-y))))))))
 
 (defn update-command [{:keys [base-text-entity base-font-entity] :as state} text]
-  (assoc state :command-text-entity
+  (assoc state
+    :command-text (some-> text (str/split #" "))
+    :command-text-entity
     (when text
       (chars/assoc-line base-text-entity 0 (mapv #(chars/crop-char base-font-entity %) (str ":" text))))))
 

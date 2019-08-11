@@ -84,7 +84,14 @@
             vim (doto (v/->vim)
                   v/init)
             on-input (fn [s]
-                       (v/input vim s)
+                       (let [{:keys [command-text command-text-entity]} @c/*state]
+                         (if (and command-text-entity (= s "<Tab>"))
+                           (when-let [completion-text (v/get-command-completion vim)]
+                             (when-let [last-part (last command-text)]
+                               (when (> (count completion-text) (count last-part))
+                                 (run! #(v/input vim (str %))
+                                   (subs completion-text (count last-part))))))
+                           (v/input vim s)))
                        (swap! c/*state
                          (fn [state]
                            (-> state
