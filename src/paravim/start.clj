@@ -85,11 +85,15 @@
                   v/init)
             on-input (fn [s]
                        (v/input vim s)
-                       (swap! c/*state c/update-cursor
-                         initial-game
-                         (v/get-current-buffer vim)
-                         (v/get-cursor-line vim)
-                         (v/get-cursor-column vim)))]
+                       (swap! c/*state
+                         (fn [state]
+                           (-> state
+                               (c/update-command (v/get-command-text vim))
+                               (c/update-cursor
+                                 initial-game
+                                 (v/get-current-buffer vim)
+                                 (v/get-cursor-line vim)
+                                 (v/get-cursor-column vim))))))]
         (listen-for-keys window on-input)
         (listen-for-chars window on-input)
         (v/set-on-auto-command vim (fn [buffer-ptr event]

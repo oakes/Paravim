@@ -113,6 +113,7 @@
   (get-line-count [this buffer-ptr])
   (set-on-buffer-update [this callback])
   (set-on-auto-command [this callback])
+  (get-command-text [this])
   (get-cursor-column [this])
   (get-cursor-line [this])
   (input [this input])
@@ -130,6 +131,7 @@
         get-line-count* (.getFunctionAddress lib "vimBufferGetLineCount")
         set-on-buffer-update* (.getFunctionAddress lib "vimSetDestructuredBufferUpdateCallback")
         set-on-auto-command* (.getFunctionAddress lib "vimSetAutoCommandCallback")
+        get-command-text* (.getFunctionAddress lib "vimCommandLineGetText")
         get-cursor-column* (.getFunctionAddress lib "vimCursorGetColumn")
         get-cursor-line* (.getFunctionAddress lib "vimCursorGetLine")
         input* (.getFunctionAddress lib "vimInput")
@@ -186,6 +188,11 @@
                                      (getSignature [this]
                                        "(ip)v"))))
         (DynCall/dcCallVoid vm set-on-auto-command*))
+      (get-command-text [this]
+        (DynCall/dcReset vm)
+        (let [ptr (DynCall/dcCallPointer vm get-command-text*)]
+          (when (> ptr 0)
+            (MemoryUtil/memUTF8 ptr))))
       (get-cursor-column [this]
         (DynCall/dcReset vm)
         (DynCall/dcCallInt vm get-cursor-column*))

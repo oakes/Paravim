@@ -109,6 +109,11 @@
                       :camera-x camera-x
                       :camera-y camera-y))))))))
 
+(defn update-command [{:keys [base-text-entity base-font-entity] :as state} text]
+  (assoc state :command-text-entity
+    (when text
+      (chars/assoc-line base-text-entity 0 (mapv #(chars/crop-char base-font-entity %) (str ":" text))))))
+
 (defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity] :as state} buffer-ptr lines]
   (assoc-in state [:buffers buffer-ptr]
     {:text-entity (assoc-lines base-text-entity base-font-entity lines)
@@ -133,7 +138,7 @@
              text-entity (c/compile game (i/->instanced-entity font-entity))
              rect-entity (e/->entity game primitives/rect)
              rects-entity (c/compile game (i/->instanced-entity rect-entity))
-             command-entity (c/compile game (t/color (e/->entity game primitives/rect) bg-color))]
+             command-bg-entity (c/compile game (t/color (e/->entity game primitives/rect) bg-color))]
          (swap! *state assoc
            :font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :w)
            :font-height (:font-height baked-font)
@@ -141,7 +146,7 @@
            :base-text-entity text-entity
            :base-rect-entity rect-entity
            :base-rects-entity rects-entity
-           :command-entity command-entity)
+           :command-bg-entity command-bg-entity)
          (callback)))))
 
 (def screen-entity
@@ -151,7 +156,7 @@
 (defn tick [game]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
-        {:keys [current-buffer buffers command-entity font-height]} @*state]
+        {:keys [current-buffer buffers command-bg-entity command-text-entity font-height]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
     (when-let [{:keys [rects-entity text-entity camera]} (get buffers current-buffer)]
@@ -161,11 +166,15 @@
       (c/render game (-> text-entity
                          (t/project game-width game-height)
                          (t/camera camera))))
-    (when command-entity
-      (c/render game (-> command-entity
+    (when command-bg-entity
+      (c/render game (-> command-bg-entity
                          (t/project game-width game-height)
                          (t/translate 0 (- game-height font-height))
-                         (t/scale game-width font-height)))))
+                         (t/scale game-width font-height)))
+      (when command-text-entity
+        (c/render game (-> command-text-entity
+                           (t/project game-width game-height)
+                           (t/translate 0 (- game-height font-height)))))))
   ;; return the game map
   game)
 
