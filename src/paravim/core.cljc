@@ -22,36 +22,57 @@
                        :current-buffer nil
                        :buffers {}}))
 
-(def colors {"number" [255 255 0 1]
-             "string" [255 0 0 1]
-             "keyword" [0 0 255 1]})
+(def colors {"number" [1 1 0 1]
+             "string" [1 0 0 1]
+             "keyword" [0 0 1 1]})
+
+(def rainbow-colors [[0 1 1 1] ;; aqua
+                     [1 (/ 165 255) 0 1] ;; orange
+                     [(/ 250 255) (/ 128 255) (/ 114 255) 1] ;; salmon
+                     [1 0 1 1] ;; fuchsia
+                     [0 1 0 1] ;; lime
+                     ])
+
+(defn get-color [class-name depth]
+  (or (colors class-name)
+      (case class-name
+        "delimiter" (nth rainbow-colors (mod depth (count rainbow-colors)))
+        nil)))
 
 (defn assoc-lines
   ([text-entity font-entity lines]
-   (->> (hs/code->hiccup (str/join "\n" lines))
-        (assoc-lines {:entity text-entity :char-entities [] :line-num 0} font-entity nil)
-        :entity))
-  ([{:keys [entity line-num] :as m} font-entity class-name hiccup]
+   (->> (get (hs/code->hiccup (str/join "\n" lines)) 2)
+        (assoc-lines {:entity text-entity
+                      :char-entities [[]]}
+                     font-entity
+                     nil
+                     -1)
+        ((fn [{:keys [entity char-entities]}]
+           (reduce-kv chars/assoc-line
+             entity
+             char-entities)))))
+  ([{:keys [entity] :as m} font-entity class-name depth hiccup]
    (cond
      (vector? hiccup)
      (let [[_ attr-map & children] hiccup
-           class-name (:class attr-map)]
+           class-name (:class attr-map)
+           depth (cond-> depth
+                         (some-> class-name (str/starts-with? "collection"))
+                         inc)]
        (reduce
          (fn [m child]
-           (assoc-lines m font-entity class-name child))
+           (assoc-lines m font-entity class-name depth child))
          m
          children))
      (= "\n" hiccup)
-     (assoc m
-            :char-entities []
-            :line-num (inc line-num)
-            :entity (chars/assoc-line entity line-num (:char-entities m)))
+     (update m :char-entities conj [])
      (string? hiccup)
-     (let [color (colors class-name)
-           char-entity (cond-> font-entity
-                               color (t/color color))
-           char-entities (mapv #(chars/crop-char char-entity %) hiccup)]
-       (update m :char-entities into char-entities)))))
+     (let [color (get-color class-name depth)
+           char-entity (cond-> font-entity color (t/color color))
+           entities (mapv #(chars/crop-char char-entity %) hiccup)
+           char-entities (:char-entities m)
+           last-line (dec (count char-entities))]
+       (update-in m [:char-entities last-line] into entities)))))
 
 (defn replace-lines [{:keys [characters] :as text-entity} font-entity new-lines first-line line-count-change]
   (let [new-chars (mapv
