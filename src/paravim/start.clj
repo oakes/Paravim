@@ -92,13 +92,11 @@
                                "<Tab>"
                                (when (= (count command-text) pos)
                                  (when-let [completion-text (v/get-command-completion vim)]
-                                   (when-let [last-part-count (some->> (str/last-index-of command-text " ")
-                                                                       inc
-                                                                       (subs command-text)
-                                                                       count)]
-                                     (when (> (count completion-text) last-part-count)
-                                       (run! #(v/input vim (str %))
-                                         (subs completion-text last-part-count))))))
+                                   (when-let [first-part (str/last-index-of command-text " ")]
+                                     (dotimes [_ (- (count command-text) (inc first-part))]
+                                       (v/input vim "<BS>"))
+                                     (doseq [ch completion-text]
+                                       (v/input vim (str ch))))))
                                ("<Right>" "<Left>" "<Up>" "<Down>")
                                nil
                                (v/input vim s)))
