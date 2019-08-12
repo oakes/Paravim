@@ -114,6 +114,7 @@
   (set-on-buffer-update [this callback])
   (set-on-auto-command [this callback])
   (get-command-text [this])
+  (get-command-position [this])
   (get-command-completion [this])
   (get-cursor-column [this])
   (get-cursor-line [this])
@@ -133,6 +134,7 @@
         set-on-buffer-update* (.getFunctionAddress lib "vimSetDestructuredBufferUpdateCallback")
         set-on-auto-command* (.getFunctionAddress lib "vimSetAutoCommandCallback")
         get-command-text* (.getFunctionAddress lib "vimCommandLineGetText")
+        get-command-position* (.getFunctionAddress lib "vimCommandLineGetPosition")
         get-command-completion* (.getFunctionAddress lib "vimCommandLineGetCompletion")
         get-cursor-column* (.getFunctionAddress lib "vimCursorGetColumn")
         get-cursor-line* (.getFunctionAddress lib "vimCursorGetLine")
@@ -195,6 +197,9 @@
         (let [ptr (DynCall/dcCallPointer vm get-command-text*)]
           (when (> ptr 0)
             (MemoryUtil/memUTF8 ptr))))
+      (get-command-position [this]
+        (DynCall/dcReset vm)
+        (DynCall/dcCallInt vm get-command-position*))
       (get-command-completion [this]
         (DynCall/dcReset vm)
         (let [ptr (DynCall/dcCallPointer vm get-command-completion*)]

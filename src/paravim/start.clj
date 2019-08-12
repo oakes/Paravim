@@ -1,6 +1,7 @@
 (ns paravim.start
   (:require [paravim.core :as c]
             [paravim.vim :as v]
+            [clojure.string :as str]
             [play-cljc.gl.core :as pc])
   (:import  [org.lwjgl.glfw GLFW Callbacks GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWCharCallbackI]
             [org.lwjgl.opengl GL GL41]
@@ -85,21 +86,27 @@
                   v/init)
             on-input (fn [s]
                        (let [{:keys [command-text command-text-entity]} @c/*state]
-                         (if (and command-text-entity (= s "<Tab>"))
-                           (when-let [completion-text (v/get-command-completion vim)]
-                             (when-let [last-part (last command-text)]
-                               (when (> (count completion-text) (count last-part))
-                                 (run! #(v/input vim (str %))
-                                   (subs completion-text (count last-part))))))
+                         (if (and command-text
+                                  command-text-entity
+                                  (= s "<Tab>"))
+                           (when (= (count command-text) (v/get-command-position vim))
+                             (when-let [completion-text (v/get-command-completion vim)]
+                               (when-let [last-part-count (some->> (str/last-index-of command-text " ")
+                                                                   inc
+                                                                   (subs command-text)
+                                                                   count)]
+                                 (when (> (count completion-text) last-part-count)
+                                   (run! #(v/input vim (str %))
+                                     (subs completion-text last-part-count))))))
                            (v/input vim s)))
                        (swap! c/*state
                          (fn [state]
                            (-> state
-                               (c/update-command (v/get-command-text vim))
+                               (c/update-command (v/get-command-text vim) (v/get-command-position vim))
                                (c/update-cursor
                                  initial-game
                                  (v/get-current-buffer vim)
-                                 (v/get-cursor-line vim)
+                                 (dec (v/get-cursor-line vim))
                                  (v/get-cursor-column vim))))))]
         (listen-for-keys window on-input)
         (listen-for-chars window on-input)
@@ -115,7 +122,7 @@
                                                              (vec (for [i (range (v/get-line-count vim buffer-ptr))]
                                                                     (v/get-line vim buffer-ptr (inc i)))))
                                                            (c/update-cursor initial-game buffer-ptr
-                                                             (v/get-cursor-line vim)
+                                                             (dec (v/get-cursor-line vim))
                                                              (v/get-cursor-column vim)))))))
                                        nil)))
         (v/set-on-buffer-update vim (fn [buffer-ptr start-line end-line line-count-change]

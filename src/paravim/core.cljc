@@ -1,7 +1,6 @@
 (ns paravim.core
   (:require [paravim.utils :as utils]
             [paravim.chars :as chars]
-            [clojure.string :as str]
             [play-cljc.gl.core :as c]
             [play-cljc.transforms :as t]
             [play-cljc.instances :as i]
@@ -65,22 +64,27 @@
           text-entity
           (range first-line (max (count new-characters) (count characters))))))))
 
-(defn update-cursor [{:keys [font-width font-height base-rect-entity] :as state} game buffer-ptr line column]
+(defn ->cursor-entity [{:keys [font-width font-height base-rect-entity] :as state} line-chars line column]
+  (let [left-char (get line-chars (dec column))
+        curr-char (get line-chars column)
+        {:keys [left top width height]} curr-char
+        width (if (or (nil? width) (== 0 width)) font-width width)
+        left (or left
+                 (some-> (:left left-char) (+ width))
+                 0)
+        top (or top (* line font-height))
+        height (or height font-height)]
+    (-> base-rect-entity
+        (t/color [(/ 112 255) (/ 128 255) (/ 144 255) 0.9])
+        (t/translate left top)
+        (t/scale width height)
+        (assoc :left left :top top :width width :height height))))
+
+(defn update-cursor [{:keys [font-height] :as state} game buffer-ptr line column]
   (update-in state [:buffers buffer-ptr]
     (fn [buffer]
-      (let [left-char (get-in buffer [:text-entity :characters (dec line) (dec column)])
-            curr-char (get-in buffer [:text-entity :characters (dec line) column])
-            {:keys [left top width height]} curr-char
-            width (if (or (nil? width) (== 0 width)) font-width width)
-            left (or left
-                     (some-> (:left left-char) (+ width))
-                     0)
-            top (or top (* (dec line) font-height))
-            height (or height font-height)
-            cursor-entity (-> base-rect-entity
-                              (t/color [(/ 112 255) (/ 128 255) (/ 144 255) 0.9])
-                              (t/translate left top)
-                              (t/scale width height))]
+      (let [line-chars (get-in buffer [:text-entity :characters line])
+            {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars line column)]
         (-> buffer
             (update :rects-entity #(i/assoc % 0 cursor-entity))
             (as-> buffer
@@ -110,12 +114,17 @@
                       :camera-x camera-x
                       :camera-y camera-y))))))))
 
-(defn update-command [{:keys [base-text-entity base-font-entity] :as state} text]
+(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity command-text-entity] :as state} text position]
   (assoc state
-    :command-text (some-> text (str/split #" "))
+    :command-text text
     :command-text-entity
     (when text
-      (chars/assoc-line base-text-entity 0 (mapv #(chars/crop-char base-font-entity %) (str ":" text))))))
+      (chars/assoc-line base-text-entity 0 (mapv #(chars/crop-char base-font-entity %) (str ":" text))))
+    :command-rects-entity
+    (when text
+      (let [line-chars (get-in command-text-entity [:characters 0])]
+        (-> base-rects-entity
+            (i/assoc 0 (->cursor-entity state line-chars 0 position)))))))
 
 (defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity] :as state} buffer-ptr lines]
   (assoc-in state [:buffers buffer-ptr]
@@ -159,7 +168,7 @@
 (defn tick [game]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
-        {:keys [current-buffer buffers command-bg-entity command-text-entity font-height]} @*state]
+        {:keys [current-buffer buffers command-bg-entity command-text-entity command-rects-entity font-height]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
     (when-let [{:keys [rects-entity text-entity camera]} (get buffers current-buffer)]
@@ -175,6 +184,9 @@
                          (t/translate 0 (- game-height font-height))
                          (t/scale game-width font-height)))
       (when command-text-entity
+        (c/render game (-> command-rects-entity
+                           (t/project game-width game-height)
+                           (t/translate 0 (- game-height font-height))))
         (c/render game (-> command-text-entity
                            (t/project game-width game-height)
                            (t/translate 0 (- game-height font-height)))))))
