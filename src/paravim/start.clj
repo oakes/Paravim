@@ -85,8 +85,8 @@
             vim (doto (v/->vim)
                   v/init)
             on-input (fn [s]
-                       (let [{:keys [command-text command-text-entity]} @c/*state]
-                         (if command-text
+                       (let [{:keys [mode command-text command-text-entity]} @c/*state]
+                         (if (and (= mode 'COMMAND_LINE) command-text)
                            (let [pos (v/get-command-position vim)]
                              (case s
                                "<Tab>"
@@ -106,6 +106,7 @@
                        (swap! c/*state
                          (fn [state]
                            (-> state
+                               (assoc :mode (v/get-mode vim))
                                (c/update-command (v/get-command-text vim) (v/get-command-position vim))
                                (c/update-cursor
                                  initial-game
@@ -114,6 +115,8 @@
                                  (v/get-cursor-column vim))))))]
         (listen-for-keys window on-input)
         (listen-for-chars window on-input)
+        (v/set-on-quit vim (fn [buffer-ptr force?]
+                             (System/exit 0)))
         (v/set-on-auto-command vim (fn [buffer-ptr event]
                                      (case event
                                        EVENT_BUFENTER

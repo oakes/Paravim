@@ -105,6 +105,13 @@
     NUM_EVENTS                  ;; MUST be the last one
   ])
 
+(def modes
+  '{0x01 NORMAL
+    0x10 INSERT
+    0x08 COMMAND_LINE
+    0x50 REPLACE
+    0x02 VISUAL})
+
 (defprotocol IVim
   (init [this])
   (open-buffer [this file-name])
@@ -122,7 +129,8 @@
   (execute [this cmd])
   (set-on-quit [this callback])
   (set-tab-size [this size])
-  (get-tab-size [this]))
+  (get-tab-size [this])
+  (get-mode [this]))
 
 (defn ->vim []
   (let [lib (Library/loadNative "libvim")
@@ -143,6 +151,7 @@
         set-on-quit* (.getFunctionAddress lib "vimSetQuitCallback")
         set-tab-size* (.getFunctionAddress lib "vimOptionSetTabSize")
         get-tab-size* (.getFunctionAddress lib "vimOptionGetTabSize")
+        get-mode* (.getFunctionAddress lib "vimGetMode")
         vm (DynCall/dcNewCallVM 1024)]
     (reify IVim
       (init [this]
@@ -236,7 +245,10 @@
         (DynCall/dcCallVoid vm set-tab-size*))
       (get-tab-size [this]
         (DynCall/dcReset vm)
-        (DynCall/dcCallInt vm get-tab-size*)))))
+        (DynCall/dcCallInt vm get-tab-size*))
+      (get-mode [this]
+        (DynCall/dcReset vm)
+        (modes (DynCall/dcCallInt vm get-mode*))))))
 
 ;; https://vim.fandom.com/wiki/Mapping_keys_in_Vim_-_Tutorial_%28Part_2%29
 

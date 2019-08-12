@@ -169,7 +169,9 @@
 (defn tick [game]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
-        {:keys [current-buffer buffers command-bg-entity command-text-entity command-rects-entity font-height]} @*state]
+        {:keys [current-buffer buffers
+                command-bg-entity command-text-entity command-rects-entity
+                font-height mode]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
     (when-let [{:keys [rects-entity text-entity camera]} (get buffers current-buffer)]
@@ -184,7 +186,9 @@
                          (t/project game-width game-height)
                          (t/translate 0 (- game-height font-height))
                          (t/scale game-width font-height)))
-      (when command-text-entity
+      (when (and (= mode 'COMMAND_LINE)
+                 command-rects-entity
+                 command-text-entity)
         (c/render game (-> command-rects-entity
                            (t/project game-width game-height)
                            (t/translate 0 (- game-height font-height))))
