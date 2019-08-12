@@ -86,18 +86,22 @@
                   v/init)
             on-input (fn [s]
                        (let [{:keys [command-text command-text-entity]} @c/*state]
-                         (if (and command-text
-                                  command-text-entity
-                                  (= s "<Tab>"))
-                           (when (= (count command-text) (v/get-command-position vim))
-                             (when-let [completion-text (v/get-command-completion vim)]
-                               (when-let [last-part-count (some->> (str/last-index-of command-text " ")
-                                                                   inc
-                                                                   (subs command-text)
-                                                                   count)]
-                                 (when (> (count completion-text) last-part-count)
-                                   (run! #(v/input vim (str %))
-                                     (subs completion-text last-part-count))))))
+                         (if command-text
+                           (let [pos (v/get-command-position vim)]
+                             (case s
+                               "<Tab>"
+                               (when (= (count command-text) pos)
+                                 (when-let [completion-text (v/get-command-completion vim)]
+                                   (when-let [last-part-count (some->> (str/last-index-of command-text " ")
+                                                                       inc
+                                                                       (subs command-text)
+                                                                       count)]
+                                     (when (> (count completion-text) last-part-count)
+                                       (run! #(v/input vim (str %))
+                                         (subs completion-text last-part-count))))))
+                               ("<Right>" "<Left>" "<Up>" "<Down>")
+                               nil
+                               (v/input vim s)))
                            (v/input vim s)))
                        (swap! c/*state
                          (fn [state]
