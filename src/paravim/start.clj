@@ -139,7 +139,7 @@
                                                              (v/get-line vim buffer-ptr (inc i))))]
                                             (c/modify-buffer state initial-game buffer-ptr lines first-line line-count-change))))))
         (c/init initial-game (fn []
-                               (v/open-buffer vim "resources/public/index.html")))
+                               (v/open-buffer vim "deps.edn")))
         (loop [game initial-game]
           (when-not (GLFW/glfwWindowShouldClose window)
             (let [ts (GLFW/glfwGetTime)

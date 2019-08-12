@@ -1,6 +1,8 @@
 (ns paravim.core
   (:require [paravim.utils :as utils]
             [paravim.chars :as chars]
+            [html-soup.core :as hs]
+            [clojure.string :as str]
             [play-cljc.gl.core :as c]
             [play-cljc.transforms :as t]
             [play-cljc.instances :as i]
@@ -20,12 +22,36 @@
                        :current-buffer nil
                        :buffers {}}))
 
-(defn assoc-lines [text-entity font-entity lines]
-  (reduce-kv
-    (fn [entity line-num line]
-      (chars/assoc-line entity line-num (mapv #(chars/crop-char font-entity %) line)))
-    text-entity
-    lines))
+(def colors {"number" [255 255 0 1]
+             "string" [255 0 0 1]
+             "keyword" [0 0 255 1]})
+
+(defn assoc-lines
+  ([text-entity font-entity lines]
+   (->> (hs/code->hiccup (str/join "\n" lines))
+        (assoc-lines {:entity text-entity :char-entities [] :line-num 0} font-entity nil)
+        :entity))
+  ([{:keys [entity line-num] :as m} font-entity class-name hiccup]
+   (cond
+     (vector? hiccup)
+     (let [[_ attr-map & children] hiccup
+           class-name (:class attr-map)]
+       (reduce
+         (fn [m child]
+           (assoc-lines m font-entity class-name child))
+         m
+         children))
+     (= "\n" hiccup)
+     (assoc m
+            :char-entities []
+            :line-num (inc line-num)
+            :entity (chars/assoc-line entity line-num (:char-entities m)))
+     (string? hiccup)
+     (let [color (colors class-name)
+           char-entity (cond-> font-entity
+                               color (t/color color))
+           char-entities (mapv #(chars/crop-char char-entity %) hiccup)]
+       (update m :char-entities into char-entities)))))
 
 (defn replace-lines [{:keys [characters] :as text-entity} font-entity new-lines first-line line-count-change]
   (let [new-chars (mapv
