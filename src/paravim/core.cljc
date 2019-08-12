@@ -68,9 +68,9 @@
   (let [left-char (get line-chars (dec column))
         curr-char (get line-chars column)
         {:keys [left top width height]} curr-char
-        width (if (or (nil? width) (== 0 width)) font-width width)
+        width (or width font-width)
         left (or left
-                 (some-> (:left left-char) (+ width))
+                 (some-> (:left left-char) (+ (:width left-char)))
                  0)
         top (or top (* line font-height))
         height (or height font-height)]

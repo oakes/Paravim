@@ -35,7 +35,7 @@
                                     (assoc :x-total x-total
                                            :left prev-xadv
                                            :top y-total
-                                           :width (+ (:w baked-char) (:xoff baked-char))
+                                           :width (:xadv baked-char)
                                            :height (:font-height baked-font))))
          next-char (get line (inc index))]
      (-> line
