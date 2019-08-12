@@ -70,7 +70,8 @@
         {:keys [left top width height]} curr-char
         width (or width font-width)
         left (or left
-                 (some-> (:left left-char) (+ (:width left-char)))
+                 (some-> (:left left-char)
+                         (+ (:width left-char)))
                  0)
         top (or top (* line font-height))
         height (or height font-height)]
@@ -114,17 +115,17 @@
                       :camera-x camera-x
                       :camera-y camera-y))))))))
 
-(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity command-text-entity] :as state} text position]
-  (assoc state
-    :command-text text
-    :command-text-entity
-    (when text
-      (chars/assoc-line base-text-entity 0 (mapv #(chars/crop-char base-font-entity %) (str ":" text))))
-    :command-rects-entity
-    (when text
-      (let [line-chars (get-in command-text-entity [:characters 0])]
-        (-> base-rects-entity
-            (i/assoc 0 (->cursor-entity state line-chars 0 position)))))))
+(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity] :as state} text position]
+  (let [command-text-entity (when text
+                              (chars/assoc-line base-text-entity 0 (mapv #(chars/crop-char base-font-entity %) (str ":" text))))
+        command-rects-entity (when text
+                               (let [line-chars (get-in command-text-entity [:characters 0])]
+                                 (-> base-rects-entity
+                                     (i/assoc 0 (->cursor-entity state line-chars 0 (inc position))))))]
+    (assoc state
+      :command-text text
+      :command-text-entity command-text-entity
+      :command-rects-entity command-rects-entity)))
 
 (defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity] :as state} buffer-ptr lines]
   (assoc-in state [:buffers buffer-ptr]
