@@ -124,6 +124,7 @@
                                                (assoc :current-buffer buffer-ptr)
                                                (cond-> (nil? (get-in state [:buffers buffer-ptr]))
                                                        (-> (c/assoc-buffer buffer-ptr
+                                                             (v/get-file-name vim buffer-ptr)
                                                              (vec (for [i (range (v/get-line-count vim buffer-ptr))]
                                                                     (v/get-line vim buffer-ptr (inc i)))))
                                                            (c/update-cursor initial-game buffer-ptr

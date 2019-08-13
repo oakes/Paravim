@@ -39,14 +39,21 @@
         "delimiter" (nth rainbow-colors (mod depth (count rainbow-colors)))
         nil)))
 
-(defn assoc-lines
+(defn assoc-lines [text-entity font-entity lines]
+  (reduce-kv
+    (fn [entity line-num line]
+      (chars/assoc-line entity line-num (mapv #(chars/crop-char font-entity %) line)))
+    text-entity
+    lines))
+
+(defn assoc-clojure-lines
   ([text-entity font-entity lines]
    (->> (get (hs/code->hiccup (str/join "\n" lines)) 2)
-        (assoc-lines {:entity text-entity
-                      :char-entities [[]]}
-                     font-entity
-                     nil
-                     -1)
+        (assoc-clojure-lines {:entity text-entity
+                              :char-entities [[]]}
+                             font-entity
+                             nil
+                             -1)
         ((fn [{:keys [entity char-entities]}]
            (reduce-kv chars/assoc-line
              entity
@@ -61,7 +68,7 @@
                          inc)]
        (reduce
          (fn [m child]
-           (assoc-lines m font-entity class-name depth child))
+           (assoc-clojure-lines m font-entity class-name depth child))
          m
          children))
      (= "\n" hiccup)
@@ -174,13 +181,25 @@
       :command-text-entity command-text-entity
       :command-rects-entity command-rects-entity)))
 
-(defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity] :as state} buffer-ptr lines]
+(defn get-extension
+  [path]
+  (some->> (str/last-index-of path ".")
+           (+ 1)
+           (subs path)
+           str/lower-case))
+
+(def clojure-exts #{"clj" "cljs" "cljc" "edn"})
+
+(defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity] :as state} buffer-ptr path lines]
   (assoc-in state [:buffers buffer-ptr]
-    {:text-entity (assoc-lines base-text-entity base-font-entity lines)
+    {:text-entity (if (clojure-exts (get-extension path))
+                    (assoc-clojure-lines base-text-entity base-font-entity lines)
+                    (assoc-lines base-text-entity base-font-entity lines))
      :rects-entity base-rects-entity
      :camera (t/translate orig-camera 0 0)
      :camera-x 0
      :camera-y 0
+     :path path
      :lines lines}))
 
 (defn modify-buffer [{:keys [base-font-entity] :as state} game buffer-ptr lines first-line line-count-change]
