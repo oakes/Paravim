@@ -90,7 +90,7 @@
     (if (= 0 line-count-change)
       (reduce-kv
         (fn [entity line-offset char-entities]
-          (chars/assoc-line text-entity (+ first-line line-offset) char-entities))
+          (chars/assoc-line entity (+ first-line line-offset) char-entities))
         text-entity
         new-chars)
       (let [chars-before (subvec characters 0 first-line)
@@ -197,8 +197,7 @@
      :camera (t/translate orig-camera 0 0)
      :camera-x 0
      :camera-y 0
-     :path path
-     :lines lines}))
+     :path path}))
 
 (defn modify-buffer [{:keys [base-font-entity] :as state} game buffer-ptr lines first-line line-count-change]
   (update-in state [:buffers buffer-ptr :text-entity]
