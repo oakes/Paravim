@@ -48,7 +48,7 @@
 
 (defn clojurify-lines
   ([text-entity lines]
-   (->> (get (hs/code->hiccup (str/join "\n" lines)) 2)
+   (->> (hs/code->hiccup (str/join "\n" lines))
         (clojurify-lines [[]] nil -1)
         (reduce-kv
           (fn [entity line-num entity-colors]
@@ -199,9 +199,13 @@
      :camera-y 0
      :path path}))
 
-(defn modify-buffer [{:keys [base-font-entity] :as state} game buffer-ptr lines first-line line-count-change]
-  (update-in state [:buffers buffer-ptr :text-entity]
-    replace-lines base-font-entity lines first-line line-count-change))
+(defn modify-buffer [{:keys [base-font-entity] :as state} game buffer-ptr lines first-line line-count-change all-lines]
+  (update-in state [:buffers buffer-ptr]
+    (fn [{:keys [text-entity path] :as buffer}]
+      (assoc buffer :text-entity
+        (cond-> (replace-lines text-entity base-font-entity lines first-line line-count-change)
+                (clojure-exts (get-extension path))
+                (clojurify-lines all-lines))))))
 
 (defn init [game callback]
   ;; allow transparency in images
