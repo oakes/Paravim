@@ -46,19 +46,19 @@
     text-entity
     lines))
 
-(defn assoc-clojure-lines
-  ([text-entity font-entity lines]
+(defn clojurify-lines
+  ([text-entity lines]
    (->> (get (hs/code->hiccup (str/join "\n" lines)) 2)
-        (assoc-clojure-lines {:entity text-entity
-                              :char-entities [[]]}
-                             font-entity
-                             nil
-                             -1)
-        ((fn [{:keys [entity char-entities]}]
-           (reduce-kv chars/assoc-line
-             entity
-             char-entities)))))
-  ([{:keys [entity] :as m} font-entity class-name depth hiccup]
+        (clojurify-lines [[]] nil -1)
+        (reduce-kv
+          (fn [entity line-num entity-colors]
+            (->> entity-colors
+                 (mapv (fn [e color]
+                         (cond-> e color (t/color color)))
+                   (get-in entity [:characters line-num]))
+                 (chars/assoc-line entity line-num)))
+          text-entity)))
+  ([entity-colors class-name depth hiccup]
    (cond
      (vector? hiccup)
      (let [[_ attr-map & children] hiccup
@@ -67,19 +67,17 @@
                          (some-> class-name (str/starts-with? "collection"))
                          inc)]
        (reduce
-         (fn [m child]
-           (assoc-clojure-lines m font-entity class-name depth child))
-         m
+         (fn [v child]
+           (clojurify-lines v class-name depth child))
+         entity-colors
          children))
      (= "\n" hiccup)
-     (update m :char-entities conj [])
+     (conj entity-colors [])
      (string? hiccup)
      (let [color (get-color class-name depth)
-           char-entity (cond-> font-entity color (t/color color))
-           entities (mapv #(chars/crop-char char-entity %) hiccup)
-           char-entities (:char-entities m)
-           last-line (dec (count char-entities))]
-       (update-in m [:char-entities last-line] into entities)))))
+           new-colors (vec (repeat (count hiccup) color))
+           last-line (dec (count entity-colors))]
+       (update entity-colors last-line into new-colors)))))
 
 (defn replace-lines [{:keys [characters] :as text-entity} font-entity new-lines first-line line-count-change]
   (let [new-chars (mapv
@@ -192,9 +190,9 @@
 
 (defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity] :as state} buffer-ptr path lines]
   (assoc-in state [:buffers buffer-ptr]
-    {:text-entity (if (clojure-exts (get-extension path))
-                    (assoc-clojure-lines base-text-entity base-font-entity lines)
-                    (assoc-lines base-text-entity base-font-entity lines))
+    {:text-entity (cond-> (assoc-lines base-text-entity base-font-entity lines)
+                          (clojure-exts (get-extension path))
+                          (clojurify-lines lines))
      :rects-entity base-rects-entity
      :camera (t/translate orig-camera 0 0)
      :camera-x 0
