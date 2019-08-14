@@ -22,6 +22,8 @@
                        :current-buffer nil
                        :buffers {}}))
 
+(def text-color [1 1 1 1])
+
 (def colors {"number" [1 1 0 1]
              "string" [1 0 0 1]
              "keyword" [0 0 1 1]})
@@ -37,7 +39,7 @@
   (or (colors class-name)
       (case class-name
         "delimiter" (nth rainbow-colors (mod depth (count rainbow-colors)))
-        nil)))
+        text-color)))
 
 (defn assoc-lines [text-entity font-entity lines]
   (reduce-kv
@@ -49,16 +51,14 @@
 (defn clojurify-lines
   ([text-entity lines]
    (->> (hs/code->hiccup (str/join "\n" lines))
-        (clojurify-lines [[]] nil -1)
+        (clojurify-lines (:characters text-entity) (volatile! 0) (volatile! 0) nil -1)
         (reduce-kv
-          (fn [entity line-num entity-colors]
-            (->> entity-colors
-                 (mapv (fn [e color]
-                         (cond-> e color (t/color color)))
-                   (get-in entity [:characters line-num]))
-                 (chars/assoc-line entity line-num)))
+          (fn [entity line-num char-entities]
+            (if (not= (get-in entity [:characters line-num]) char-entities)
+              (chars/assoc-line entity line-num char-entities)
+              entity))
           text-entity)))
-  ([entity-colors class-name depth hiccup]
+  ([characters *line-num *char-num class-name depth hiccup]
    (cond
      (vector? hiccup)
      (let [[_ attr-map & children] hiccup
@@ -67,17 +67,25 @@
                          (some-> class-name (str/starts-with? "collection"))
                          inc)]
        (reduce
-         (fn [v child]
-           (clojurify-lines v class-name depth child))
-         entity-colors
+         (fn [characters child]
+           (clojurify-lines characters *line-num *char-num class-name depth child))
+         characters
          children))
      (= "\n" hiccup)
-     (conj entity-colors [])
+     (do
+       (vswap! *line-num inc)
+       (vreset! *char-num 0)
+       characters)
      (string? hiccup)
      (let [color (get-color class-name depth)
-           new-colors (vec (repeat (count hiccup) color))
-           last-line (dec (count entity-colors))]
-       (update entity-colors last-line into new-colors)))))
+           char-num @*char-num]
+       (update characters @*line-num
+         (fn [char-entities]
+           (reduce
+             (fn [char-entities i]
+               (update char-entities i t/color color))
+             char-entities
+             (range char-num (vswap! *char-num + (count hiccup))))))))))
 
 (defn replace-lines [{:keys [characters] :as text-entity} font-entity new-lines first-line line-count-change]
   (let [new-chars (mapv
@@ -214,7 +222,7 @@
   ;; load font
   (#?(:clj load-font-clj :cljs load-font-cljs)
      (fn [{:keys [data]} baked-font]
-       (let [font-entity (t/color (text/->font-entity game data baked-font) [1 1 1 1])
+       (let [font-entity (t/color (text/->font-entity game data baked-font) text-color)
              text-entity (c/compile game (i/->instanced-entity font-entity))
              rect-entity (e/->entity game primitives/rect)
              rects-entity (c/compile game (i/->instanced-entity rect-entity))
