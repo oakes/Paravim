@@ -1,7 +1,8 @@
 (ns paravim.chars
   (:require [play-cljc.transforms :as t]
             [play-cljc.math :as m]
-            [play-cljc.instances :as i]))
+            [play-cljc.instances :as i]
+            [play-cljc.gl.text :as text]))
 
 (defn crop-char [{:keys [baked-font] :as font-entity} ch]
   (let [{:keys [baked-chars baseline first-char]} baked-font
@@ -55,7 +56,7 @@
                                 #(m/multiply-matrices 3 (m/translation-matrix left top) %)))
                             new-line)]
     (-> text-entity
-        (i/assoc line-num adjusted-new-line)
+        (text/assoc-line line-num adjusted-new-line)
         (assoc-in [:characters line-num] new-line))))
 
 (defn dissoc-char
@@ -74,11 +75,8 @@
          (i/dissoc (+ index prev-count))))))
 
 (defn dissoc-line [text-entity line-num]
-  (-> (reduce
-        (fn [entity i]
-          (dissoc-char entity line-num 0))
-        text-entity
-        (range (count (get-in text-entity [:characters line-num]))))
+  (-> text-entity
+      (text/dissoc-line line-num)
       (update :characters (fn [characters]
                             (let [v1 (subvec characters 0 line-num)
                                   v2 (subvec characters (inc line-num))]
