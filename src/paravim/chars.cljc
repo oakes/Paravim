@@ -18,13 +18,14 @@
         (assoc :baked-char baked-char))))
 
 (defn assoc-char
-  ([line text-entity index char-entity]
-   (assoc-char line text-entity 0 index char-entity))
-  ([line {:keys [baked-font characters] :or {characters []} :as text-entity} line-num index {:keys [baked-char] :as char-entity}]
+  ([text-entity index char-entity]
+   (assoc-char text-entity 0 index char-entity))
+  ([{:keys [baked-font characters] :or {characters []} :as text-entity} line-num index {:keys [baked-char] :as char-entity}]
    (let [characters (loop [chars characters]
                       (if (<= (count chars) line-num)
                         (recur (conj chars []))
                         chars))
+         line (get characters line-num)
          prev-chars (subvec line 0 index)
          prev-xadv (reduce + 0 (map #(-> % :baked-char :xadv) prev-chars))
          x-total (+ (:xadv baked-char) prev-xadv)
@@ -39,17 +40,19 @@
                                            :width (:xadv baked-char)
                                            :height (:font-height baked-font))))
          next-char (get line (inc index))]
-     (-> line
+     (-> text-entity
+         (assoc :characters (assoc characters line-num line))
          ;; adjust the next char if its horizontal position changed
          (cond-> (and next-char (not= (:x-total replaced-char) x-total))
-                 (assoc-char text-entity line-num (inc index) next-char))))))
+                 (assoc-char line-num (inc index) next-char))))))
 
 (defn assoc-line [text-entity line-num char-entities]
-  (let [new-line (reduce-kv
-                   (fn [line char-num entity]
-                     (assoc-char line text-entity line-num char-num entity))
-                   []
-                   char-entities)
+  (let [new-text-entity (reduce-kv
+                          (fn [text-entity char-num entity]
+                            (assoc-char text-entity line-num char-num entity))
+                          (assoc-in text-entity [:characters line-num] [])
+                          char-entities)
+        new-line (get-in new-text-entity [:characters line-num])
         adjusted-new-line (mapv
                             (fn [{:keys [left] :as char-entity}]
                               (update-in char-entity [:uniforms 'u_translate_matrix]
