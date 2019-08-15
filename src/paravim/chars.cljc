@@ -36,7 +36,6 @@
          line (assoc line index (-> char-entity
                                     (assoc :x-total x-total
                                            :left prev-xadv
-                                           :top y-total
                                            :width (:xadv baked-char)
                                            :height (:font-height baked-font))))
          next-char (get line (inc index))]
