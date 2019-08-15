@@ -196,9 +196,16 @@
 
 (def clojure-exts #{"clj" "cljs" "cljc" "edn"})
 
-(defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity] :as state} buffer-ptr path lines]
+(defn update-uniforms [text-entity font-height lines]
+  (-> text-entity
+      (assoc-in [:uniforms 'u_char_counts] (mapv count lines))
+      (assoc-in [:uniforms 'u_font_height] font-height)))
+
+(defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity font-height] :as state} buffer-ptr path lines]
   (assoc-in state [:buffers buffer-ptr]
     {:text-entity (cond-> (assoc-lines base-text-entity base-font-entity lines)
+                          true
+                          (update-uniforms font-height lines)
                           (clojure-exts (get-extension path))
                           (clojurify-lines lines))
      :rects-entity base-rects-entity
@@ -207,13 +214,51 @@
      :camera-y 0
      :path path}))
 
-(defn modify-buffer [{:keys [base-font-entity] :as state} game buffer-ptr lines first-line line-count-change all-lines]
+(defn modify-buffer [{:keys [base-font-entity font-height] :as state} game buffer-ptr lines first-line line-count-change all-lines]
   (update-in state [:buffers buffer-ptr]
     (fn [{:keys [text-entity path] :as buffer}]
       (assoc buffer :text-entity
         (cond-> (replace-lines text-entity base-font-entity lines first-line line-count-change)
+                true
+                (update-uniforms font-height all-lines)
                 (clojure-exts (get-extension path))
                 (clojurify-lines all-lines))))))
+
+(def ^:private instanced-font-vertex-shader
+  {:inputs
+   '{a_position vec2
+     a_color vec4
+     a_translate_matrix mat3
+     a_texture_matrix mat3
+     a_scale_matrix mat3}
+   :uniforms
+   '{u_matrix mat3
+     u_char_counts [int 1024]
+     u_font_height float}
+   :outputs
+   '{v_tex_coord vec2
+     v_color vec4}
+   :signatures
+   '{main ([] void)}
+   :functions
+   '{main ([]
+           (=int total_char_count 0)
+           (=int current_line 0)
+           ("for" "(int i=0; i<1024; ++i)"
+             (+= total_char_count "u_char_counts[i]")
+             ("if" (> total_char_count gl_InstanceID) "break")
+             ("else" (+= current_line 1)))
+           (=mat3 translate_matrix a_translate_matrix)
+           (+= "translate_matrix[2][1]" (* u_font_height current_line))
+           (= gl_Position
+              (vec4
+                (.xy (* u_matrix
+                        translate_matrix
+                        a_scale_matrix
+                        (vec3 a_position 1)))
+                0 1))
+           (= v_tex_coord (.xy (* a_texture_matrix (vec3 a_position 1))))
+           (= v_color a_color))}})
 
 (defn init [game callback]
   ;; allow transparency in images
@@ -222,8 +267,10 @@
   ;; load font
   (#?(:clj load-font-clj :cljs load-font-cljs)
      (fn [{:keys [data]} baked-font]
-       (let [font-entity (t/color (text/->font-entity game data baked-font) text-color)
-             text-entity (c/compile game (i/->instanced-entity font-entity))
+       (let [font-entity (-> (text/->font-entity game data baked-font)
+                             (t/color text-color))
+             text-entity (c/compile game (assoc (i/->instanced-entity font-entity)
+                                                :vertex instanced-font-vertex-shader))
              rect-entity (e/->entity game primitives/rect)
              rects-entity (c/compile game (i/->instanced-entity rect-entity))
              command-bg-entity (c/compile game (t/color (e/->entity game primitives/rect) bg-color))]

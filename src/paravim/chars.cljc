@@ -51,9 +51,9 @@
                    []
                    char-entities)
         adjusted-new-line (mapv
-                            (fn [{:keys [left top] :as char-entity}]
+                            (fn [{:keys [left] :as char-entity}]
                               (update-in char-entity [:uniforms 'u_translate_matrix]
-                                #(m/multiply-matrices 3 (m/translation-matrix left top) %)))
+                                #(m/multiply-matrices 3 (m/translation-matrix left 0) %)))
                             new-line)]
     (-> text-entity
         (text/assoc-line line-num adjusted-new-line)
