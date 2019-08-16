@@ -138,9 +138,7 @@
                                                 last-line (+ (dec end-line) line-count-change)
                                                 lines (vec (for [i (range first-line last-line)]
                                                              (v/get-line vim buffer-ptr (inc i))))]
-                                            (c/modify-buffer state initial-game buffer-ptr lines first-line line-count-change
-                                                             (vec (for [i (range (v/get-line-count vim buffer-ptr))]
-                                                                    (v/get-line vim buffer-ptr (inc i))))))))))
+                                            (c/modify-buffer state initial-game buffer-ptr lines first-line line-count-change))))))
         (c/init initial-game (fn []
                                (v/open-buffer vim "deps.edn")))
         (loop [game initial-game]

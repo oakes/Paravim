@@ -75,7 +75,7 @@
          characters
          children))
      (let [color (get-color class-name depth)]
-      (reduce
+       (reduce
          (fn [characters ch]
            (if (= ch \newline)
              (do
@@ -88,7 +88,26 @@
          characters
          data)))))
 
-(defn replace-lines [{:keys [characters] :as text-entity} font-entity new-lines first-line line-count-change]
+(defn update-lines [lines new-lines first-line line-count-change]
+  (if (= 0 line-count-change)
+    (reduce-kv
+      (fn [lines line-offset line]
+        (assoc lines (+ first-line line-offset) line))
+      lines
+      new-lines)
+    (let [lines-to-remove (if (neg? line-count-change)
+                            (+ (* -1 line-count-change) (count new-lines))
+                            (- (count new-lines) line-count-change))
+          lines (->> (subvec lines (+ first-line lines-to-remove))
+                     (into (subvec lines 0 first-line))
+                     (into []))
+          lines (->> (subvec lines first-line)
+                     (into new-lines)
+                     (into (subvec lines 0 first-line))
+                     (into []))]
+      lines)))
+
+(defn replace-lines [text-entity font-entity new-lines first-line line-count-change]
   (let [new-chars (mapv
                     (fn [line]
                       (mapv
@@ -98,32 +117,24 @@
                     new-lines)]
     (if (= 0 line-count-change)
       (reduce-kv
-        (fn [entity line-offset char-entities]
-          (chars/assoc-line entity (+ first-line line-offset) char-entities))
+        (fn [text-entity line-offset char-entities]
+          (chars/assoc-line text-entity (+ first-line line-offset) char-entities))
         text-entity
         new-chars)
-      (let [chars-before (subvec characters 0 first-line)
-            lines-to-remove (if (neg? line-count-change)
-                              (* -1 line-count-change)
-                              0)
-            lines-to-add (vec (repeat line-count-change []))
-            chars-after (subvec characters (+ first-line lines-to-remove))
-            new-characters (->> chars-after
-                                (into lines-to-add)
-                                (into chars-before)
-                                (into []))
-            new-characters (reduce
-                             (fn [new-characters i]
-                               (assoc new-characters (+ first-line i) (nth new-chars i)))
-                             new-characters
-                             (range (count new-chars)))]
-        (reduce
-          (fn [entity line-num]
-            (if-let [char-entity (get new-characters line-num)]
-              (chars/assoc-line entity line-num char-entity)
-              (chars/dissoc-line entity (count new-characters))))
-          text-entity
-          (range first-line (max (count new-characters) (count characters))))))))
+      (let [lines-to-remove (if (neg? line-count-change)
+                              (+ (* -1 line-count-change) (count new-lines))
+                              (- (count new-lines) line-count-change))
+            text-entity (reduce
+                          (fn [text-entity _]
+                            (chars/dissoc-line text-entity first-line))
+                          text-entity
+                          (range 0 lines-to-remove))
+            text-entity (reduce-kv
+                          (fn [text-entity line-offset char-entities]
+                            (chars/insert-line text-entity (+ first-line line-offset) char-entities))
+                          text-entity
+                          new-chars)]
+        text-entity))))
 
 (defn ->cursor-entity [{:keys [font-width font-height base-rect-entity] :as state} line-chars line column]
   (let [left-char (get line-chars (dec column))
@@ -213,17 +224,21 @@
      :camera (t/translate orig-camera 0 0)
      :camera-x 0
      :camera-y 0
-     :path path}))
+     :path path
+     :lines lines}))
 
-(defn modify-buffer [{:keys [base-font-entity font-height] :as state} game buffer-ptr lines first-line line-count-change all-lines]
+(defn modify-buffer [{:keys [base-font-entity font-height] :as state} game buffer-ptr new-lines first-line line-count-change]
   (update-in state [:buffers buffer-ptr]
-    (fn [{:keys [text-entity path] :as buffer}]
-      (assoc buffer :text-entity
-        (cond-> (replace-lines text-entity base-font-entity lines first-line line-count-change)
-                true
-                (update-uniforms font-height all-lines)
-                (clojure-exts (get-extension path))
-                (clojurify-lines all-lines))))))
+    (fn [{:keys [text-entity path lines] :as buffer}]
+      (let [lines (update-lines lines new-lines first-line line-count-change)]
+        (assoc buffer
+          :lines lines
+          :text-entity
+          (cond-> (replace-lines text-entity base-font-entity new-lines first-line line-count-change)
+                  true
+                  (update-uniforms font-height lines)
+                  (clojure-exts (get-extension path))
+                  (clojurify-lines lines)))))))
 
 (def ^:private instanced-font-vertex-shader
   {:inputs
