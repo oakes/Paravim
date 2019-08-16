@@ -1,7 +1,7 @@
 (ns paravim.core
   (:require [paravim.utils :as utils]
             [paravim.chars :as chars]
-            [html-soup.core :as hs]
+            [html-soup.parse :as hs]
             [clojure.string :as str]
             [play-cljc.gl.core :as c]
             [play-cljc.transforms :as t]
@@ -24,9 +24,9 @@
 
 (def text-color [1 1 1 1])
 
-(def colors {"number" [1 1 0 1]
-             "string" [1 0 0 1]
-             "keyword" [0 0 1 1]})
+(def colors {:number [1 1 0 1]
+             :string [1 0 0 1]
+             :keyword [0 0 1 1]})
 
 (def rainbow-colors [[0 1 1 1] ;; aqua
                      [1 (/ 165 255) 0 1] ;; orange
@@ -38,7 +38,7 @@
 (defn get-color [class-name depth]
   (or (colors class-name)
       (case class-name
-        "delimiter" (nth rainbow-colors (mod depth (count rainbow-colors)))
+        :delimiter (nth rainbow-colors (mod depth (count rainbow-colors)))
         text-color)))
 
 (defn assoc-lines [text-entity font-entity lines]
@@ -50,42 +50,43 @@
 
 (defn clojurify-lines
   ([text-entity lines]
-   (->> (hs/code->hiccup (str/join "\n" lines))
-        (clojurify-lines (:characters text-entity) (volatile! 0) (volatile! 0) nil -1)
-        (reduce-kv
-          (fn [entity line-num char-entities]
-            (if (not= (get-in entity [:characters line-num]) char-entities)
-              (chars/assoc-line entity line-num char-entities)
-              entity))
-          text-entity)))
-  ([characters *line-num *char-num class-name depth hiccup]
-   (cond
-     (vector? hiccup)
-     (let [[_ attr-map & children] hiccup
-           class-name (:class attr-map)
+   (let [*line-num (volatile! 0)
+         *char-num (volatile! -1)]
+     (->> (hs/parse (str/join "\n" lines))
+          (reduce
+            (fn [characters data]
+              (clojurify-lines characters *line-num *char-num nil -1 data))
+            (:characters text-entity))
+          (reduce-kv
+            (fn [entity line-num char-entities]
+              (if (not= (get-in entity [:characters line-num]) char-entities)
+                (chars/assoc-line entity line-num char-entities)
+                entity))
+            text-entity))))
+  ([characters *line-num *char-num class-name depth data]
+   (if (vector? data)
+     (let [[class-name & children] data
            depth (cond-> depth
-                         (some-> class-name (str/starts-with? "collection"))
+                         (= class-name :collection)
                          inc)]
        (reduce
          (fn [characters child]
            (clojurify-lines characters *line-num *char-num class-name depth child))
          characters
          children))
-     (= "\n" hiccup)
-     (do
-       (vswap! *line-num inc)
-       (vreset! *char-num 0)
-       characters)
-     (string? hiccup)
-     (let [color (get-color class-name depth)
-           char-num @*char-num]
-       (update characters @*line-num
-         (fn [char-entities]
-           (reduce
-             (fn [char-entities i]
-               (update char-entities i t/color color))
-             char-entities
-             (range char-num (vswap! *char-num + (count hiccup))))))))))
+     (let [color (get-color class-name depth)]
+      (reduce
+         (fn [characters ch]
+           (if (= ch \newline)
+             (do
+               (vswap! *line-num inc)
+               (vreset! *char-num -1)
+               characters)
+             (update characters @*line-num
+               (fn [char-entities]
+                 (update char-entities (vswap! *char-num inc) t/color color)))))
+         characters
+         data)))))
 
 (defn replace-lines [{:keys [characters] :as text-entity} font-entity new-lines first-line line-count-change]
   (let [new-chars (mapv
