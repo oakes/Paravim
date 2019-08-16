@@ -8,7 +8,7 @@
         org.lwjgl/lwjgl-opengl {:mvn/version "3.2.2"}
         org.lwjgl/lwjgl-stb {:mvn/version "3.2.2"}
         edna {:mvn/version "1.6.0"}
-        vim-soup {:local/root "../vim-soup"}}
+        vim-jni {:local/root "../vim-jni"}}
  :aliases {:dev {:extra-deps {org.clojure/clojurescript {:mvn/version "1.10.520"}
                               com.bhauman/figwheel-main {:mvn/version "0.2.0"}
                               ;nightlight {:mvn/version "RELEASE"}

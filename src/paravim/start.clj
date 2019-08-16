@@ -1,6 +1,6 @@
 (ns paravim.start
   (:require [paravim.core :as c]
-            [vim-soup.core :as v]
+            [vim-jni.core :as v]
             [clojure.string :as str]
             [play-cljc.gl.core :as pc])
   (:import  [org.lwjgl.glfw GLFW Callbacks GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWCharCallbackI]
