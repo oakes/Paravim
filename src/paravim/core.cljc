@@ -249,7 +249,7 @@
      a_scale_matrix mat3}
    :uniforms
    '{u_matrix mat3
-     u_char_counts [int 1024]
+     u_char_counts [int 1000]
      u_font_height float}
    :outputs
    '{v_tex_coord vec2
