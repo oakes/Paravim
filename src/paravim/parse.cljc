@@ -33,39 +33,62 @@
 
 (defprotocol IRegex
   (find [this])
-  (group [this index]))
+  (group [this index])
+  (index [this])
+  (line [this])
+  (character [this]))
 
-(defn ->regex [s]
+(defn ->regex [match-str]
   (let [regex #?(:clj  regex
                  :cljs (js/RegExp. regex-str "g"))
-        matcher #?(:clj (.matcher ^Pattern regex s)
-                   :cljs (atom (make-array 0)))]
+        *matcher #?(:clj (.matcher ^Pattern regex match-str)
+                    :cljs (volatile! (make-array 0)))]
     (reify IRegex
       (find [this]
-        #?(:clj  (re-find matcher)
-           :cljs (when @matcher (reset! matcher (.exec regex s)))))
+        #?(:clj  (re-find *matcher)
+           :cljs (when @*matcher (vreset! *matcher (.exec regex match-str)))))
       (group [this index]
-        #?(:clj  (.group ^Matcher matcher ^int index)
-           :cljs (aget @matcher index))))))
+        #?(:clj  (.group ^Matcher *matcher ^int index)
+           :cljs (aget @*matcher index)))
+      (index [this]
+        #?(:clj  (.start ^Matcher *matcher)
+           :cljs (.-index @*matcher)))
+      (line [this]
+        (->> (subs match-str 0 (inc (index this)))
+             (re-seq #"\n")
+             count))
+      (character [this]
+        (let [s (subs match-str 0 (inc (index this)))]
+          (->> s
+               (or (some->> (str/last-index-of s "\n")
+                            inc
+                            (subs s))
+                   s)
+               count
+               dec))))))
 
 (declare read-token)
 
 (defn read-coll [matcher [_ delim :as token-data]]
-  (let [end-delim (delims delim)]
-    (loop [data [token-data]]
-      (if (find matcher)
-        (let [[_ token :as token-data] (read-token matcher)
-              data (conj data token-data)]
-          (cond
-            (= token end-delim)
-            (into [:collection] data)
-            (close-delims token)
-            (with-meta (into [:collection] data)
-              {:error-message "Unmatched delimiter"})
-            :else
-            (recur data)))
-        (with-meta (into [:collection] data)
-          {:error-message "EOF while reading"})))))
+  (let [end-delim (delims delim)
+        line-num (line matcher)
+        char-num (character matcher)]
+    (vary-meta
+      (loop [data [token-data]]
+        (if (find matcher)
+          (let [[_ token :as token-data] (read-token matcher)
+                data (conj data token-data)]
+            (cond
+              (= token end-delim)
+              (into [:collection] data)
+              (close-delims token)
+              (vary-meta (into [:collection] data)
+                assoc :error-message "Unmatched delimiter")
+              :else
+              (recur data)))
+          (vary-meta (into [:collection] data)
+            assoc :error-message "EOF while reading")))
+      assoc :line-num line-num :char-num char-num)))
 
 (defn read-token [matcher]
   (let [token (group matcher 0)
