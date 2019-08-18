@@ -16,6 +16,7 @@
 
 (def orig-camera (e/->camera true))
 (def bg-color [(/ 0 255) (/ 16 255) (/ 64 255) 0.9])
+(def font-size-multiplier (/ 1 2))
 
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
@@ -151,7 +152,10 @@
         (t/color [(/ 112 255) (/ 128 255) (/ 144 255) 0.9])
         (t/translate left top)
         (t/scale width height)
-        (assoc :left left :top top :width width :height height))))
+        (assoc :left (* left font-size-multiplier)
+               :top (* top font-size-multiplier)
+               :width (* width font-size-multiplier)
+               :height (* height font-size-multiplier)))))
 
 (defn update-cursor [{:keys [font-height] :as state} game buffer-ptr line column]
   (update-in state [:buffers buffer-ptr]
@@ -162,10 +166,10 @@
             (update :rects-entity #(i/assoc % 0 cursor-entity))
             (as-> buffer
                   (let [{:keys [camera camera-x camera-y]} buffer
-                        cursor-bottom (+ top font-height)
+                        cursor-bottom (+ top height)
                         cursor-right (+ left width)
                         game-width (utils/get-width game)
-                        game-height (- (utils/get-height game) font-height)
+                        game-height (- (utils/get-height game) height)
                         camera-bottom (+ camera-y game-height)
                         camera-right (+ camera-x game-width)
                         camera-x (cond
@@ -315,24 +319,28 @@
     (when-let [{:keys [rects-entity text-entity camera]} (get buffers current-buffer)]
       (c/render game (-> rects-entity
                          (t/project game-width game-height)
-                         (t/camera camera)))
+                         (t/camera camera)
+                         (t/scale font-size-multiplier font-size-multiplier)))
       (c/render game (-> text-entity
                          (t/project game-width game-height)
-                         (t/camera camera))))
+                         (t/camera camera)
+                         (t/scale font-size-multiplier font-size-multiplier))))
     (when command-bg-entity
       (c/render game (-> command-bg-entity
                          (t/project game-width game-height)
-                         (t/translate 0 (- game-height font-height))
+                         (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                          (t/scale game-width font-height)))
       (when (and (= mode 'COMMAND_LINE)
                  command-rects-entity
                  command-text-entity)
         (c/render game (-> command-rects-entity
                            (t/project game-width game-height)
-                           (t/translate 0 (- game-height font-height))))
+                           (t/translate 0 (- game-height (* font-size-multiplier font-height)))
+                           (t/scale font-size-multiplier font-size-multiplier)))
         (c/render game (-> command-text-entity
                            (t/project game-width game-height)
-                           (t/translate 0 (- game-height font-height)))))))
+                           (t/translate 0 (- game-height (* font-size-multiplier font-height)))
+                           (t/scale font-size-multiplier font-size-multiplier))))))
   ;; return the game map
   game)
 
