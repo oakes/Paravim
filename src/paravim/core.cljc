@@ -51,34 +51,27 @@
 (defn clojurify-lines
   ([text-entity lines]
    (let [*line-num (volatile! 0)
-         *char-num (volatile! -1)
-         *open-delims (volatile! {})]
+         *char-num (volatile! -1)]
      (->> (parse/parse (str/join "\n" lines))
           (reduce
             (fn [characters data]
-              (clojurify-lines characters *line-num *char-num *open-delims nil -1 data))
+              (clojurify-lines characters *line-num *char-num nil -1 data))
             (:characters text-entity))
           (reduce-kv
             (fn [entity line-num char-entities]
               (if (not= (get-in entity [:characters line-num]) char-entities)
                 (chars/assoc-line entity line-num char-entities)
                 entity))
-            text-entity)
-          (#(assoc % :open-delims @*open-delims)))))
-  ([characters *line-num *char-num *open-delims class-name depth data]
+            text-entity))))
+  ([characters *line-num *char-num class-name depth data]
    (if (vector? data)
      (let [[class-name & children] data
            depth (cond-> depth
                          (= class-name :collection)
                          inc)]
-       (when (= class-name :delimiter)
-         (when-let [{:keys [open-delim? start-line end-char]} (meta data)]
-           (when open-delim?
-             (vswap! *open-delims update start-line (fn [v]
-                                                      (conj (or v []) end-char))))))
        (reduce
          (fn [characters child]
-           (clojurify-lines characters *line-num *char-num *open-delims class-name depth child))
+           (clojurify-lines characters *line-num *char-num class-name depth child))
          characters
          children))
      (let [color (get-color class-name depth)]
@@ -164,23 +157,8 @@
   (update-in state [:buffers buffer-ptr]
     (fn [buffer]
       (let [line-chars (get-in buffer [:text-entity :characters line])
-            {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars line column)
-            open-delims (-> buffer :text-entity :open-delims)]
+            {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars line column)]
         (-> buffer
-            (assoc :tab-stops (reduce
-                                (fn [v i]
-                                  (let [first-stop (first v)]
-                                    (if (and first-stop (<= first-stop 1))
-                                      (reduced v)
-                                      (if-let [stops (get open-delims i)]
-                                        (-> (take-while #(or (nil? first-stop)
-                                                             (< % first-stop))
-                                              stops)
-                                            vec
-                                            (into v))
-                                        v))))
-                                []
-                                (range (dec line) -1 -1)))
             (update :rects-entity #(i/assoc % 0 cursor-entity))
             (as-> buffer
                   (let [{:keys [camera camera-x camera-y]} buffer
