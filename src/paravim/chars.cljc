@@ -4,10 +4,15 @@
             [play-cljc.instances :as i]
             [play-cljc.gl.text :as text]))
 
+(defn- get-char-code [ch first-char]
+  (- #?(:clj (int ch) :cljs (.charCodeAt ch 0)) first-char))
+
 (defn crop-char [{:keys [baked-font] :as font-entity} ch]
   (let [{:keys [baked-chars baseline first-char]} baked-font
-        char-code (- #?(:clj (int ch) :cljs (.charCodeAt ch 0)) first-char)
-        baked-char (nth baked-chars char-code)
+        char-code (get-char-code ch first-char)
+        baked-char (or (get baked-chars char-code)
+                       (nth baked-chars (get-char-code \space first-char)))
+        baked-char (cond-> baked-char (= ch \tab) (update :xadv * 2))
         {:keys [x y w h xoff yoff]} baked-char]
     (-> font-entity
         (t/crop x y w h)
