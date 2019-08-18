@@ -83,7 +83,15 @@
                                 :delta-time 0
                                 :total-time 0)
             vim (doto (v/->vim)
-                  v/init)
+                  v/init
+                  (v/execute "set hidden")
+                  (v/execute "set noswapfile")
+                  (v/execute "set nobackup")
+                  (v/execute "set nowritebackup")
+                  (v/execute "set tabstop=2")
+                  (v/execute "set softtabstop=2")
+                  (v/execute "set shiftwidth=2")
+                  (v/execute "set expandtab"))
             on-input (fn [s]
                        (let [{:keys [mode command-text command-text-entity]} @c/*state]
                          (if (and (= mode 'COMMAND_LINE) command-text)
