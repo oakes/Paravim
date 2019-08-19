@@ -36,9 +36,7 @@
 (defprotocol IRegex
   (find [this])
   (group [this index])
-  (index [this])
-  (line [this])
-  (character [this]))
+  (index [this]))
 
 (defn ->regex [match-str]
   (let [regex #?(:clj  regex
@@ -54,57 +52,28 @@
            :cljs (aget @*matcher index)))
       (index [this]
         #?(:clj  (.start ^Matcher *matcher)
-           :cljs (.-index @*matcher)))
-      (line [this]
-        (->> (subs match-str 0 (inc (index this)))
-             (re-seq #"\n")
-             count))
-      (character [this]
-        (let [s (subs match-str 0 (inc (index this)))]
-          (->> s
-               (or (some->> (str/last-index-of s "\n")
-                            inc
-                            (subs s))
-                   s)
-               count
-               dec))))))
+           :cljs (.-index @*matcher))))))
 
 (declare read-token)
 
-(defn wrap-coll [matcher data start-line-num start-char-num]
-  (let [text (group matcher 0)
-        line-num (line matcher)
-        char-num (character matcher)]
-    (vary-meta (into [:collection] data)
-      assoc
-      :start-line start-line-num
-      :end-line line-num
-      :start-char start-char-num
-      :end-char (+ char-num (count text)))))
+(defn wrap-coll [data]
+  (into [:collection] data))
 
 (defn read-coll [matcher [_ delim :as token-data]]
-  (let [end-delim (delims delim)
-        line-num (line matcher)
-        char-num (character matcher)
-        token-data (vary-meta token-data assoc
-                     :open-delim? true
-                     :start-line line-num
-                     :end-line line-num
-                     :start-char char-num
-                     :end-char (+ char-num (count delim)))]
+  (let [end-delim (delims delim)]
     (loop [data [token-data]]
       (if (find matcher)
         (let [[_ token :as token-data] (read-token matcher)
               data (conj data token-data)]
           (cond
             (= token end-delim)
-            (wrap-coll matcher data line-num char-num)
+            (wrap-coll data)
             (close-delims token)
-            (vary-meta (wrap-coll matcher data line-num char-num)
+            (vary-meta (wrap-coll data)
               assoc :error-message "Unmatched delimiter")
             :else
             (recur data)))
-        (vary-meta (wrap-coll matcher data line-num char-num)
+        (vary-meta (wrap-coll data)
           assoc :error-message "EOF while reading")))))
 
 (defn read-token [matcher]
@@ -115,17 +84,11 @@
     (if (and (= group :delimiter)
              (open-delims token))
       (read-coll matcher [group token])
-      (as-> group $
-            (if (and (= $ :symbol)
-                     (str/starts-with? token ":"))
-              :keyword
-              $)
-            [$ token]
-            (let [line-num (line matcher)
-                  char-num (character matcher)]
-              (vary-meta $ assoc
-                :start-line line-num
-                :start-char char-num))))))
+      [(if (and (= group :symbol)
+                (str/starts-with? token ":"))
+         :keyword
+         group)
+      token])))
 
 (defn parse [s]
   (let [matcher (->regex s)]
