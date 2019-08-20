@@ -1,7 +1,7 @@
 (ns paravim.core
   (:require [paravim.utils :as utils]
             [paravim.chars :as chars]
-            [paravim.parse :as parse]
+            [paren-salsa.core :as ps]
             [clojure.string :as str]
             [play-cljc.gl.core :as c]
             [play-cljc.transforms :as t]
@@ -53,7 +53,7 @@
   ([text-entity lines]
    (let [*line-num (volatile! 0)
          *char-num (volatile! -1)]
-     (->> (parse/parse (str/join "\n" lines))
+     (->> (ps/parse (str/join "\n" lines))
           (reduce
             (fn [characters data]
               (clojurify-lines characters *line-num *char-num nil -1 data))
