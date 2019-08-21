@@ -1,7 +1,7 @@
 (ns paravim.core
   (:require [paravim.utils :as utils]
             [paravim.chars :as chars]
-            [paren-salsa.core :as ps]
+            [parinferish.core :as ps]
             [clojure.string :as str]
             [play-cljc.gl.core :as c]
             [play-cljc.transforms :as t]
