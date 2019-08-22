@@ -264,7 +264,7 @@
    '{main ([]
            (=int total_char_count 0)
            (=int current_line 0)
-           ("for" "(int i=0; i<1024; ++i)"
+           ("for" "(int i=0; i<1000; ++i)"
              (+= total_char_count [u_char_counts i])
              ("if" (> total_char_count gl_InstanceID) "break")
              ("else" (+= current_line 1)))
