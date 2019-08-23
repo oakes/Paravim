@@ -379,7 +379,7 @@
       (c/render game (-> command-bg-entity
                          (t/project game-width game-height)
                          (t/translate 0 (- game-height (* font-size-multiplier font-height)))
-                         (t/scale game-width font-height)))
+                         (t/scale game-width (* font-size-multiplier font-height))))
       (when (and (= mode 'COMMAND_LINE)
                  command-rects-entity
                  command-text-entity)
