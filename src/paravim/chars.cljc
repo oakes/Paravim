@@ -2,7 +2,85 @@
   (:require [play-cljc.transforms :as t]
             [play-cljc.math :as m]
             [play-cljc.instances :as i]
-            [play-cljc.gl.text :as text]))
+            [play-cljc.gl.utils :as u]))
+
+(defn- replace-instance-attr [start-index end-index entities instanced-entity attr-name uni-name]
+  (let [new-data (reduce
+                   (fn [v entity]
+                     (if (:program entity)
+                       (throw (ex-info "Only uncompiled entities can be assoc'ed to an instanced entity" {}))
+                       (into v (get-in entity [:uniforms uni-name]))))
+                   []
+                   entities)]
+    (update-in instanced-entity [:attributes attr-name]
+               (fn [attr]
+                 (if attr
+                   (let [{:keys [size iter]} (u/merge-attribute-opts instanced-entity attr-name attr)
+                         data-len (* size iter)
+                         start-offset (* start-index data-len)
+                         end-offset (* end-index data-len)]
+                     (update attr :data
+                       (fn [data]
+                         (let [v1 (subvec data 0 start-offset)
+                               v2 (subvec data start-offset end-offset)
+                               v3 (subvec data end-offset)]
+                           (->> v3
+                                (into new-data)
+                                (into v1)
+                                (into []))))))
+                   {:data (vec new-data)
+                    :divisor 1})))))
+
+(defn- dissoc-instance-attr [start-index end-index instanced-entity attr-name]
+  (update-in instanced-entity [:attributes attr-name]
+             (fn [attr]
+               (let [{:keys [size iter]} (u/merge-attribute-opts instanced-entity attr-name attr)
+                     data-len (* size iter)
+                     start-offset (* start-index data-len)
+                     end-offset (* end-index data-len)]
+                 (update attr :data
+                         (fn [data]
+                           (let [v1 (subvec data 0 start-offset)
+                                 v2 (subvec data start-offset end-offset)
+                                 v3 (subvec data end-offset)]
+                             (into (into [] v1) v3))))))))
+
+(def ^:private instanced-font-attrs->unis
+  '{a_translate_matrix u_translate_matrix
+    a_scale_matrix u_scale_matrix
+    a_texture_matrix u_texture_matrix
+    a_color u_color})
+
+(defn assoc-line* [instanced-entity i entities]
+  (let [characters (:characters instanced-entity)
+        prev-lines (subvec characters 0 i)
+        prev-count (reduce + 0 (map count prev-lines))
+        curr-count (count (get characters i))
+        total-count (+ prev-count curr-count)]
+    (reduce-kv
+      (partial replace-instance-attr prev-count total-count entities)
+      instanced-entity
+      instanced-font-attrs->unis)))
+
+(defn insert-line* [instanced-entity i entities]
+  (let [characters (:characters instanced-entity)
+        prev-lines (subvec characters 0 i)
+        prev-count (reduce + 0 (map count prev-lines))]
+    (reduce-kv
+      (partial replace-instance-attr prev-count prev-count entities)
+      instanced-entity
+      instanced-font-attrs->unis)))
+
+(defn dissoc-line* [instanced-entity i]
+  (let [characters (:characters instanced-entity)
+        prev-lines (subvec characters 0 i)
+        prev-count (reduce + 0 (map count prev-lines))
+        curr-count (count (get characters i))
+        total-count (+ prev-count curr-count)]
+    (reduce
+      (partial dissoc-instance-attr prev-count total-count)
+      instanced-entity
+      (keys instanced-font-attrs->unis))))
 
 (defn- get-char-code [ch first-char]
   (- #?(:clj (int ch) :cljs (.charCodeAt ch 0)) first-char))
@@ -63,7 +141,7 @@
                                 #(m/multiply-matrices 3 (m/translation-matrix left 0) %)))
                             new-line)]
     (-> text-entity
-        (text/assoc-line line-num adjusted-new-line)
+        (assoc-line* line-num adjusted-new-line)
         (assoc-in [:characters line-num] new-line))))
 
 (defn insert-line [{:keys [characters] :as text-entity} line-num char-entities]
@@ -83,7 +161,7 @@
                                 #(m/multiply-matrices 3 (m/translation-matrix left 0) %)))
                             new-line)]
     (-> text-entity
-        (text/insert-line line-num adjusted-new-line)
+        (insert-line* line-num adjusted-new-line)
         (assoc :characters (:characters new-text-entity)))))
 
 (defn dissoc-char
@@ -103,7 +181,7 @@
 
 (defn dissoc-line [text-entity line-num]
   (-> text-entity
-      (text/dissoc-line line-num)
+      (dissoc-line* line-num)
       (update :characters (fn [characters]
                             (let [v1 (subvec characters 0 line-num)
                                   v2 (subvec characters (inc line-num))]
