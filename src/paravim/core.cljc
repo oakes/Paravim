@@ -280,6 +280,55 @@
            (= v_tex_coord (.xy (* a_texture_matrix (vec3 a_position 1))))
            (= v_color a_color))}})
 
+(def ^:private instanced-font-fragment-shader
+  {:precision "mediump float"
+   :uniforms
+   '{u_image sampler2D}
+   :inputs
+   '{v_tex_coord vec2
+     v_color vec4}
+   :outputs
+   '{o_color vec4}
+   :signatures
+   '{main ([] void)}
+   :functions
+   '{main ([]
+           (= o_color (texture u_image v_tex_coord))
+           ("if" (== (.rgb o_color) (vec3 "0.0" "0.0" "0.0"))
+             "discard")
+           ("else"
+             (= o_color v_color))
+           ;; the size of one pixel
+           (=vec2 one_pixel (/ (vec2 1) (vec2 (textureSize u_image 0))))
+           ;; left
+           (=vec4 left_color (texture u_image (+ v_tex_coord (vec2 (.x one_pixel) "0.0"))))
+           ("if" (== (.rgb left_color) (vec3 "0.0" "0.0" "0.0"))
+             (= left_color (vec4 "0.0" "0.0" "0.0" "0.0")))
+           ("else"
+             (= left_color v_color))
+           ;; right
+           (=vec4 right_color (texture u_image (+ v_tex_coord (vec2 (- 0 (.x one_pixel)) "0.0"))))
+           ("if" (== (.rgb right_color) (vec3 "0.0" "0.0" "0.0"))
+             (= right_color (vec4 "0.0" "0.0" "0.0" "0.0")))
+           ("else"
+             (= right_color v_color))
+           ;; top
+           (=vec4 top_color (texture u_image (+ v_tex_coord (vec2 "0.0" (.y one_pixel)))))
+           ("if" (== (.rgb top_color) (vec3 "0.0" "0.0" "0.0"))
+             (= top_color (vec4 "0.0" "0.0" "0.0" "0.0")))
+           ("else"
+             (= top_color v_color))
+           ;; bottom
+           (=vec4 bottom_color (texture u_image (+ v_tex_coord (vec2 "0.0" (- 0 (.y one_pixel))))))
+           ("if" (== (.rgb bottom_color) (vec3 "0.0" "0.0" "0.0"))
+             (= bottom_color (vec4 "0.0" "0.0" "0.0" "0.0")))
+           ("else"
+             (= bottom_color v_color))
+           ;; average
+           (= o_color
+             (/ (+ o_color left_color right_color top_color bottom_color)
+                "5.0")))}})
+
 (defn init [game callback]
   ;; allow transparency in images
   (gl game enable (gl game BLEND))
@@ -290,7 +339,8 @@
        (let [font-entity (-> (text/->font-entity game data baked-font)
                              (t/color text-color))
              text-entity (c/compile game (assoc (i/->instanced-entity font-entity)
-                                                :vertex instanced-font-vertex-shader))
+                                                :vertex instanced-font-vertex-shader
+                                                :fragment instanced-font-fragment-shader))
              rect-entity (e/->entity game primitives/rect)
              rects-entity (c/compile game (i/->instanced-entity rect-entity))
              command-bg-entity (c/compile game (t/color (e/->entity game primitives/rect) bg-color))]
