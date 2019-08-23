@@ -15,7 +15,7 @@
   #?(:cljs (:require-macros [paravim.text :refer [load-font-cljs]])))
 
 (def orig-camera (e/->camera true))
-(def bg-color [(/ 0 255) (/ 16 255) (/ 64 255) 0.9])
+(def bg-color [(/ 42 255) (/ 34 255) (/ 36 255) 0.95])
 (def font-size-multiplier (/ 1 2))
 
 (defonce *state (atom {:mouse-x 0
@@ -25,16 +25,16 @@
 
 (def text-color [1 1 1 1])
 
-(def colors {:number [1 1 0 1]
-             :string [1 0 0 1]
-             :keyword [0 0 1 1]})
+(def colors {:number [(/ 255 255) (/ 193 255) (/ 94 255) 1]
+             :string [(/ 209 255) (/ 153 255) (/ 101 255) 1]
+             :keyword [(/ 86 255) (/ 181 255) (/ 194 255) 1]
+             :comment [(/ 150 255) (/ 129 255) (/ 133 255) 1]})
 
-(def rainbow-colors [[0 1 1 1] ;; aqua
-                     [1 (/ 165 255) 0 1] ;; orange
-                     [(/ 250 255) (/ 128 255) (/ 114 255) 1] ;; salmon
-                     [1 0 1 1] ;; fuchsia
-                     [0 1 0 1] ;; lime
-                     ])
+(def rainbow-colors [[(/ 220 255) (/ 103 255) (/ 44 255) 1]
+                     [(/ 223 255) (/ 107 255) (/ 117 255) 1]
+                     [(/ 209 255) (/ 153 255) (/ 101 255) 1]
+                     [(/ 199 255) (/ 116 255) (/ 151 255) 1]
+                     [(/ 65 255) (/ 174 255) (/ 122 255) 1]])
 
 (defn get-color [class-name depth]
   (or (colors class-name)
