@@ -294,7 +294,7 @@
    '{main ([]
            (= o_color (texture u_image v_tex_coord))
            ("if" (== (.rgb o_color) (vec3 "0.0" "0.0" "0.0"))
-             "discard")
+             (= o_color (vec4 "0.0" "0.0" "0.0" "0.0")))
            ("else"
              (= o_color v_color))
            ;; the size of one pixel
@@ -326,7 +326,10 @@
            ;; average
            (= o_color
              (/ (+ o_color left_color right_color top_color bottom_color)
-                "5.0")))}})
+                "5.0"))
+           ;; discard transparent pixels
+           ("if" (== (.w o_color) "0.0")
+             "discard"))}})
 
 (defn init [game callback]
   ;; allow transparency in images
