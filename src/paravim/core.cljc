@@ -342,7 +342,8 @@
                              (t/color text-color))
              text-entity (c/compile game (assoc (i/->instanced-entity font-entity)
                                                 :vertex instanced-font-vertex-shader
-                                                :fragment instanced-font-fragment-shader))
+                                                :fragment instanced-font-fragment-shader
+                                                :characters []))
              rect-entity (e/->entity game primitives/rect)
              rects-entity (c/compile game (i/->instanced-entity rect-entity))
              command-bg-entity (c/compile game (t/color (e/->entity game primitives/rect) bg-color))]
