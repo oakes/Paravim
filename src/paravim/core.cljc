@@ -41,6 +41,9 @@
         :delimiter (nth rainbow-colors (mod depth (count rainbow-colors)))
         text-color)))
 
+(defn make-transparent [color]
+  (assoc color 3 0.25))
+
 (defn assoc-lines [text-entity font-entity lines]
   (reduce-kv
     (fn [entity line-num line]
@@ -100,7 +103,7 @@
                                   (-> entity :character (not= ch)))
                            (chars/crop-char font-entity ch)
                            entity)
-                         (t/color color))))))))
+                         (t/color (cond-> color parinfer? make-transparent)))))))))
          characters
          data)))))
 
@@ -234,32 +237,44 @@
       (assoc-in [:uniforms 'u_font_height] font-height)))
 
 (defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity font-height] :as state} buffer-ptr path lines]
-  (assoc-in state [:buffers buffer-ptr]
-    {:text-entity (cond-> (assoc-lines base-text-entity base-font-entity lines)
-                          (clojure-exts (get-extension path))
-                          (clojurify-lines base-font-entity (ps/parse (str/join "\n" lines)) false)
-                          true
-                          (update-uniforms font-height))
-     :rects-entity base-rects-entity
-     :camera (t/translate orig-camera 0 0)
-     :camera-x 0
-     :camera-y 0
-     :path path
-     :lines lines}))
+  (let [text-entity (assoc-lines base-text-entity base-font-entity lines)
+        parsed-code (ps/parse (str/join "\n" lines))]
+    (assoc-in state [:buffers buffer-ptr]
+      {:text-entity (cond-> text-entity
+                            (clojure-exts (get-extension path))
+                            (clojurify-lines base-font-entity parsed-code false)
+                            true
+                            (update-uniforms font-height))
+       :parinfer-text-entity (when (clojure-exts (get-extension path))
+                               (-> text-entity
+                                   (clojurify-lines base-font-entity parsed-code true)
+                                   (update-uniforms font-height)))
+       :rects-entity base-rects-entity
+       :camera (t/translate orig-camera 0 0)
+       :camera-x 0
+       :camera-y 0
+       :path path
+       :lines lines})))
 
 (defn modify-buffer [{:keys [base-font-entity font-height] :as state} game buffer-ptr new-lines first-line line-count-change]
   (update-in state [:buffers buffer-ptr]
-    (fn [{:keys [text-entity path lines cursor-line cursor-column] :as buffer}]
+    (fn [{:keys [text-entity parinfer-text-entity path lines cursor-line cursor-column] :as buffer}]
       (let [lines (update-lines lines new-lines first-line line-count-change)
-            opts {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}]
+            opts {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}
+            parsed-code (ps/parse (str/join "\n" lines) opts)]
         (assoc buffer
           :lines lines
           :text-entity
           (cond-> (replace-lines text-entity base-font-entity new-lines first-line line-count-change)
                   (clojure-exts (get-extension path))
-                  (clojurify-lines base-font-entity (ps/parse (str/join "\n" lines) opts) true)
+                  (clojurify-lines base-font-entity parsed-code false)
                   true
-                  (update-uniforms font-height)))))))
+                  (update-uniforms font-height))
+          :parinfer-text-entity
+          (when (clojure-exts (get-extension path))
+            (-> (replace-lines parinfer-text-entity base-font-entity new-lines first-line line-count-change)
+                (clojurify-lines base-font-entity parsed-code true)
+                (update-uniforms font-height))))))))
 
 (def ^:private instanced-font-vertex-shader
   {:inputs
@@ -387,11 +402,16 @@
                 font-height mode]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
-    (when-let [{:keys [rects-entity text-entity camera]} (get buffers current-buffer)]
+    (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]} (get buffers current-buffer)]
       (c/render game (-> rects-entity
                          (t/project game-width game-height)
                          (t/camera camera)
                          (t/scale font-size-multiplier font-size-multiplier)))
+      (when parinfer-text-entity
+        (c/render game (-> parinfer-text-entity
+                           (t/project game-width game-height)
+                           (t/camera camera)
+                           (t/scale font-size-multiplier font-size-multiplier))))
       (c/render game (-> text-entity
                          (t/project game-width game-height)
                          (t/camera camera)
