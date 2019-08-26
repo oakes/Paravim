@@ -41,8 +41,8 @@
         :delimiter (nth rainbow-colors (mod depth (count rainbow-colors)))
         text-color)))
 
-(defn make-transparent [color]
-  (assoc color 3 0.25))
+(defn set-alpha [color alpha]
+  (assoc color 3 alpha))
 
 (defn assoc-lines [text-entity font-entity lines]
   (reduce-kv
@@ -103,7 +103,7 @@
                                   (-> entity :character (not= ch)))
                            (chars/crop-char font-entity ch)
                            entity)
-                         (t/color (cond-> color parinfer? make-transparent)))))))))
+                         (t/color (cond-> color parinfer? (set-alpha (if (= class-name :delimiter) 0.25 0.05)))))))))))
          characters
          data)))))
 
