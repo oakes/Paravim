@@ -21,7 +21,8 @@
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
                        :current-buffer nil
-                       :buffers {}}))
+                       :buffers {}
+                       :buffer-updates []}))
 
 (def text-color [1 1 1 1])
 

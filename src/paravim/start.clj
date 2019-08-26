@@ -119,14 +119,13 @@
                                  (dec (v/get-cursor-line vim))
                                  (v/get-cursor-column vim))
                                (as-> state
-                                     (if-let [{:keys [buffer-ptr start-line end-line line-count-change]} (:buffer-update state)]
-                                       (let [first-line (dec start-line)
-                                             last-line (+ (dec end-line) line-count-change)
-                                             lines (vec (for [i (range first-line last-line)]
-                                                          (v/get-line vim buffer-ptr (inc i))))]
-                                         (-> state
-                                             (dissoc :buffer-update)
-                                             (c/modify-buffer initial-game buffer-ptr lines first-line line-count-change)))
+                                     (if (seq (:buffer-updates state))
+                                       (-> (reduce
+                                             (fn [state {:keys [buffer-ptr lines first-line line-count-change]}]
+                                               (c/modify-buffer state initial-game buffer-ptr lines first-line line-count-change))
+                                             state
+                                             (:buffer-updates state))
+                                           (assoc :buffer-updates []))
                                        state))))))]
         (listen-for-keys window on-input)
         (listen-for-chars window on-input)
@@ -149,10 +148,14 @@
                                                              (v/get-cursor-column vim)))))))
                                        nil)))
         (v/set-on-buffer-update vim (fn [buffer-ptr start-line end-line line-count-change]
-                                      (swap! c/*state assoc :buffer-update {:buffer-ptr buffer-ptr
-                                                                            :start-line start-line
-                                                                            :end-line end-line
-                                                                            :line-count-change line-count-change})))
+                                      (let [first-line (dec start-line)
+                                            last-line (+ (dec end-line) line-count-change)
+                                            lines (vec (for [i (range first-line last-line)]
+                                                         (v/get-line vim buffer-ptr (inc i))))]
+                                        (swap! c/*state update :buffer-updates conj {:buffer-ptr buffer-ptr
+                                                                                     :lines lines
+                                                                                     :first-line first-line
+                                                                                     :line-count-change line-count-change}))))
         (c/init initial-game (fn []
                                (v/open-buffer vim "deps.edn")))
         (loop [game initial-game]
