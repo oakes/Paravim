@@ -238,14 +238,15 @@
 
 (defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity font-height] :as state} buffer-ptr path lines]
   (let [text-entity (assoc-lines base-text-entity base-font-entity lines)
-        parsed-code (ps/parse (str/join "\n" lines))]
+        parsed-code (when (clojure-exts (get-extension path))
+                      (ps/parse (str/join "\n" lines)))]
     (assoc-in state [:buffers buffer-ptr]
       {:text-entity (cond-> text-entity
-                            (clojure-exts (get-extension path))
+                            parsed-code
                             (clojurify-lines base-font-entity parsed-code false)
                             true
                             (update-uniforms font-height))
-       :parinfer-text-entity (when (clojure-exts (get-extension path))
+       :parinfer-text-entity (when parsed-code
                                (-> text-entity
                                    (clojurify-lines base-font-entity parsed-code true)
                                    (update-uniforms font-height)))
@@ -260,18 +261,18 @@
   (update-in state [:buffers buffer-ptr]
     (fn [{:keys [text-entity parinfer-text-entity path lines cursor-line cursor-column] :as buffer}]
       (let [lines (update-lines lines new-lines first-line line-count-change)
-            opts {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}
-            parsed-code (ps/parse (str/join "\n" lines) opts)]
+            parsed-code (when (clojure-exts (get-extension path))
+                          (ps/parse (str/join "\n" lines) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}))]
         (assoc buffer
           :lines lines
           :text-entity
           (cond-> (replace-lines text-entity base-font-entity new-lines first-line line-count-change)
-                  (clojure-exts (get-extension path))
+                  parsed-code
                   (clojurify-lines base-font-entity parsed-code false)
                   true
                   (update-uniforms font-height))
           :parinfer-text-entity
-          (when (clojure-exts (get-extension path))
+          (when parsed-code
             (-> (replace-lines parinfer-text-entity base-font-entity new-lines first-line line-count-change)
                 (clojurify-lines base-font-entity parsed-code true)
                 (update-uniforms font-height))))))))
