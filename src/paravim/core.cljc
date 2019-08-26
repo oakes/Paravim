@@ -49,13 +49,13 @@
     lines))
 
 (defn clojurify-lines
-  ([text-entity lines]
+  ([text-entity font-entity parsed-code parinfer?]
    (let [*line-num (volatile! 0)
          *char-num (volatile! -1)]
-     (->> (ps/parse (str/join "\n" lines))
+     (->> parsed-code
           (reduce
             (fn [characters data]
-              (clojurify-lines characters *line-num *char-num nil -1 data))
+              (clojurify-lines characters font-entity *line-num *char-num nil -1 data parinfer?))
             (:characters text-entity))
           (reduce-kv
             (fn [entity line-num char-entities]
@@ -63,28 +63,44 @@
                 (chars/assoc-line entity line-num char-entities)
                 entity))
             text-entity))))
-  ([characters *line-num *char-num class-name depth data]
+  ([characters font-entity *line-num *char-num class-name depth data parinfer?]
    (if (vector? data)
      (let [[class-name & children] data
            depth (cond-> depth
                          (= class-name :collection)
                          inc)]
-       (reduce
-         (fn [characters child]
-           (clojurify-lines characters *line-num *char-num class-name depth child))
+       (if (or (and parinfer? (-> data meta :action (= :remove)))
+               (and (not parinfer?) (-> data meta :action (= :insert))))
          characters
-         children))
+         (reduce
+           (fn [characters child]
+             (clojurify-lines characters font-entity *line-num *char-num class-name depth child parinfer?))
+           characters
+           children)))
      (let [color (get-color class-name depth)]
        (reduce
          (fn [characters ch]
            (if (= ch \newline)
-             (do
+             (let [line-num @*line-num
+                   char-num (inc @*char-num)]
                (vswap! *line-num inc)
                (vreset! *char-num -1)
-               characters)
+               (if parinfer?
+                 (update characters line-num
+                   (fn [char-entities]
+                     (if (not= (count char-entities) char-num)
+                       (into [] (subvec char-entities 0 char-num))
+                       char-entities)))
+                 characters))
              (update characters @*line-num
                (fn [char-entities]
-                 (update char-entities (vswap! *char-num inc) t/color color)))))
+                 (update char-entities (vswap! *char-num inc)
+                   (fn [entity]
+                     (-> (if (and parinfer?
+                                  (-> entity :character (not= ch)))
+                           (chars/crop-char font-entity ch)
+                           entity)
+                         (t/color color))))))))
          characters
          data)))))
 
@@ -162,6 +178,7 @@
       (let [line-chars (get-in buffer [:text-entity :characters line])
             {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars line column)]
         (-> buffer
+            (assoc :cursor-line line :cursor-column column)
             (update :rects-entity #(i/assoc % 0 cursor-entity))
             (as-> buffer
                   (let [{:keys [camera camera-x camera-y]} buffer
@@ -211,18 +228,18 @@
 
 (def clojure-exts #{"clj" "cljs" "cljc" "edn"})
 
-(defn update-uniforms [text-entity font-height lines]
+(defn update-uniforms [{:keys [characters] :as text-entity} font-height]
   (-> text-entity
-      (assoc-in [:uniforms 'u_char_counts] (mapv count lines))
+      (assoc-in [:uniforms 'u_char_counts] (mapv count characters))
       (assoc-in [:uniforms 'u_font_height] font-height)))
 
 (defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity font-height] :as state} buffer-ptr path lines]
   (assoc-in state [:buffers buffer-ptr]
     {:text-entity (cond-> (assoc-lines base-text-entity base-font-entity lines)
-                          true
-                          (update-uniforms font-height lines)
                           (clojure-exts (get-extension path))
-                          (clojurify-lines lines))
+                          (clojurify-lines base-font-entity (ps/parse (str/join "\n" lines)) false)
+                          true
+                          (update-uniforms font-height))
      :rects-entity base-rects-entity
      :camera (t/translate orig-camera 0 0)
      :camera-x 0
@@ -232,16 +249,17 @@
 
 (defn modify-buffer [{:keys [base-font-entity font-height] :as state} game buffer-ptr new-lines first-line line-count-change]
   (update-in state [:buffers buffer-ptr]
-    (fn [{:keys [text-entity path lines] :as buffer}]
-      (let [lines (update-lines lines new-lines first-line line-count-change)]
+    (fn [{:keys [text-entity path lines cursor-line cursor-column] :as buffer}]
+      (let [lines (update-lines lines new-lines first-line line-count-change)
+            opts {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}]
         (assoc buffer
           :lines lines
           :text-entity
           (cond-> (replace-lines text-entity base-font-entity new-lines first-line line-count-change)
-                  true
-                  (update-uniforms font-height lines)
                   (clojure-exts (get-extension path))
-                  (clojurify-lines lines)))))))
+                  (clojurify-lines base-font-entity (ps/parse (str/join "\n" lines) opts) true)
+                  true
+                  (update-uniforms font-height)))))))
 
 (def ^:private instanced-font-vertex-shader
   {:inputs

@@ -98,7 +98,7 @@
                   (m/scaling-matrix w h))
         (assoc-in [:uniforms 'u_translate_matrix]
                   (m/translation-matrix xoff (+ baseline yoff)))
-        (assoc :baked-char baked-char))))
+        (assoc :baked-char baked-char :character ch))))
 
 (defn assoc-char
   ([text-entity index char-entity]
