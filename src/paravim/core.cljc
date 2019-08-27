@@ -266,6 +266,7 @@
                           (ps/parse (str/join "\n" lines) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}))]
         (assoc buffer
           :lines lines
+          :parsed-code parsed-code
           :text-entity
           (cond-> (replace-lines text-entity base-font-entity new-lines first-line line-count-change)
                   parsed-code
