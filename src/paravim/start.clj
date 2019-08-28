@@ -64,10 +64,13 @@
         (callback (str (char codepoint)))))))
 
 (defn apply-parinfer! [state vim]
-  (let [buffer-ptr (v/get-current-buffer vim)]
+  (let [buffer-ptr (v/get-current-buffer vim)
+        mode (v/get-mode vim)]
     (if-let [parsed-code (get-in state [:buffers buffer-ptr :parsed-code])]
       (let [cursor-line (v/get-cursor-line vim)
             cursor-column (v/get-cursor-column vim)]
+        (when (not= 'INSERT mode)
+          (v/input vim "i"))
         (doseq [{:keys [line column content action]} (par/diff parsed-code)]
           (v/set-cursor-position vim (inc line) column)
           (doseq [ch (seq content)]
@@ -77,6 +80,8 @@
               :insert
               (v/input vim (str ch)))))
         (v/set-cursor-position vim cursor-line cursor-column)
+        (when (not= 'INSERT mode)
+          (v/input vim "<Esc>"))
         (update-in state [:buffers buffer-ptr] dissoc :parsed-code))
       state)))
 
@@ -122,7 +127,7 @@
                   (v/execute "set expandtab"))
             on-input (fn [s]
                        (let [{:keys [mode command-text command-text-entity mode]} @c/*state]
-                         (when (and (= mode 'INSERT) (= s "<Esc>"))
+                         (when (and (= 'INSERT mode) (= s "<Esc>"))
                            (swap! c/*state
                              (fn [state]
                                (-> state
@@ -153,7 +158,8 @@
                                    (v/get-cursor-column vim))
                                  (update-buffers initial-game)
                                  (as-> state
-                                       (if (not= 'INSERT (:mode state))
+                                       (if (and (not= 'INSERT (:mode state))
+                                                (not= s "u"))
                                          (apply-parinfer! state vim)
                                          state)))))))]
         (listen-for-keys window on-input)
