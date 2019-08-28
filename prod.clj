@@ -9,8 +9,8 @@
   '[clojure.java.io :as io]
   '[clojure.string :as str]
   '[leiningen.core.project :as p :refer [defproject]]
-  '[leiningen.clean :refer [clean]]
-  '[leiningen.uberjar :refer [uberjar]])
+  '[leiningen.install :refer [install]]
+  '[leiningen.deploy :refer [deploy]])
 
 (defn read-project-clj []
   (p/ensure-dynamic-classloader)
@@ -45,13 +45,20 @@
      :source-paths []
      :resource-paths paths}))
 
-(defmethod task "uberjar"
+(defmethod task "install"
   [_]
-  (let [project (-> (read-project-clj)
-                    (merge (read-deps-edn [:linux :macos :windows]))
-                    p/init-project)]
-    (clean project)
-    (uberjar project)
-    (System/exit 0)))
+  (-> (read-project-clj)
+      (merge (read-deps-edn []))
+      p/init-project
+      install)
+  (System/exit 0))
+
+(defmethod task "deploy"
+  [_]
+  (-> (read-project-clj)
+      (merge (read-deps-edn []))
+      p/init-project
+      (deploy "clojars"))
+  (System/exit 0))
 
 (task *command-line-args*)
