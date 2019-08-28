@@ -63,10 +63,19 @@
       (invoke [this window codepoint]
         (callback (str (char codepoint)))))))
 
-(defn apply-parinfer! [state vim]
-  (let [buffer-ptr (v/get-current-buffer vim)
-        mode (v/get-mode vim)]
-    (if-let [parsed-code (get-in state [:buffers buffer-ptr :parsed-code])]
+(defn update-buffers [state game]
+  (if-let [updates (not-empty (:buffer-updates state))]
+    (-> (reduce
+          (fn [state {:keys [buffer-ptr lines first-line line-count-change]}]
+            (c/modify-buffer state game buffer-ptr lines first-line line-count-change))
+          state
+          updates)
+        (assoc :buffer-updates []))
+    state))
+
+(defn apply-parinfer! [{:keys [mode] :as state} vim game buffer-ptr]
+  (let [{:keys [parsed-code needs-parinfer?]} (get-in state [:buffers buffer-ptr])]
+    (when needs-parinfer?
       (let [cursor-line (v/get-cursor-line vim)
             cursor-column (v/get-cursor-column vim)
             diffs (par/diff parsed-code)]
@@ -83,19 +92,12 @@
                 (v/input vim (str ch)))))
           (v/set-cursor-position vim cursor-line cursor-column)
           (when (not= 'INSERT mode)
-            (v/input vim "<Esc>")))
-        (update-in state [:buffers buffer-ptr] dissoc :parsed-code))
-      state)))
-
-(defn update-buffers [state game]
-  (if-let [updates (not-empty (:buffer-updates state))]
-    (-> (reduce
-          (fn [state {:keys [buffer-ptr lines first-line line-count-change]}]
-            (c/modify-buffer state game buffer-ptr lines first-line line-count-change))
-          state
-          updates)
-        (assoc :buffer-updates []))
-    state))
+            (v/input vim "<Esc>"))))
+      (swap! c/*state
+        (fn [state]
+          (-> state
+              (assoc-in [:buffers buffer-ptr :needs-parinfer?] false)
+              (update-buffers game)))))))
 
 (defn -main [& args]
   (when-not (GLFW/glfwInit)
@@ -128,13 +130,10 @@
                   (v/execute "set shiftwidth=2")
                   (v/execute "set expandtab"))
             on-input (fn [s]
-                       (let [{:keys [mode command-text command-text-entity mode]} @c/*state]
+                       (let [{:keys [mode command-text command-text-entity current-buffer]} @c/*state]
                          (when (and (= 'INSERT mode) (= s "<Esc>"))
-                           (swap! c/*state
-                             (fn [state]
-                               (-> state
-                                   (update-buffers initial-game)
-                                   (apply-parinfer! vim)))))
+                           (-> (swap! c/*state update-buffers initial-game)
+                               (apply-parinfer! vim initial-game current-buffer)))
                          (if (and (= mode 'COMMAND_LINE) command-text)
                            (let [pos (v/get-command-position vim)]
                              (case s
@@ -150,20 +149,21 @@
                                nil
                                (v/input vim s)))
                            (v/input vim s))
-                         (swap! c/*state
-                           (fn [state]
-                             (-> state
-                                 (assoc :mode (v/get-mode vim))
-                                 (c/update-command (v/get-command-text vim) (v/get-command-position vim))
-                                 (c/update-cursor initial-game (v/get-current-buffer vim)
-                                   (dec (v/get-cursor-line vim))
-                                   (v/get-cursor-column vim))
-                                 (update-buffers initial-game)
-                                 (as-> state
-                                       (if (and (not= 'INSERT (:mode state))
-                                                (not= s "u"))
-                                         (apply-parinfer! state vim)
-                                         state)))))))]
+                         (let [current-buffer (v/get-current-buffer vim)
+                               mode (v/get-mode vim)]
+                           (cond-> (swap! c/*state
+                                     (fn [state]
+                                       (-> state
+                                           (assoc :mode mode)
+                                           (c/update-command (v/get-command-text vim) (v/get-command-position vim))
+                                           (c/update-cursor initial-game current-buffer
+                                             (dec (v/get-cursor-line vim))
+                                             (v/get-cursor-column vim))
+                                           (update-buffers initial-game)
+                                           (c/update-highlight current-buffer))))
+                                   (and (not= 'INSERT mode)
+                                        (not= s "u"))
+                                   (apply-parinfer! vim initial-game current-buffer)))))]
         (listen-for-keys window on-input)
         (listen-for-chars window on-input)
         (v/set-on-quit vim (fn [buffer-ptr force?]

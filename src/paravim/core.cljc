@@ -176,14 +176,14 @@
                :width (* width font-size-multiplier)
                :height (* height font-size-multiplier)))))
 
-(defn update-cursor [{:keys [font-height] :as state} game buffer-ptr line column]
+(defn update-cursor [{:keys [font-height base-rects-entity] :as state} game buffer-ptr line column]
   (update-in state [:buffers buffer-ptr]
     (fn [buffer]
       (let [line-chars (get-in buffer [:text-entity :characters line])
             {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars line column)]
         (-> buffer
             (assoc :cursor-line line :cursor-column column)
-            (update :rects-entity #(i/assoc % 0 cursor-entity))
+            (assoc :rects-entity (i/assoc base-rects-entity 0 cursor-entity))
             (as-> buffer
                   (let [{:keys [camera camera-x camera-y]} buffer
                         cursor-bottom (+ top height)
@@ -223,6 +223,9 @@
       :command-text-entity command-text-entity
       :command-rects-entity command-rects-entity)))
 
+(defn update-highlight [state buffer-ptr]
+  state)
+
 (defn get-extension
   [path]
   (some->> (str/last-index-of path ".")
@@ -237,7 +240,7 @@
       (assoc-in [:uniforms 'u_char_counts] (mapv count characters))
       (assoc-in [:uniforms 'u_font_height] font-height)))
 
-(defn assoc-buffer [{:keys [base-font-entity base-text-entity base-rects-entity font-height] :as state} buffer-ptr path lines]
+(defn assoc-buffer [{:keys [base-font-entity base-text-entity font-height] :as state} buffer-ptr path lines]
   (let [text-entity (assoc-lines base-text-entity base-font-entity lines)
         parsed-code (when (clojure-exts (get-extension path))
                       (ps/parse (str/join "\n" lines)))]
@@ -251,12 +254,12 @@
                                (-> text-entity
                                    (clojurify-lines base-font-entity parsed-code true)
                                    (update-uniforms font-height)))
-       :rects-entity base-rects-entity
        :camera (t/translate orig-camera 0 0)
        :camera-x 0
        :camera-y 0
        :path path
-       :lines lines})))
+       :lines lines
+       :parsed-code parsed-code})))
 
 (defn modify-buffer [{:keys [base-font-entity font-height] :as state} game buffer-ptr new-lines first-line line-count-change]
   (update-in state [:buffers buffer-ptr]
@@ -267,6 +270,7 @@
         (assoc buffer
           :lines lines
           :parsed-code parsed-code
+          :needs-parinfer? (some? parsed-code)
           :text-entity
           (cond-> (replace-lines text-entity base-font-entity new-lines first-line line-count-change)
                   parsed-code
