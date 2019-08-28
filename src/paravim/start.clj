@@ -68,20 +68,22 @@
         mode (v/get-mode vim)]
     (if-let [parsed-code (get-in state [:buffers buffer-ptr :parsed-code])]
       (let [cursor-line (v/get-cursor-line vim)
-            cursor-column (v/get-cursor-column vim)]
-        (when (not= 'INSERT mode)
-          (v/input vim "i"))
-        (doseq [{:keys [line column content action]} (par/diff parsed-code)]
-          (v/set-cursor-position vim (inc line) column)
-          (doseq [ch (seq content)]
-            (case action
-              :remove
-              (v/input vim "<Del>")
-              :insert
-              (v/input vim (str ch)))))
-        (v/set-cursor-position vim cursor-line cursor-column)
-        (when (not= 'INSERT mode)
-          (v/input vim "<Esc>"))
+            cursor-column (v/get-cursor-column vim)
+            diffs (par/diff parsed-code)]
+        (when (seq diffs)
+          (when (not= 'INSERT mode)
+            (v/input vim "i"))
+          (doseq [{:keys [line column content action]} diffs]
+            (v/set-cursor-position vim (inc line) column)
+            (doseq [ch (seq content)]
+              (case action
+                :remove
+                (v/input vim "<Del>")
+                :insert
+                (v/input vim (str ch)))))
+          (v/set-cursor-position vim cursor-line cursor-column)
+          (when (not= 'INSERT mode)
+            (v/input vim "<Esc>")))
         (update-in state [:buffers buffer-ptr] dissoc :parsed-code))
       state)))
 
