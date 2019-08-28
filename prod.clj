@@ -6,7 +6,6 @@
   (System/exit 1))
 
 (require
-  '[cljs.build.api :as api]
   '[clojure.java.io :as io]
   '[clojure.string :as str]
   '[leiningen.core.project :as p :refer [defproject]]
@@ -45,26 +44,6 @@
     {:dependencies deps
      :source-paths []
      :resource-paths paths}))
-
-(defn delete-children-recursively! [f]
-  (when (.isDirectory f)
-    (doseq [f2 (.listFiles f)]
-      (delete-children-recursively! f2)))
-  (when (.exists f) (io/delete-file f)))
-
-(defmethod task nil
-  [_]
-  (let [out-file "resources/public/main.js"
-        out-dir "resources/public/main.out"]
-    (println "Building main.js")
-    (delete-children-recursively! (io/file out-dir))
-    (api/build "src" {:main          'paravim.start
-                      :optimizations :advanced
-                      :output-to     out-file
-                      :output-dir    out-dir})
-    (delete-children-recursively! (io/file out-dir))
-    (println "Build complete:" out-file)
-    (System/exit 0)))
 
 (defmethod task "uberjar"
   [_]

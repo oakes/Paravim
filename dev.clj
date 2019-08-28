@@ -6,8 +6,6 @@
   (System/exit 1))
 
 (require
-  '[figwheel.main :as figwheel]
-  ;'[nightlight.core :as nightlight]
   '[clojure.java.io :as io])
 
 (defn delete-children-recursively! [f]
@@ -16,18 +14,10 @@
       (delete-children-recursively! f2)))
   (when (.exists f) (io/delete-file f)))
 
-(defmethod task nil
-  [_]
-  (delete-children-recursively! (io/file "resources/public/main.out"))
-  ;(nightlight/start {:port 4000
-  ;                   :url "http://localhost:9500"})
-  (figwheel/-main "--build" "dev"))
-
 (require '[paravim.start-dev])
 
 (defmethod task "native"
   [_]
-  ;(nightlight/start {:port 4001})
   (paravim.start-dev/start))
 
 (task *command-line-args*)
