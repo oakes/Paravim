@@ -55,32 +55,45 @@
 (defn clojurify-lines
   ([text-entity font-entity parsed-code parinfer?]
    (let [*line-num (volatile! 0)
-         *char-num (volatile! -1)]
-     (->> parsed-code
-          (reduce
-            (fn [characters data]
-              (clojurify-lines characters font-entity *line-num *char-num nil -1 data parinfer?))
-            (:characters text-entity))
-          (reduce-kv
-            (fn [entity line-num char-entities]
-              (if (not= (get-in entity [:characters line-num]) char-entities)
-                (chars/assoc-line entity line-num char-entities)
-                entity))
-            text-entity))))
-  ([characters font-entity *line-num *char-num class-name depth data parinfer?]
+         *char-num (volatile! -1)
+         *collections (volatile! [])]
+     (as-> parsed-code $
+           (reduce
+             (fn [characters data]
+               (clojurify-lines characters font-entity *line-num *char-num *collections nil -1 data parinfer?))
+             (:characters text-entity)
+             $)
+           (reduce-kv
+             (fn [entity line-num char-entities]
+               (if (not= (get-in entity [:characters line-num]) char-entities)
+                 (chars/assoc-line entity line-num char-entities)
+                 entity))
+             text-entity
+             $)
+           (assoc $ :collections @*collections))))
+  ([characters font-entity *line-num *char-num *collections class-name depth data parinfer?]
    (if (vector? data)
      (let [[class-name & children] data
            depth (cond-> depth
                          (= class-name :collection)
-                         inc)]
-       (if (or (and parinfer? (-> data meta :action (= :remove)))
-               (and (not parinfer?) (-> data meta :action (= :insert))))
-         characters
-         (reduce
-           (fn [characters child]
-             (clojurify-lines characters font-entity *line-num *char-num class-name depth child parinfer?))
-           characters
-           children)))
+                         inc)
+           line-num @*line-num
+           char-num @*char-num
+           characters (if (or (and parinfer? (-> data meta :action (= :remove)))
+                              (and (not parinfer?) (-> data meta :action (= :insert))))
+                        characters
+                        (reduce
+                          (fn [characters child]
+                            (clojurify-lines characters font-entity *line-num *char-num *collections class-name depth child parinfer?))
+                          characters
+                          children))]
+       (when (= class-name :collection)
+         (vswap! *collections conj {:start-line line-num
+                                    :start-column (inc char-num)
+                                    :end-line @*line-num
+                                    :end-column (inc @*char-num)
+                                    :depth depth}))
+       characters)
      (let [color (get-color class-name depth)]
        (reduce
          (fn [characters ch]
@@ -224,6 +237,16 @@
       :command-rects-entity command-rects-entity)))
 
 (defn update-highlight [state buffer-ptr]
+  (let [{:keys [text-entity cursor-line cursor-column]} (get-in state [:buffers buffer-ptr])]
+    (println (->> (:collections text-entity)
+                  (filter (fn [{:keys [start-line start-column end-line end-column]}]
+                            (and (or (< start-line cursor-line)
+                                     (and (= start-line cursor-line)
+                                          (<= start-column cursor-column)))
+                                 (or (> end-line cursor-line)
+                                     (and (= end-line cursor-line)
+                                          (> end-column cursor-column))))))
+                  first)))
   state)
 
 (defn get-extension
