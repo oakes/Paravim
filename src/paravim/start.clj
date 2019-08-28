@@ -66,7 +66,6 @@
 (defn apply-parinfer! [vim buffer-ptr parsed-code]
   (let [cursor-line (v/get-cursor-line vim)
         cursor-column (v/get-cursor-column vim)]
-    (v/input vim "i")
     (doseq [{:keys [line column content action]} (par/diff parsed-code)]
       (v/set-cursor-position vim (inc line) column)
       (doseq [ch (seq content)]
@@ -75,8 +74,17 @@
           (v/input vim "<Del>")
           :insert
           (v/input vim (str ch)))))
-    (v/set-cursor-position vim cursor-line cursor-column)
-    (v/input vim "<Esc>")))
+    (v/set-cursor-position vim cursor-line cursor-column)))
+
+(defn update-buffers [state game]
+  (if-let [updates (not-empty (:buffer-updates state))]
+    (-> (reduce
+          (fn [state {:keys [buffer-ptr lines first-line line-count-change]}]
+            (c/modify-buffer state game buffer-ptr lines first-line line-count-change))
+          state
+          updates)
+        (assoc :buffer-updates []))
+    state))
 
 (defn -main [& args]
   (when-not (GLFW/glfwInit)
@@ -110,6 +118,19 @@
                   (v/execute "set expandtab"))
             on-input (fn [s]
                        (let [{:keys [mode command-text command-text-entity]} @c/*state]
+                         (swap! c/*state
+                           (fn [state]
+                             (as-> state $
+                                   (update-buffers $ initial-game)
+                                   (if (and (= (:mode $) 'INSERT)
+                                            (= s "<Esc>"))
+                                     (let [current-buffer-ptr (v/get-current-buffer vim)]
+                                       (if-let [code (get-in $ [:buffers current-buffer-ptr :parsed-code])]
+                                         (do
+                                           (apply-parinfer! vim current-buffer-ptr code)
+                                           (update-in $ [:buffers current-buffer-ptr] dissoc :parsed-code))
+                                         $))
+                                     $))))
                          (if (and (= mode 'COMMAND_LINE) command-text)
                            (let [pos (v/get-command-position vim)]
                              (case s
@@ -124,32 +145,16 @@
                                ("<Right>" "<Left>" "<Up>" "<Down>")
                                nil
                                (v/input vim s)))
-                           (v/input vim s)))
-                       (let [current-buffer-ptr (v/get-current-buffer vim)]
+                           (v/input vim s))
                          (swap! c/*state
                            (fn [state]
                              (-> state
                                  (assoc :mode (v/get-mode vim))
                                  (c/update-command (v/get-command-text vim) (v/get-command-position vim))
-                                 (c/update-cursor initial-game current-buffer-ptr
+                                 (c/update-cursor initial-game (v/get-current-buffer vim)
                                    (dec (v/get-cursor-line vim))
                                    (v/get-cursor-column vim))
-                                 (as-> state
-                                       (if-let [updates (not-empty (:buffer-updates state))]
-                                         (-> (reduce
-                                               (fn [state {:keys [buffer-ptr lines first-line line-count-change]}]
-                                                 (c/modify-buffer state initial-game buffer-ptr lines first-line line-count-change))
-                                               state
-                                               updates)
-                                             (assoc :buffer-updates []))
-                                         state)
-                                       (if (not= (:mode state) 'INSERT)
-                                         (if-let [code (get-in state [:buffers current-buffer-ptr :parsed-code])]
-                                           (do
-                                             (apply-parinfer! vim current-buffer-ptr code)
-                                             (update-in state [:buffers current-buffer-ptr] dissoc :parsed-code))
-                                           state)
-                                         state)))))))]
+                                 (update-buffers initial-game))))))]
         (listen-for-keys window on-input)
         (listen-for-chars window on-input)
         (v/set-on-quit vim (fn [buffer-ptr force?]
