@@ -195,7 +195,9 @@
       (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
             {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars cursor-line cursor-column)]
         (-> buffer
-            (assoc :rects-entity (i/assoc base-rects-entity 0 cursor-entity))
+            (assoc :rects-entity (-> base-rects-entity
+                                     (i/assoc 0 cursor-entity)
+                                     (assoc :rect-count 1)))
             (as-> buffer
                   (let [{:keys [camera camera-x camera-y]} buffer
                         cursor-bottom (+ top height)
@@ -235,17 +237,37 @@
       :command-text-entity command-text-entity
       :command-rects-entity command-rects-entity)))
 
-(defn range->rects [text-entity font-height {:keys [start-line start-column end-line end-column]}]
-  (vec (for [line-num (range start-line (inc end-line))]
-         (let [line-chars (-> text-entity :characters (nth line-num))
-               start-column (if (= line-num start-line) start-column 0)
-               end-column (if (= line-num end-column) end-column (dec (count line-chars)))
-               empty-columns (subvec line-chars 0 start-column)
-               filled-columns (subvec line-chars start-column (inc end-column))]
-           {:left (->> empty-columns (map :width) (reduce +))
-            :top (* line-num font-height)
-            :width (->> filled-columns (map :width) (reduce +))
-            :height font-height}))))
+(defn range->rects [text-entity font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
+  (let [{:keys [start-line start-column end-line end-column]}
+        (if (or (> start-line end-line)
+                (and (= start-line end-line)
+                     (> start-column end-column)))
+          {:start-line end-line
+           :start-column end-column
+           :end-line start-line
+           :end-column (inc start-column)}
+          rect-range)]
+    (vec (for [line-num (range start-line (inc end-line))]
+           (let [line-chars (-> text-entity :characters (nth line-num))
+                 start-column (if (= line-num start-line) start-column 0)
+                 end-column (if (= line-num end-line) end-column (count line-chars))
+                 empty-columns (subvec line-chars 0 start-column)
+                 filled-columns (subvec line-chars start-column end-column)]
+             {:left (->> empty-columns (map :width) (reduce +))
+              :top (* line-num font-height)
+              :width (->> filled-columns (map :width) (reduce +))
+              :height font-height})))))
+
+(defn assoc-rects [{:keys [rect-count] :as rects-entity} rect-entity color rects]
+  (reduce-kv
+    (fn [rects-entity i {:keys [left top width height]}]
+      (i/assoc rects-entity (+ i rect-count)
+               (-> rect-entity
+                   (t/color color)
+                   (t/translate left top)
+                   (t/scale width height))))
+    (update rects-entity :rect-count + (count rects))
+    rects))
 
 (defn update-highlight [{:keys [font-height base-rect-entity] :as state} buffer-ptr]
   (update-in state [:buffers buffer-ptr]
@@ -261,18 +283,14 @@
                          first)]
         (let [color (assoc (get-color :delimiter (:depth coll)) 3 0.05)
               rects (range->rects text-entity font-height coll)]
-          (update buffer :rects-entity
-                  (fn [rects-entity]
-                    (reduce-kv
-                      (fn [rects-entity i {:keys [left top width height]}]
-                        (i/assoc rects-entity (inc i)
-                                 (-> base-rect-entity
-                                     (t/color color)
-                                     (t/translate left top)
-                                     (t/scale width height))))
-                      rects-entity
-                      rects))))
+          (update buffer :rects-entity assoc-rects base-rect-entity color rects))
         buffer))))
+
+(defn update-selection [{:keys [font-height base-rect-entity] :as state} buffer-ptr visual-range]
+  (update-in state [:buffers buffer-ptr]
+    (fn [{:keys [text-entity] :as buffer}]
+      (let [rects (range->rects text-entity font-height visual-range)]
+        (update buffer :rects-entity assoc-rects base-rect-entity [1 1 1 0.5] rects)))))
 
 (defn get-extension
   [path]

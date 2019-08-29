@@ -162,7 +162,11 @@
                                            (update-in [:buffers current-buffer] merge {:cursor-line cursor-line :cursor-column cursor-column})
                                            (update-buffers initial-game)
                                            (c/update-cursor initial-game current-buffer)
-                                           (c/update-highlight current-buffer))))
+                                           (c/update-highlight current-buffer)
+                                           (cond-> (v/visual-active? vim)
+                                                   (c/update-selection current-buffer (-> (v/get-visual-range vim)
+                                                                                          (update :start-line dec)
+                                                                                          (update :end-line dec)))))))
                                    (and (not= 'INSERT mode)
                                         (not= s "u"))
                                    (apply-parinfer! vim initial-game current-buffer)))))]
