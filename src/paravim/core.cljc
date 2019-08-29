@@ -25,6 +25,8 @@
                        :buffer-updates []}))
 
 (def text-color [1 1 1 1])
+(def cursor-color [(/ 112 255) (/ 128 255) (/ 144 255) 0.9])
+(def select-color [(/ 148 255) (/ 69 255) (/ 5 255) 0.5])
 
 (def colors {:number [(/ 255 255) (/ 193 255) (/ 94 255) 1]
              :string [(/ 209 255) (/ 153 255) (/ 101 255) 1]
@@ -181,7 +183,7 @@
         top (* line font-height)
         height (or height font-height)]
     (-> base-rect-entity
-        (t/color [(/ 112 255) (/ 128 255) (/ 144 255) 0.9])
+        (t/color cursor-color)
         (t/translate left top)
         (t/scale width height)
         (assoc :left (* left font-size-multiplier)
@@ -290,7 +292,7 @@
   (update-in state [:buffers buffer-ptr]
     (fn [{:keys [text-entity] :as buffer}]
       (let [rects (range->rects text-entity font-height visual-range)]
-        (update buffer :rects-entity assoc-rects base-rect-entity [1 1 1 0.5] rects)))))
+        (update buffer :rects-entity assoc-rects base-rect-entity select-color rects)))))
 
 (defn get-extension
   [path]
