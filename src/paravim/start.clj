@@ -159,7 +159,7 @@
                                        (-> state
                                            (assoc :mode mode)
                                            (c/update-command (v/get-command-text vim) (v/get-command-position vim))
-                                           (update-in [:buffers current-buffer] merge {:cursor-line cursor-line :cursor-column cursor-column})
+                                           (update-in [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)
                                            (update-buffers initial-game)
                                            (c/update-cursor initial-game current-buffer)
                                            (c/update-highlight current-buffer)
@@ -188,7 +188,7 @@
                                                                (v/get-file-name vim buffer-ptr)
                                                                (vec (for [i (range (v/get-line-count vim buffer-ptr))]
                                                                       (v/get-line vim buffer-ptr (inc i)))))
-                                                             (update-in [:buffers buffer-ptr] merge {:cursor-line cursor-line :cursor-column cursor-column})
+                                                             (update-in [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column)
                                                              (c/update-cursor initial-game buffer-ptr)))))))
                                        nil)))
         (v/set-on-buffer-update vim (fn [buffer-ptr start-line end-line line-count-change]
