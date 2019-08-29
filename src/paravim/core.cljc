@@ -235,7 +235,19 @@
       :command-text-entity command-text-entity
       :command-rects-entity command-rects-entity)))
 
-(defn update-highlight [{:keys [font-width font-height base-rect-entity] :as state} buffer-ptr]
+(defn range->rects [text-entity font-height {:keys [start-line start-column end-line end-column]}]
+  (vec (for [line-num (range start-line (inc end-line))]
+         (let [line-chars (-> text-entity :characters (nth line-num))
+               start-column (if (= line-num start-line) start-column 0)
+               end-column (if (= line-num end-column) end-column (dec (count line-chars)))
+               empty-columns (subvec line-chars 0 start-column)
+               filled-columns (subvec line-chars start-column (inc end-column))]
+           {:left (->> empty-columns (map :width) (reduce +))
+            :top (* line-num font-height)
+            :width (->> filled-columns (map :width) (reduce +))
+            :height font-height}))))
+
+(defn update-highlight [{:keys [font-height base-rect-entity] :as state} buffer-ptr]
   (update-in state [:buffers buffer-ptr]
     (fn [{:keys [text-entity cursor-line cursor-column] :as buffer}]
       (if-let [coll (->> (:collections text-entity)
@@ -247,18 +259,8 @@
                                             (and (= end-line cursor-line)
                                                  (> end-column cursor-column))))))
                          first)]
-        (let [{:keys [start-line start-column end-line end-column depth]} coll
-              color (assoc (get-color :delimiter depth) 3 0.05)
-              rects (vec (for [line-num (range start-line (inc end-line))]
-                           (let [line-chars (-> text-entity :characters (nth line-num))
-                                 start-column (if (= line-num start-line) start-column 0)
-                                 end-column (if (= line-num end-column) end-column (dec (count line-chars)))
-                                 empty-columns (subvec line-chars 0 start-column)
-                                 filled-columns (subvec line-chars start-column (inc end-column))]
-                             {:left (->> empty-columns (map :width) (reduce +))
-                              :top (* line-num font-height)
-                              :width (->> filled-columns (map :width) (reduce +))
-                              :height font-height})))]
+        (let [color (assoc (get-color :delimiter (:depth coll)) 3 0.05)
+              rects (range->rects text-entity font-height coll)]
           (update buffer :rects-entity
                   (fn [rects-entity]
                     (reduce-kv
