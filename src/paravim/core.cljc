@@ -189,13 +189,12 @@
                :width (* width font-size-multiplier)
                :height (* height font-size-multiplier)))))
 
-(defn update-cursor [{:keys [font-height base-rects-entity] :as state} game buffer-ptr line column]
+(defn update-cursor [{:keys [font-height base-rects-entity] :as state} game buffer-ptr]
   (update-in state [:buffers buffer-ptr]
-    (fn [buffer]
-      (let [line-chars (get-in buffer [:text-entity :characters line])
-            {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars line column)]
+    (fn [{:keys [cursor-line cursor-column] :as buffer}]
+      (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
+            {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars cursor-line cursor-column)]
         (-> buffer
-            (assoc :cursor-line line :cursor-column column)
             (assoc :rects-entity (i/assoc base-rects-entity 0 cursor-entity))
             (as-> buffer
                   (let [{:keys [camera camera-x camera-y]} buffer

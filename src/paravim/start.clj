@@ -128,7 +128,8 @@
                   (v/execute "set tabstop=2")
                   (v/execute "set softtabstop=2")
                   (v/execute "set shiftwidth=2")
-                  (v/execute "set expandtab"))
+                  (v/execute "set expandtab")
+                  (v/execute "filetype plugin indent on"))
             on-input (fn [s]
                        (let [{:keys [mode command-text command-text-entity current-buffer]} @c/*state]
                          (when (and (= 'INSERT mode) (= s "<Esc>"))
@@ -150,16 +151,17 @@
                                (v/input vim s)))
                            (v/input vim s))
                          (let [current-buffer (v/get-current-buffer vim)
-                               mode (v/get-mode vim)]
+                               mode (v/get-mode vim)
+                               cursor-line (dec (v/get-cursor-line vim))
+                               cursor-column (v/get-cursor-column vim)]
                            (cond-> (swap! c/*state
                                      (fn [state]
                                        (-> state
                                            (assoc :mode mode)
                                            (c/update-command (v/get-command-text vim) (v/get-command-position vim))
-                                           (c/update-cursor initial-game current-buffer
-                                             (dec (v/get-cursor-line vim))
-                                             (v/get-cursor-column vim))
+                                           (update-in [:buffers current-buffer] merge {:cursor-line cursor-line :cursor-column cursor-column})
                                            (update-buffers initial-game)
+                                           (c/update-cursor initial-game current-buffer)
                                            (c/update-highlight current-buffer))))
                                    (and (not= 'INSERT mode)
                                         (not= s "u"))
@@ -171,18 +173,19 @@
         (v/set-on-auto-command vim (fn [buffer-ptr event]
                                      (case event
                                        EVENT_BUFENTER
-                                       (swap! c/*state
-                                         (fn [state]
-                                           (-> state
-                                               (assoc :current-buffer buffer-ptr)
-                                               (cond-> (nil? (get-in state [:buffers buffer-ptr]))
-                                                       (-> (c/assoc-buffer buffer-ptr
-                                                             (v/get-file-name vim buffer-ptr)
-                                                             (vec (for [i (range (v/get-line-count vim buffer-ptr))]
-                                                                    (v/get-line vim buffer-ptr (inc i)))))
-                                                           (c/update-cursor initial-game buffer-ptr
-                                                             (dec (v/get-cursor-line vim))
-                                                             (v/get-cursor-column vim)))))))
+                                       (let [cursor-line (dec (v/get-cursor-line vim))
+                                             cursor-column (v/get-cursor-column vim)]
+                                         (swap! c/*state
+                                           (fn [state]
+                                             (-> state
+                                                 (assoc :current-buffer buffer-ptr)
+                                                 (cond-> (nil? (get-in state [:buffers buffer-ptr]))
+                                                         (-> (c/assoc-buffer buffer-ptr
+                                                               (v/get-file-name vim buffer-ptr)
+                                                               (vec (for [i (range (v/get-line-count vim buffer-ptr))]
+                                                                      (v/get-line vim buffer-ptr (inc i)))))
+                                                             (update-in [:buffers buffer-ptr] merge {:cursor-line cursor-line :cursor-column cursor-column})
+                                                             (c/update-cursor initial-game buffer-ptr)))))))
                                        nil)))
         (v/set-on-buffer-update vim (fn [buffer-ptr start-line end-line line-count-change]
                                       (let [first-line (dec start-line)
