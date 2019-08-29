@@ -236,18 +236,42 @@
       :command-text-entity command-text-entity
       :command-rects-entity command-rects-entity)))
 
-(defn update-highlight [state buffer-ptr]
-  (let [{:keys [text-entity cursor-line cursor-column]} (get-in state [:buffers buffer-ptr])]
-    (println (->> (:collections text-entity)
-                  (filter (fn [{:keys [start-line start-column end-line end-column]}]
-                            (and (or (< start-line cursor-line)
-                                     (and (= start-line cursor-line)
-                                          (<= start-column cursor-column)))
-                                 (or (> end-line cursor-line)
-                                     (and (= end-line cursor-line)
-                                          (> end-column cursor-column))))))
-                  first)))
-  state)
+(defn update-highlight [{:keys [font-width font-height base-rect-entity] :as state} buffer-ptr]
+  (update-in state [:buffers buffer-ptr]
+    (fn [{:keys [text-entity cursor-line cursor-column] :as buffer}]
+      (if-let [coll (->> (:collections text-entity)
+                         (filter (fn [{:keys [start-line start-column end-line end-column]}]
+                                   (and (or (< start-line cursor-line)
+                                            (and (= start-line cursor-line)
+                                                 (<= start-column cursor-column)))
+                                        (or (> end-line cursor-line)
+                                            (and (= end-line cursor-line)
+                                                 (> end-column cursor-column))))))
+                         first)]
+        (let [{:keys [start-line start-column end-line end-column depth]} coll
+              color (assoc (get-color :delimiter depth) 3 0.05)
+              rects (vec (for [line-num (range start-line (inc end-line))]
+                           (let [line-chars (-> text-entity :characters (nth line-num))
+                                 start-column (if (= line-num start-line) start-column 0)
+                                 end-column (if (= line-num end-column) end-column (dec (count line-chars)))
+                                 empty-columns (subvec line-chars 0 start-column)
+                                 filled-columns (subvec line-chars start-column (inc end-column))]
+                             {:left (->> empty-columns (map :width) (reduce +))
+                              :top (* line-num font-height)
+                              :width (->> filled-columns (map :width) (reduce +))
+                              :height font-height})))]
+          (update buffer :rects-entity
+                  (fn [rects-entity]
+                    (reduce-kv
+                      (fn [rects-entity i {:keys [left top width height]}]
+                        (i/assoc rects-entity (inc i)
+                                 (-> base-rect-entity
+                                     (t/color color)
+                                     (t/translate left top)
+                                     (t/scale width height))))
+                      rects-entity
+                      rects))))
+        buffer))))
 
 (defn get-extension
   [path]
