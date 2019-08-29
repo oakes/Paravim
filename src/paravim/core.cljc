@@ -247,7 +247,7 @@
           {:start-line end-line
            :start-column end-column
            :end-line start-line
-           :end-column (inc start-column)}
+           :end-column start-column}
           rect-range)]
     (vec (for [line-num (range start-line (inc end-line))]
            (let [line-chars (-> text-entity :characters (nth line-num))
