@@ -63,17 +63,20 @@
       (invoke [this window codepoint]
         (callback (str (char codepoint)))))))
 
-(defn update-buffers [state game]
+(defn update-buffers [state]
   (if-let [updates (not-empty (:buffer-updates state))]
-    (-> (reduce
-          (fn [state {:keys [buffer-ptr lines first-line line-count-change]}]
-            (c/modify-buffer state game buffer-ptr lines first-line line-count-change))
-          state
-          updates)
-        (assoc :buffer-updates []))
+    (let [buffer-ptrs (set (map :buffer-ptr updates))]
+      (as-> state $
+            (reduce
+              (fn [state {:keys [buffer-ptr lines first-line line-count-change]}]
+                (c/update-text state buffer-ptr lines first-line line-count-change))
+              $
+              updates)
+            (assoc $ :buffer-updates [])
+            (reduce c/parse-text $ buffer-ptrs)))
     state))
 
-(defn apply-parinfer! [{:keys [mode] :as state} vim game buffer-ptr]
+(defn apply-parinfer! [{:keys [mode] :as state} vim buffer-ptr]
   (let [{:keys [parsed-code needs-parinfer?]} (get-in state [:buffers buffer-ptr])]
     (when needs-parinfer?
       (let [cursor-line (v/get-cursor-line vim)
@@ -97,7 +100,7 @@
         (fn [state]
           (-> state
               (assoc-in [:buffers buffer-ptr :needs-parinfer?] false)
-              (update-buffers game)))))))
+              (update-buffers)))))))
 
 (defn -main [& args]
   (when-not (GLFW/glfwInit)
@@ -133,8 +136,8 @@
             on-input (fn [s]
                        (let [{:keys [mode command-text command-text-entity current-buffer]} @c/*state]
                          (when (and (= 'INSERT mode) (= s "<Esc>"))
-                           (-> (swap! c/*state update-buffers initial-game)
-                               (apply-parinfer! vim initial-game current-buffer)))
+                           (-> (swap! c/*state update-buffers)
+                               (apply-parinfer! vim current-buffer)))
                          (if (and (= mode 'COMMAND_LINE) command-text)
                            (let [pos (v/get-command-position vim)]
                              (case s
@@ -160,7 +163,7 @@
                                            (assoc :mode mode)
                                            (c/update-command (v/get-command-text vim) (v/get-command-position vim))
                                            (update-in [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)
-                                           (update-buffers initial-game)
+                                           (update-buffers)
                                            (c/update-cursor initial-game current-buffer)
                                            (c/update-highlight current-buffer)
                                            (cond-> (v/visual-active? vim)
@@ -169,7 +172,7 @@
                                                                                           (update :end-line dec)))))))
                                    (and (not= 'INSERT mode)
                                         (not= s "u"))
-                                   (apply-parinfer! vim initial-game current-buffer)))))]
+                                   (apply-parinfer! vim current-buffer)))))]
         (listen-for-keys window on-input)
         (listen-for-chars window on-input)
         (v/set-on-quit vim (fn [buffer-ptr force?]

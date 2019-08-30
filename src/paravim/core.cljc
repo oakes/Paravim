@@ -329,25 +329,30 @@
        :lines lines
        :parsed-code parsed-code})))
 
-(defn modify-buffer [{:keys [base-font-entity font-height] :as state} game buffer-ptr new-lines first-line line-count-change]
+(defn update-text [{:keys [base-font-entity] :as state} buffer-ptr new-lines first-line line-count-change]
+  (update-in state [:buffers buffer-ptr]
+    (fn [{:keys [lines parinfer-text-entity] :as buffer}]
+      (-> buffer
+          (assoc :lines (update-lines lines new-lines first-line line-count-change))
+          (update :text-entity replace-lines base-font-entity new-lines first-line line-count-change)
+          (cond-> parinfer-text-entity
+                  (update :parinfer-text-entity replace-lines base-font-entity new-lines first-line line-count-change))))))
+
+(defn parse-text [{:keys [base-font-entity font-height] :as state} buffer-ptr]
   (update-in state [:buffers buffer-ptr]
     (fn [{:keys [text-entity parinfer-text-entity path lines cursor-line cursor-column] :as buffer}]
-      (let [lines (update-lines lines new-lines first-line line-count-change)
-            parsed-code (when (clojure-exts (get-extension path))
+      (let [parsed-code (when (clojure-exts (get-extension path))
                           (ps/parse (str/join "\n" lines) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}))]
         (assoc buffer
-          :lines lines
           :parsed-code parsed-code
           :needs-parinfer? (some? parsed-code)
           :text-entity
-          (cond-> (replace-lines text-entity base-font-entity new-lines first-line line-count-change)
-                  parsed-code
-                  (clojurify-lines base-font-entity parsed-code false)
-                  true
-                  (update-uniforms font-height))
+          (-> text-entity
+              (cond-> parsed-code (clojurify-lines base-font-entity parsed-code false))
+              (update-uniforms font-height))
           :parinfer-text-entity
           (when parsed-code
-            (-> (replace-lines parinfer-text-entity base-font-entity new-lines first-line line-count-change)
+            (-> parinfer-text-entity
                 (clojurify-lines base-font-entity parsed-code true)
                 (update-uniforms font-height))))))))
 
