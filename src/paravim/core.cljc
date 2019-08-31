@@ -342,21 +342,19 @@
 
 (defn parse-text [{:keys [base-font-entity font-height] :as state} buffer-ptr]
   (update-in state [:buffers buffer-ptr]
-    (fn [{:keys [text-entity parinfer-text-entity path lines cursor-line cursor-column] :as buffer}]
+    (fn [{:keys [text-entity path lines cursor-line cursor-column] :as buffer}]
       (let [parsed-code (when (clojure-exts (get-extension path))
-                          (ps/parse (str/join "\n" lines) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}))]
+                          (ps/parse (str/join "\n" lines) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}))
+            text-entity (cond-> text-entity
+                                parsed-code
+                                (clojurify-lines base-font-entity parsed-code false))
+            parinfer-text-entity (when parsed-code
+                                   (clojurify-lines text-entity base-font-entity parsed-code true))]
         (assoc buffer
           :parsed-code parsed-code
           :needs-parinfer? (some? parsed-code)
-          :text-entity
-          (-> text-entity
-              (cond-> parsed-code (clojurify-lines base-font-entity parsed-code false))
-              (update-uniforms font-height text-alpha))
-          :parinfer-text-entity
-          (when parsed-code
-            (-> parinfer-text-entity
-                (clojurify-lines base-font-entity parsed-code true)
-                (update-uniforms font-height parinfer-alpha))))))))
+          :text-entity (update-uniforms text-entity font-height text-alpha)
+          :parinfer-text-entity (update-uniforms parinfer-text-entity font-height parinfer-alpha))))))
 
 (def ^:private instanced-font-vertex-shader
   {:inputs
