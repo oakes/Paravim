@@ -28,6 +28,9 @@
 (def cursor-color [(/ 112 255) (/ 128 255) (/ 144 255) 0.9])
 (def select-color [(/ 148 255) (/ 69 255) (/ 5 255) 0.5])
 
+(def text-alpha 1.0)
+(def parinfer-alpha 0.15)
+
 (def colors {:number [(/ 255 255) (/ 193 255) (/ 94 255) 1]
              :string [(/ 209 255) (/ 153 255) (/ 101 255) 1]
              :keyword [(/ 86 255) (/ 181 255) (/ 194 255) 1]
@@ -119,7 +122,7 @@
                                   (-> entity :character (not= ch)))
                            (chars/crop-char font-entity ch)
                            entity)
-                         (t/color (cond-> color parinfer? (set-alpha (if (= class-name :delimiter) 0.25 0.05)))))))))))
+                         (t/color color))))))))
          characters
          data)))))
 
@@ -303,25 +306,24 @@
 
 (def clojure-exts #{"clj" "cljs" "cljc" "edn"})
 
-(defn update-uniforms [{:keys [characters] :as text-entity} font-height]
-  (-> text-entity
-      (assoc-in [:uniforms 'u_char_counts] (mapv count characters))
-      (assoc-in [:uniforms 'u_font_height] font-height)))
+(defn update-uniforms [{:keys [characters] :as text-entity} font-height alpha]
+  (update text-entity :uniforms assoc
+      'u_char_counts (mapv count characters)
+      'u_font_height font-height
+      'u_alpha alpha))
 
 (defn assoc-buffer [{:keys [base-font-entity base-text-entity font-height] :as state} buffer-ptr path lines]
   (let [text-entity (assoc-lines base-text-entity base-font-entity lines)
         parsed-code (when (clojure-exts (get-extension path))
-                      (ps/parse (str/join "\n" lines)))]
-    (assoc-in state [:buffers buffer-ptr]
-      {:text-entity (cond-> text-entity
+                      (ps/parse (str/join "\n" lines)))
+        text-entity (cond-> text-entity
                             parsed-code
-                            (clojurify-lines base-font-entity parsed-code false)
-                            true
-                            (update-uniforms font-height))
-       :parinfer-text-entity (when parsed-code
-                               (-> text-entity
-                                   (clojurify-lines base-font-entity parsed-code true)
-                                   (update-uniforms font-height)))
+                            (clojurify-lines base-font-entity parsed-code false))
+        parinfer-text-entity (when parsed-code
+                               (clojurify-lines text-entity base-font-entity parsed-code true))]
+    (assoc-in state [:buffers buffer-ptr]
+      {:text-entity (update-uniforms text-entity font-height text-alpha)
+       :parinfer-text-entity (update-uniforms parinfer-text-entity font-height parinfer-alpha)
        :camera (t/translate orig-camera 0 0)
        :camera-x 0
        :camera-y 0
@@ -349,12 +351,12 @@
           :text-entity
           (-> text-entity
               (cond-> parsed-code (clojurify-lines base-font-entity parsed-code false))
-              (update-uniforms font-height))
+              (update-uniforms font-height text-alpha))
           :parinfer-text-entity
           (when parsed-code
             (-> parinfer-text-entity
                 (clojurify-lines base-font-entity parsed-code true)
-                (update-uniforms font-height))))))))
+                (update-uniforms font-height parinfer-alpha))))))))
 
 (def ^:private instanced-font-vertex-shader
   {:inputs
@@ -395,7 +397,8 @@
 (def ^:private instanced-font-fragment-shader
   {:precision "mediump float"
    :uniforms
-   '{u_image sampler2D}
+   '{u_image sampler2D
+     u_alpha float}
    :inputs
    '{v_tex_coord vec2
      v_color vec4}
@@ -405,11 +408,19 @@
    '{main ([] void)}
    :functions
    '{main ([]
+           ;; get the color from the attributes
+           (=vec4 input_color v_color)
+           ;; set its alpha color if necessary
+           ("if" (== (.w input_color) "1.0")
+             (= (.w input_color) u_alpha))
+           ;; get the color from the texture
            (= o_color (texture u_image v_tex_coord))
+           ;; if it's black, make it a transparent pixel
            ("if" (== (.rgb o_color) (vec3 "0.0" "0.0" "0.0"))
              (= o_color (vec4 "0.0" "0.0" "0.0" "0.0")))
+           ;; otherwise, use the input color
            ("else"
-             (= o_color v_color))
+             (= o_color input_color))
            ;; the size of one pixel
            (=vec2 one_pixel (/ (vec2 1) (vec2 (textureSize u_image 0))))
            ;; left
@@ -417,25 +428,25 @@
            ("if" (== (.rgb left_color) (vec3 "0.0" "0.0" "0.0"))
              (= left_color (vec4 "0.0" "0.0" "0.0" "0.0")))
            ("else"
-             (= left_color v_color))
+             (= left_color input_color))
            ;; right
            (=vec4 right_color (texture u_image (+ v_tex_coord (vec2 (- 0 (.x one_pixel)) "0.0"))))
            ("if" (== (.rgb right_color) (vec3 "0.0" "0.0" "0.0"))
              (= right_color (vec4 "0.0" "0.0" "0.0" "0.0")))
            ("else"
-             (= right_color v_color))
+             (= right_color input_color))
            ;; top
            (=vec4 top_color (texture u_image (+ v_tex_coord (vec2 "0.0" (.y one_pixel)))))
            ("if" (== (.rgb top_color) (vec3 "0.0" "0.0" "0.0"))
              (= top_color (vec4 "0.0" "0.0" "0.0" "0.0")))
            ("else"
-             (= top_color v_color))
+             (= top_color input_color))
            ;; bottom
            (=vec4 bottom_color (texture u_image (+ v_tex_coord (vec2 "0.0" (- 0 (.y one_pixel))))))
            ("if" (== (.rgb bottom_color) (vec3 "0.0" "0.0" "0.0"))
              (= bottom_color (vec4 "0.0" "0.0" "0.0" "0.0")))
            ("else"
-             (= bottom_color v_color))
+             (= bottom_color input_color))
            ;; average
            (= o_color
              (/ (+ o_color left_color right_color top_color bottom_color)
