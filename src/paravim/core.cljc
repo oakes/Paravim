@@ -333,18 +333,20 @@
      :path path
      :lines lines}))
 
-(defn update-clojure-buffer [{:keys [base-font-entity font-height] :as state} buffer-ptr path lines]
-  (if (clojure-exts (get-extension path))
-    (update-in state [:buffers buffer-ptr]
-      (fn [{:keys [text-entity path] :as buffer}]
-        (let [parsed-code (ps/parse (str/join "\n" lines))
+(defn update-clojure-buffer [{:keys [base-font-entity font-height] :as state} buffer-ptr init?]
+  (update-in state [:buffers buffer-ptr]
+    (fn [{:keys [text-entity path lines cursor-line cursor-column] :as buffer}]
+      (if (clojure-exts (get-extension path))
+        (let [parse-opts (if init? {} {:mode :smart :cursor-line cursor-line :cursor-column cursor-column})
+              parsed-code (ps/parse (str/join "\n" lines) parse-opts)
               text-entity (clojurify-lines text-entity base-font-entity parsed-code false)
               parinfer-text-entity (clojurify-lines text-entity base-font-entity parsed-code true)]
           (assoc buffer
-            :text-entity text-entity
+            :text-entity (update-uniforms text-entity font-height text-alpha)
             :parinfer-text-entity (update-uniforms parinfer-text-entity font-height parinfer-alpha)
-            :parsed-code parsed-code))))
-    state))
+            :parsed-code parsed-code
+            :needs-parinfer? (not init?)))
+        buffer))))
 
 (defn update-text [{:keys [base-font-entity] :as state} buffer-ptr new-lines first-line line-count-change]
   (update-in state [:buffers buffer-ptr]
@@ -352,22 +354,6 @@
       (-> buffer
           (assoc :lines (update-lines lines new-lines first-line line-count-change))
           (update :text-entity replace-lines base-font-entity new-lines first-line line-count-change)))))
-
-(defn parse-text [{:keys [base-font-entity font-height] :as state} buffer-ptr]
-  (update-in state [:buffers buffer-ptr]
-    (fn [{:keys [text-entity path lines cursor-line cursor-column] :as buffer}]
-      (let [parsed-code (when (clojure-exts (get-extension path))
-                          (ps/parse (str/join "\n" lines) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}))
-            text-entity (cond-> text-entity
-                                parsed-code
-                                (clojurify-lines base-font-entity parsed-code false))
-            parinfer-text-entity (when parsed-code
-                                   (clojurify-lines text-entity base-font-entity parsed-code true))]
-        (assoc buffer
-          :parsed-code parsed-code
-          :needs-parinfer? (some? parsed-code)
-          :text-entity (update-uniforms text-entity font-height text-alpha)
-          :parinfer-text-entity (some-> parinfer-text-entity (update-uniforms font-height parinfer-alpha)))))))
 
 (def ^:private instanced-font-vertex-shader
   {:inputs

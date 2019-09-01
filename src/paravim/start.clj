@@ -73,7 +73,7 @@
               $
               updates)
             (assoc $ :buffer-updates [])
-            (reduce c/parse-text $ buffer-ptrs)))
+            (reduce #(c/update-clojure-buffer %1 %2 false) $ buffer-ptrs)))
     state))
 
 (defn apply-parinfer! [{:keys [mode] :as state} vim buffer-ptr]
@@ -191,7 +191,7 @@
                                                  (assoc :current-buffer buffer-ptr)
                                                  (cond-> (nil? (get-in state [:buffers buffer-ptr]))
                                                          (-> (c/assoc-buffer buffer-ptr path lines)
-                                                             (c/update-clojure-buffer buffer-ptr path lines)
+                                                             (c/update-clojure-buffer buffer-ptr true)
                                                              (update-in [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column)
                                                              (c/update-cursor initial-game buffer-ptr)))))))
                                        nil)))
