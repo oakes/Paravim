@@ -123,13 +123,10 @@
      (assoc text-entity :characters (assoc characters line-num line)))))
 
 (defn assoc-line [text-entity line-num char-entities]
-  (let [new-text-entity (specter/select-first
-                          (specter/traversed specter/INDEXED-VALS
-                                             (fn
-                                               ([]
-                                                (specter/setval [:characters line-num] [] text-entity))
-                                               ([new-text-entity [char-num char-entity]]
-                                                (assoc-char new-text-entity line-num char-num char-entity))))
+  (let [new-text-entity (reduce-kv
+                          (fn [text-entity char-num char-entity]
+                            (assoc-char text-entity line-num char-num char-entity))
+                          (specter/setval [:characters line-num] [] text-entity)
                           char-entities)
         new-line (specter/select-first [:characters line-num] new-text-entity)
         adjusted-new-line (specter/transform
