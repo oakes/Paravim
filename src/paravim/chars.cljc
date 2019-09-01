@@ -143,20 +143,8 @@
                             (into [[]])
                             (into (subvec characters 0 line-num))
                             (into []))
-        new-text-entity (reduce-kv
-                          (fn [text-entity char-num entity]
-                            (assoc-char text-entity line-num char-num entity))
-                          (assoc text-entity :characters new-characters)
-                          char-entities)
-        new-line (get-in new-text-entity [:characters line-num])
-        adjusted-new-line (mapv
-                            (fn [{:keys [left] :as char-entity}]
-                              (update-in char-entity [:uniforms 'u_translate_matrix]
-                                #(m/multiply-matrices 3 (m/translation-matrix left 0) %)))
-                            new-line)]
-    (-> text-entity
-        (insert-line* line-num adjusted-new-line)
-        (assoc :characters (:characters new-text-entity)))))
+        text-entity (assoc text-entity :characters new-characters)]
+    (assoc-line text-entity line-num char-entities)))
 
 (defn dissoc-line [text-entity line-num]
   (-> text-entity
