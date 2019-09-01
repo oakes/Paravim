@@ -2,7 +2,8 @@
   (:require [play-cljc.transforms :as t]
             [play-cljc.math :as m]
             [play-cljc.instances :as i]
-            [play-cljc.gl.utils :as u]))
+            [play-cljc.gl.utils :as u]
+            [com.rpl.specter :as specter]))
 
 (defn- replace-instance-attr [start-index end-index entities instanced-entity attr-name uni-name]
   (let [new-data (reduce
@@ -120,29 +121,27 @@
                                     (assoc :x-total x-total
                                            :left prev-xadv
                                            :width (:xadv baked-char)
-                                           :height (:font-height baked-font))))
-         next-char (get line (inc index))]
-     (-> text-entity
-         (assoc :characters (assoc characters line-num line))
-         ;; adjust the next char if its horizontal position changed
-         (cond-> (and next-char (not= (:x-total replaced-char) x-total))
-                 (assoc-char line-num (inc index) next-char))))))
+                                           :height (:font-height baked-font))))]
+     (assoc text-entity :characters (assoc characters line-num line)))))
 
 (defn assoc-line [text-entity line-num char-entities]
-  (let [new-text-entity (reduce-kv
-                          (fn [text-entity char-num entity]
-                            (assoc-char text-entity line-num char-num entity))
-                          (assoc-in text-entity [:characters line-num] [])
+  (let [new-text-entity (specter/select-any
+                          (specter/traversed specter/INDEXED-VALS
+                                             (fn
+                                               ([]
+                                                (specter/setval [:characters line-num] [] text-entity))
+                                               ([new-text-entity [char-num char-entity]]
+                                                (assoc-char new-text-entity line-num char-num char-entity))))
                           char-entities)
-        new-line (get-in new-text-entity [:characters line-num])
-        adjusted-new-line (mapv
-                            (fn [{:keys [left] :as char-entity}]
-                              (update-in char-entity [:uniforms 'u_translate_matrix]
-                                #(m/multiply-matrices 3 (m/translation-matrix left 0) %)))
+        new-line (specter/select-any [:characters line-num] new-text-entity)
+        adjusted-new-line (specter/transform
+                            [specter/ALL (specter/collect-one :left) :uniforms 'u_translate_matrix]
+                            (fn [left matrix]
+                              (m/multiply-matrices 3 (m/translation-matrix left 0) matrix))
                             new-line)]
     (-> text-entity
         (assoc-line* line-num adjusted-new-line)
-        (assoc-in [:characters line-num] new-line))))
+        (->> (specter/setval [:characters line-num] new-line)))))
 
 (defn insert-line [{:keys [characters] :as text-entity} line-num char-entities]
   (let [new-characters (->> (subvec characters line-num)

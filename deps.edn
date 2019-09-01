@@ -6,7 +6,8 @@
         org.lwjgl/lwjgl-opengl {:mvn/version "3.2.2"}
         org.lwjgl/lwjgl-stb {:mvn/version "3.2.2"}
         libvim-clj {:local/root "../libvim-clj"}
-        parinferish {:mvn/version "0.6.0"}}
+        parinferish {:mvn/version "0.6.0"}
+        com.rpl/specter {:mvn/version "1.1.2"}}
  :aliases {:dev {:extra-deps {orchestra {:mvn/version "2018.12.06-2"}
                               expound {:mvn/version "0.7.2"}}
                  :main-opts ["dev.clj"]}
