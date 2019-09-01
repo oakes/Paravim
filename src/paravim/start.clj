@@ -66,14 +66,20 @@
 (defn update-buffers [state]
   (if-let [updates (not-empty (:buffer-updates state))]
     (let [buffer-ptrs (set (map :buffer-ptr updates))]
-      (as-> state $
+      (as-> state state
             (reduce
               (fn [state {:keys [buffer-ptr lines first-line line-count-change]}]
                 (c/update-text state buffer-ptr lines first-line line-count-change))
-              $
+              state
               updates)
-            (assoc $ :buffer-updates [])
-            (reduce #(c/update-clojure-buffer %1 %2 false) $ buffer-ptrs)))
+            (assoc state :buffer-updates [])
+            (reduce (fn [state buffer-ptr]
+                      (if (c/clojure-buffer? state buffer-ptr)
+                        (-> state
+                            (c/parse-clojure-buffer buffer-ptr false)
+                            (c/update-clojure-buffer buffer-ptr))
+                        state))
+                    state buffer-ptrs)))
     state))
 
 (defn apply-parinfer! [{:keys [mode] :as state} vim buffer-ptr]
@@ -187,13 +193,19 @@
                                                      (v/get-line vim buffer-ptr (inc i))))]
                                          (swap! c/*state
                                            (fn [state]
-                                             (-> state
-                                                 (assoc :current-buffer buffer-ptr)
-                                                 (cond-> (nil? (get-in state [:buffers buffer-ptr]))
-                                                         (-> (c/assoc-buffer buffer-ptr path lines)
-                                                             (c/update-clojure-buffer buffer-ptr true)
-                                                             (update-in [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column)
-                                                             (c/update-cursor initial-game buffer-ptr)))))))
+                                             (as-> state state
+                                                   (assoc state :current-buffer buffer-ptr)
+                                                   (if (nil? (get-in state [:buffers buffer-ptr]))
+                                                     (as-> state state
+                                                           (c/assoc-buffer state buffer-ptr path lines)
+                                                           (if (c/clojure-buffer? state buffer-ptr)
+                                                             (-> state
+                                                                 (c/parse-clojure-buffer buffer-ptr true)
+                                                                 (c/update-clojure-buffer buffer-ptr))
+                                                             state)
+                                                           (update-in state [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column)
+                                                           (c/update-cursor state initial-game buffer-ptr))
+                                                     state)))))
                                        nil)))
         (v/set-on-buffer-update vim (fn [buffer-ptr start-line end-line line-count-change]
                                       (let [first-line (dec start-line)

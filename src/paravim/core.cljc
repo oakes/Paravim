@@ -312,6 +312,9 @@
 
 (def clojure-exts #{"clj" "cljs" "cljc" "edn"})
 
+(defn clojure-buffer? [state buffer-ptr]
+  (some-> state :buffers (get buffer-ptr) :path get-extension clojure-exts))
+
 (defn update-uniforms [{:keys [characters] :as text-entity} font-height alpha]
   (update text-entity :uniforms assoc
       'u_char_counts (mapv count characters)
@@ -333,27 +336,34 @@
      :path path
      :lines lines}))
 
-(defn update-clojure-buffer [{:keys [base-font-entity font-height] :as state} buffer-ptr init?]
+(defn parse-clojure-buffer [state buffer-ptr init?]
   (update-in state [:buffers buffer-ptr]
-    (fn [{:keys [text-entity path lines cursor-line cursor-column] :as buffer}]
-      (if (clojure-exts (get-extension path))
-        (let [parse-opts (if init? {} {:mode :smart :cursor-line cursor-line :cursor-column cursor-column})
-              parsed-code (ps/parse (str/join "\n" lines) parse-opts)
-              text-entity (clojurify-lines text-entity base-font-entity parsed-code false)
-              parinfer-text-entity (clojurify-lines text-entity base-font-entity parsed-code true)]
-          (assoc buffer
-            :text-entity (update-uniforms text-entity font-height text-alpha)
-            :parinfer-text-entity (update-uniforms parinfer-text-entity font-height parinfer-alpha)
-            :parsed-code parsed-code
-            :needs-parinfer? (not init?)))
-        buffer))))
+    (fn [{:keys [lines cursor-line cursor-column] :as buffer}]
+      (let [parse-opts (if init? {} {:mode :smart :cursor-line cursor-line :cursor-column cursor-column})
+            parsed-code (ps/parse (str/join "\n" lines) parse-opts)]
+        (assoc buffer
+          :parsed-code parsed-code
+          :needs-parinfer? (not init?))))))
 
-(defn update-text [{:keys [base-font-entity] :as state} buffer-ptr new-lines first-line line-count-change]
+(defn update-clojure-buffer [{:keys [base-font-entity font-height] :as state} buffer-ptr]
   (update-in state [:buffers buffer-ptr]
-    (fn [{:keys [lines parinfer-text-entity] :as buffer}]
+    (fn [{:keys [text-entity parsed-code lines] :as buffer}]
+      (let [text-entity (clojurify-lines text-entity base-font-entity parsed-code false)
+            parinfer-text-entity (clojurify-lines text-entity base-font-entity parsed-code true)]
+        (assoc buffer
+          :text-entity (update-uniforms text-entity font-height text-alpha)
+          :parinfer-text-entity (update-uniforms parinfer-text-entity font-height parinfer-alpha))))))
+
+(defn update-text [{:keys [base-font-entity font-height] :as state} buffer-ptr new-lines first-line line-count-change]
+  (update-in state [:buffers buffer-ptr]
+    (fn [{:keys [lines] :as buffer}]
       (-> buffer
           (assoc :lines (update-lines lines new-lines first-line line-count-change))
-          (update :text-entity replace-lines base-font-entity new-lines first-line line-count-change)))))
+          (update :text-entity
+                  (fn [text-entity]
+                    (-> text-entity
+                        (replace-lines base-font-entity new-lines first-line line-count-change)
+                        (update-uniforms font-height text-alpha))))))))
 
 (def ^:private instanced-font-vertex-shader
   {:inputs
