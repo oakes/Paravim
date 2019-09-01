@@ -6,7 +6,7 @@
 
 (defn- replace-instance-attr [start-index end-index entities instanced-entity attr-name uni-name]
   (let [new-data (into [] (specter/traverse-all [:uniforms uni-name specter/ALL]) entities)
-        data-len (specter/select-first [:attribute-lengths attr-name] instanced-entity)
+        data-len (specter/select-any [:attribute-lengths attr-name] instanced-entity)
         start-offset (* start-index data-len)
         end-offset (* end-index data-len)]
     (update-in instanced-entity [:attributes attr-name]
@@ -27,7 +27,7 @@
 (defn- dissoc-instance-attr [start-index end-index instanced-entity attr-name]
   (if (= start-index end-index)
     instanced-entity
-    (let [data-len (specter/select-first [:attribute-lengths attr-name] instanced-entity)
+    (let [data-len (specter/select-any [:attribute-lengths attr-name] instanced-entity)
           start-offset (* start-index data-len)
           end-offset (* end-index data-len)]
       (update-in instanced-entity [:attributes attr-name]
@@ -121,7 +121,7 @@
                             (assoc-char text-entity line-num char-num char-entity))
                           (specter/setval [:characters line-num] [] text-entity)
                           char-entities)
-        new-line (specter/select-first [:characters line-num] new-text-entity)
+        new-line (specter/select-any [:characters line-num] new-text-entity)
         adjusted-new-line (specter/transform
                             [specter/ALL (specter/collect-one :left) :uniforms 'u_translate_matrix]
                             (fn [left matrix]
