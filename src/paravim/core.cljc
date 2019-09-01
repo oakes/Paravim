@@ -335,7 +335,7 @@
                                (clojurify-lines text-entity base-font-entity parsed-code true))]
     (assoc-in state [:buffers buffer-ptr]
       {:text-entity (update-uniforms text-entity font-height text-alpha)
-       :parinfer-text-entity (update-uniforms parinfer-text-entity font-height parinfer-alpha)
+       :parinfer-text-entity (some-> parinfer-text-entity (update-uniforms font-height parinfer-alpha))
        :camera (t/translate orig-camera 0 0)
        :camera-x 0
        :camera-y 0
@@ -348,9 +348,7 @@
     (fn [{:keys [lines parinfer-text-entity] :as buffer}]
       (-> buffer
           (assoc :lines (update-lines lines new-lines first-line line-count-change))
-          (update :text-entity replace-lines base-font-entity new-lines first-line line-count-change)
-          (cond-> parinfer-text-entity
-                  (update :parinfer-text-entity replace-lines base-font-entity new-lines first-line line-count-change))))))
+          (update :text-entity replace-lines base-font-entity new-lines first-line line-count-change)))))
 
 (defn parse-text [{:keys [base-font-entity font-height] :as state} buffer-ptr]
   (update-in state [:buffers buffer-ptr]
@@ -366,7 +364,7 @@
           :parsed-code parsed-code
           :needs-parinfer? (some? parsed-code)
           :text-entity (update-uniforms text-entity font-height text-alpha)
-          :parinfer-text-entity (update-uniforms parinfer-text-entity font-height parinfer-alpha))))))
+          :parinfer-text-entity (some-> parinfer-text-entity (update-uniforms font-height parinfer-alpha)))))))
 
 (def ^:private instanced-font-vertex-shader
   {:inputs
