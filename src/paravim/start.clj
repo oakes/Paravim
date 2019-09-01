@@ -181,16 +181,17 @@
                                      (case event
                                        EVENT_BUFENTER
                                        (let [cursor-line (dec (v/get-cursor-line vim))
-                                             cursor-column (v/get-cursor-column vim)]
+                                             cursor-column (v/get-cursor-column vim)
+                                             path (v/get-file-name vim buffer-ptr)
+                                             lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
+                                                     (v/get-line vim buffer-ptr (inc i))))]
                                          (swap! c/*state
                                            (fn [state]
                                              (-> state
                                                  (assoc :current-buffer buffer-ptr)
                                                  (cond-> (nil? (get-in state [:buffers buffer-ptr]))
-                                                         (-> (c/assoc-buffer buffer-ptr
-                                                               (v/get-file-name vim buffer-ptr)
-                                                               (vec (for [i (range (v/get-line-count vim buffer-ptr))]
-                                                                      (v/get-line vim buffer-ptr (inc i)))))
+                                                         (-> (c/assoc-buffer buffer-ptr path lines)
+                                                             (c/update-clojure-buffer buffer-ptr path lines)
                                                              (update-in [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column)
                                                              (c/update-cursor initial-game buffer-ptr)))))))
                                        nil)))

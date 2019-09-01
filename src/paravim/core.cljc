@@ -63,13 +63,6 @@
 (defn set-alpha [color alpha]
   (assoc color 3 alpha))
 
-(defn assoc-lines [text-entity font-entity lines]
-  (reduce-kv
-    (fn [entity line-num line]
-      (chars/assoc-line entity line-num (mapv #(chars/crop-char font-entity %) line)))
-    text-entity
-    lines))
-
 (defn clojurify-lines
   ([text-entity font-entity parsed-code parinfer?]
    (let [*line-num (volatile! 0)
@@ -326,23 +319,32 @@
       'u_alpha alpha))
 
 (defn assoc-buffer [{:keys [base-font-entity base-text-entity font-height] :as state} buffer-ptr path lines]
-  (let [text-entity (assoc-lines base-text-entity base-font-entity lines)
-        parsed-code (when (clojure-exts (get-extension path))
-                      (ps/parse (str/join "\n" lines)))
-        text-entity (cond-> text-entity
-                            parsed-code
-                            (clojurify-lines base-font-entity parsed-code false))
-        parinfer-text-entity (when parsed-code
-                               (clojurify-lines text-entity base-font-entity parsed-code true))]
-    (assoc-in state [:buffers buffer-ptr]
-      {:text-entity (update-uniforms text-entity font-height text-alpha)
-       :parinfer-text-entity (some-> parinfer-text-entity (update-uniforms font-height parinfer-alpha))
-       :camera (t/translate orig-camera 0 0)
-       :camera-x 0
-       :camera-y 0
-       :path path
-       :lines lines
-       :parsed-code parsed-code})))
+  (assoc-in state [:buffers buffer-ptr]
+    {:text-entity
+     (-> (reduce-kv
+           (fn [entity line-num line]
+             (chars/assoc-line entity line-num (mapv #(chars/crop-char base-font-entity %) line)))
+           base-text-entity
+           lines)
+         (update-uniforms font-height text-alpha))
+     :camera (t/translate orig-camera 0 0)
+     :camera-x 0
+     :camera-y 0
+     :path path
+     :lines lines}))
+
+(defn update-clojure-buffer [{:keys [base-font-entity font-height] :as state} buffer-ptr path lines]
+  (if (clojure-exts (get-extension path))
+    (update-in state [:buffers buffer-ptr]
+      (fn [{:keys [text-entity path] :as buffer}]
+        (let [parsed-code (ps/parse (str/join "\n" lines))
+              text-entity (clojurify-lines text-entity base-font-entity parsed-code false)
+              parinfer-text-entity (clojurify-lines text-entity base-font-entity parsed-code true)]
+          (assoc buffer
+            :text-entity text-entity
+            :parinfer-text-entity (update-uniforms parinfer-text-entity font-height parinfer-alpha)
+            :parsed-code parsed-code))))
+    state))
 
 (defn update-text [{:keys [base-font-entity] :as state} buffer-ptr new-lines first-line line-count-change]
   (update-in state [:buffers buffer-ptr]
