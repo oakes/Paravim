@@ -161,21 +161,6 @@
         (insert-line* line-num adjusted-new-line)
         (assoc :characters (:characters new-text-entity)))))
 
-(defn dissoc-char
-  ([text-entity index]
-   (dissoc-char text-entity 0 index))
-  ([{:keys [characters] :as text-entity} line-num index]
-   (let [line (nth characters line-num)
-         prev-lines (subvec characters 0 line-num)
-         prev-count (reduce + 0 (map count prev-lines))
-         v1 (subvec line 0 index)
-         v2 (subvec line (inc index))
-         line (into (into [] v1) v2)
-         next-char (get line index)]
-     (-> text-entity
-         (assoc-in [:characters line-num] line)
-         (i/dissoc (+ index prev-count))))))
-
 (defn dissoc-line [text-entity line-num]
   (-> text-entity
       (dissoc-line* line-num)
