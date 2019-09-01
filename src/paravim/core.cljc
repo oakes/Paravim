@@ -15,7 +15,6 @@
   #?(:cljs (:require-macros [paravim.text :refer [load-font-cljs]])))
 
 (def orig-camera (e/->camera true))
-(def bg-color [(/ 42 255) (/ 34 255) (/ 36 255) 0.95])
 (def font-size-multiplier (/ 1 2))
 
 (defonce *state (atom {:mouse-x 0
@@ -24,22 +23,35 @@
                        :buffers {}
                        :buffer-updates []}))
 
+(def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
+
 (def text-color [1 1 1 1])
 (def cursor-color [(/ 112 255) (/ 128 255) (/ 144 255) 0.9])
-(def select-color [(/ 148 255) (/ 69 255) (/ 5 255) 0.5])
+(def select-color [(/ 148 255) (/ 69 255) (/ 5 255) 0.8])
 
 (def text-alpha 1.0)
 (def parinfer-alpha 0.15)
+(def highlight-alpha 0.05)
 
-(def colors {:number [(/ 255 255) (/ 193 255) (/ 94 255) 1]
-             :string [(/ 209 255) (/ 153 255) (/ 101 255) 1]
-             :keyword [(/ 86 255) (/ 181 255) (/ 194 255) 1]
-             :comment [(/ 150 255) (/ 129 255) (/ 133 255) 1]})
+(def yellow-color [(/ 255 255) (/ 193 255) (/ 94 255) 1])
+(def tan-color [(/ 209 255) (/ 153 255) (/ 101 255) 1])
+(def cyan-color [(/ 86 255) (/ 181 255) (/ 194 255) 1])
+(def gray-color [(/ 150 255) (/ 129 255) (/ 133 255) 1])
 
-(def rainbow-colors [[(/ 220 255) (/ 103 255) (/ 44 255) 1]
-                     [(/ 223 255) (/ 107 255) (/ 117 255) 1]
-                     [(/ 199 255) (/ 116 255) (/ 151 255) 1]
-                     [(/ 65 255) (/ 174 255) (/ 122 255) 1]])
+(def colors {:number yellow-color
+             :string tan-color
+             :keyword cyan-color
+             :comment gray-color})
+
+(def orange-color [(/ 220 255) (/ 103 255) (/ 44 255) 1])
+(def red-color [(/ 210 255) (/ 45 255) (/ 58 255) 1])
+(def purple-color [(/ 163 255) (/ 67 255) (/ 107 255) 1])
+(def green-color [(/ 65 255) (/ 174 255) (/ 122 255) 1])
+
+(def rainbow-colors [orange-color
+                     red-color
+                     purple-color
+                     green-color])
 
 (defn get-color [class-name depth]
   (or (colors class-name)
@@ -286,7 +298,7 @@
                                             (and (= end-line cursor-line)
                                                  (> end-column cursor-column))))))
                          first)]
-        (let [color (assoc (get-color :delimiter (:depth coll)) 3 0.05)
+        (let [color (set-alpha (get-color :delimiter (:depth coll)) highlight-alpha)
               rects (range->rects text-entity font-height coll)]
           (update buffer :rects-entity assoc-rects base-rect-entity color rects))
         buffer))))
