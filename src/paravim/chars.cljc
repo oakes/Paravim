@@ -45,7 +45,7 @@
     a_texture_matrix u_texture_matrix
     a_color u_color})
 
-(defn assoc-line* [instanced-entity i entities]
+(defn- assoc-line* [instanced-entity i entities]
   (let [characters (:characters instanced-entity)
         prev-lines (subvec characters 0 i)
         prev-count (reduce + 0 (map count prev-lines))
@@ -56,7 +56,7 @@
       instanced-entity
       instanced-font-attrs->unis)))
 
-(defn insert-line* [instanced-entity i entities]
+(defn- insert-line* [instanced-entity i entities]
   (let [characters (:characters instanced-entity)
         prev-lines (subvec characters 0 i)
         prev-count (reduce + 0 (map count prev-lines))]
@@ -65,7 +65,7 @@
       instanced-entity
       instanced-font-attrs->unis)))
 
-(defn dissoc-line* [instanced-entity i]
+(defn- dissoc-line* [instanced-entity i]
   (let [characters (:characters instanced-entity)
         prev-lines (subvec characters 0 i)
         prev-count (reduce + 0 (map count prev-lines))
