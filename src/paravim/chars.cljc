@@ -6,13 +6,7 @@
             [com.rpl.specter :as specter]))
 
 (defn- replace-instance-attr [start-index end-index entities instanced-entity attr-name uni-name]
-  (let [new-data (reduce
-                   (fn [v entity]
-                     (if (:program entity)
-                       (throw (ex-info "Only uncompiled entities can be assoc'ed to an instanced entity" {}))
-                       (into v (get-in entity [:uniforms uni-name]))))
-                   []
-                   entities)]
+  (let [new-data (into [] (specter/traverse-all [:uniforms uni-name specter/ALL]) entities)]
     (update-in instanced-entity [:attributes attr-name]
                (fn [attr]
                  (if attr
@@ -95,10 +89,8 @@
         {:keys [x y w h xoff yoff]} baked-char]
     (-> font-entity
         (t/crop x y w h)
-        (assoc-in [:uniforms 'u_scale_matrix]
-                  (m/scaling-matrix w h))
-        (assoc-in [:uniforms 'u_translate_matrix]
-                  (m/translation-matrix xoff (+ baseline yoff)))
+        (->> (specter/setval [:uniforms 'u_scale_matrix] (m/scaling-matrix w h))
+             (specter/setval [:uniforms 'u_translate_matrix] (m/translation-matrix xoff (+ baseline yoff))))
         (assoc :baked-char baked-char :character ch))))
 
 (defn assoc-char
@@ -125,7 +117,7 @@
      (assoc text-entity :characters (assoc characters line-num line)))))
 
 (defn assoc-line [text-entity line-num char-entities]
-  (let [new-text-entity (specter/select-any
+  (let [new-text-entity (specter/select-first
                           (specter/traversed specter/INDEXED-VALS
                                              (fn
                                                ([]
@@ -133,7 +125,7 @@
                                                ([new-text-entity [char-num char-entity]]
                                                 (assoc-char new-text-entity line-num char-num char-entity))))
                           char-entities)
-        new-line (specter/select-any [:characters line-num] new-text-entity)
+        new-line (specter/select-first [:characters line-num] new-text-entity)
         adjusted-new-line (specter/transform
                             [specter/ALL (specter/collect-one :left) :uniforms 'u_translate_matrix]
                             (fn [left matrix]
