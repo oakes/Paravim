@@ -48,7 +48,7 @@
 (defmethod task "install"
   [_]
   (-> (read-project-clj)
-      (merge (read-deps-edn []))
+      (merge (read-deps-edn [:linux :macos :windows]))
       p/init-project
       install)
   (System/exit 0))
@@ -56,7 +56,7 @@
 (defmethod task "deploy"
   [_]
   (-> (read-project-clj)
-      (merge (read-deps-edn []))
+      (merge (read-deps-edn [:linux :macos :windows]))
       p/init-project
       (deploy "clojars"))
   (System/exit 0))
