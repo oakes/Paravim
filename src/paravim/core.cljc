@@ -3,6 +3,7 @@
             [paravim.chars :as chars]
             [parinferish.core :as ps]
             [clojure.string :as str]
+            [play-cljc.gl.utils :as u]
             [play-cljc.gl.core :as c]
             [play-cljc.transforms :as t]
             [play-cljc.instances :as i]
@@ -476,6 +477,15 @@
                                                 :vertex instanced-font-vertex-shader
                                                 :fragment instanced-font-fragment-shader
                                                 :characters []))
+             ;; store the attribute lengths so we don't have to calculate them later
+             text-entity (reduce
+                           (fn [text-entity attr-name]
+                             (let [type-name (u/get-attribute-type text-entity attr-name)
+                                   {:keys [size iter]} (merge u/default-opts (u/type->attribute-opts type-name))]
+                               (assoc-in text-entity [:attribute-lengths attr-name]
+                                         (* size iter))))
+                           text-entity
+                           (keys chars/instanced-font-attrs->unis))
              rect-entity (e/->entity game primitives/rect)
              rects-entity (c/compile game (i/->instanced-entity rect-entity))
              command-bg-entity (c/compile game (t/color (e/->entity game primitives/rect) bg-color))]

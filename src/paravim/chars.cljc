@@ -2,17 +2,11 @@
   (:require [play-cljc.transforms :as t]
             [play-cljc.math :as m]
             [play-cljc.instances :as i]
-            [play-cljc.gl.utils :as u]
             [com.rpl.specter :as specter]))
-
-(defn- merge-attribute-opts [entity attr-name]
-  (let [type-name (u/get-attribute-type entity attr-name)]
-    (merge u/default-opts (u/type->attribute-opts type-name))))
 
 (defn- replace-instance-attr [start-index end-index entities instanced-entity attr-name uni-name]
   (let [new-data (into [] (specter/traverse-all [:uniforms uni-name specter/ALL]) entities)
-        {:keys [size iter]} (merge-attribute-opts instanced-entity attr-name)
-        data-len (* size iter)
+        data-len (specter/select-first [:attribute-lengths attr-name] instanced-entity)
         start-offset (* start-index data-len)
         end-offset (* end-index data-len)]
     (update-in instanced-entity [:attributes attr-name]
@@ -33,8 +27,7 @@
 (defn- dissoc-instance-attr [start-index end-index instanced-entity attr-name]
   (if (= start-index end-index)
     instanced-entity
-    (let [{:keys [size iter]} (merge-attribute-opts instanced-entity attr-name)
-          data-len (* size iter)
+    (let [data-len (specter/select-first [:attribute-lengths attr-name] instanced-entity)
           start-offset (* start-index data-len)
           end-offset (* end-index data-len)]
       (update-in instanced-entity [:attributes attr-name]
@@ -46,7 +39,7 @@
                                      v3 (subvec data end-offset)]
                                  (into (into [] v1) v3)))))))))
 
-(def ^:private instanced-font-attrs->unis
+(def ^:const instanced-font-attrs->unis
   '{a_translate_matrix u_translate_matrix
     a_scale_matrix u_scale_matrix
     a_texture_matrix u_texture_matrix
