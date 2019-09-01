@@ -5,40 +5,44 @@
             [play-cljc.gl.utils :as u]
             [com.rpl.specter :as specter]))
 
+(defn- merge-attribute-opts [entity attr-name]
+  (let [type-name (u/get-attribute-type entity attr-name)]
+    (merge u/default-opts (u/type->attribute-opts type-name))))
+
 (defn- replace-instance-attr [start-index end-index entities instanced-entity attr-name uni-name]
-  (let [new-data (into [] (specter/traverse-all [:uniforms uni-name specter/ALL]) entities)]
+  (let [new-data (into [] (specter/traverse-all [:uniforms uni-name specter/ALL]) entities)
+        {:keys [size iter]} (merge-attribute-opts instanced-entity attr-name)
+        data-len (* size iter)
+        start-offset (* start-index data-len)
+        end-offset (* end-index data-len)]
     (update-in instanced-entity [:attributes attr-name]
                (fn [attr]
                  (if attr
-                   (let [{:keys [size iter]} (u/merge-attribute-opts instanced-entity attr-name attr)
-                         data-len (* size iter)
-                         start-offset (* start-index data-len)
-                         end-offset (* end-index data-len)]
-                     (update attr :data
-                       (fn [data]
-                         (let [v1 (subvec data 0 start-offset)
-                               v2 (subvec data start-offset end-offset)
-                               v3 (subvec data end-offset)]
-                           (->> v3
-                                (into new-data)
-                                (into v1)
-                                (into []))))))
+                   (update attr :data
+                     (fn [data]
+                       (let [v1 (subvec data 0 start-offset)
+                             v2 (subvec data start-offset end-offset)
+                             v3 (subvec data end-offset)]
+                         (->> v3
+                              (into new-data)
+                              (into v1)
+                              (into [])))))
                    {:data (vec new-data)
                     :divisor 1})))))
 
 (defn- dissoc-instance-attr [start-index end-index instanced-entity attr-name]
-  (update-in instanced-entity [:attributes attr-name]
-             (fn [attr]
-               (let [{:keys [size iter]} (u/merge-attribute-opts instanced-entity attr-name attr)
-                     data-len (* size iter)
-                     start-offset (* start-index data-len)
-                     end-offset (* end-index data-len)]
-                 (update attr :data
-                         (fn [data]
-                           (let [v1 (subvec data 0 start-offset)
-                                 v2 (subvec data start-offset end-offset)
-                                 v3 (subvec data end-offset)]
-                             (into (into [] v1) v3))))))))
+  (let [{:keys [size iter]} (merge-attribute-opts instanced-entity attr-name)
+        data-len (* size iter)
+        start-offset (* start-index data-len)
+        end-offset (* end-index data-len)]
+    (update-in instanced-entity [:attributes attr-name]
+               (fn [attr]
+                   (update attr :data
+                           (fn [data]
+                             (let [v1 (subvec data 0 start-offset)
+                                   v2 (subvec data start-offset end-offset)
+                                   v3 (subvec data end-offset)]
+                               (into (into [] v1) v3))))))))
 
 (def ^:private instanced-font-attrs->unis
   '{a_translate_matrix u_translate_matrix
