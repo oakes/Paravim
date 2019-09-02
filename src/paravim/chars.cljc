@@ -128,10 +128,10 @@
         (->> (specter/setval [:characters line-num] new-line)))))
 
 (defn insert-line [{:keys [characters] :as text-entity} line-num char-entities]
-  (let [new-characters (->> (subvec characters line-num)
-                            (into [[]])
-                            (into (subvec characters 0 line-num))
-                            (into []))
+  (let [new-characters (rrb/catvec
+                         (rrb/subvec characters 0 line-num)
+                         [[]]
+                         (rrb/subvec characters line-num))
         text-entity (assoc text-entity :characters new-characters)]
     (assoc-line text-entity line-num char-entities)))
 
@@ -139,9 +139,7 @@
   (-> text-entity
       (dissoc-line* line-num)
       (update :characters (fn [characters]
-                            (let [v1 (subvec characters 0 line-num)
-                                  v2 (subvec characters (inc line-num))]
-                              (->> v2
-                                   (into v1)
-                                   (into [])))))))
+                            (let [v1 (rrb/subvec characters 0 line-num)
+                                  v2 (rrb/subvec characters (inc line-num))]
+                              (rrb/catvec v1 v2))))))
 
