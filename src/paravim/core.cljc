@@ -312,8 +312,11 @@
 
 (def clojure-exts #{"clj" "cljs" "cljc" "edn"})
 
-(defn clojure-buffer? [state buffer-ptr]
-  (some-> state :buffers (get buffer-ptr) :path get-extension clojure-exts))
+(defn get-buffer [state buffer-ptr]
+  (get-in state [:buffers buffer-ptr]))
+
+(defn clojure-buffer? [buffer]
+  (-> buffer :path get-extension clojure-exts))
 
 (defn update-uniforms [{:keys [characters] :as text-entity} font-height alpha]
   (update text-entity :uniforms assoc

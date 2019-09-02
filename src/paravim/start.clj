@@ -74,7 +74,7 @@
               updates)
             (assoc state :buffer-updates [])
             (reduce (fn [state buffer-ptr]
-                      (if (c/clojure-buffer? state buffer-ptr)
+                      (if (c/clojure-buffer? (c/get-buffer state buffer-ptr))
                         (-> state
                             (c/parse-clojure-buffer buffer-ptr false)
                             (c/update-clojure-buffer buffer-ptr))
@@ -198,7 +198,7 @@
                                                    (if (nil? (get-in state [:buffers buffer-ptr]))
                                                      (as-> state state
                                                            (c/assoc-buffer state buffer-ptr path lines)
-                                                           (if (c/clojure-buffer? state buffer-ptr)
+                                                           (if (c/clojure-buffer? (c/get-buffer state buffer-ptr))
                                                              (-> state
                                                                  (c/parse-clojure-buffer buffer-ptr true)
                                                                  (c/update-clojure-buffer buffer-ptr))
