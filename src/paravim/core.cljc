@@ -236,9 +236,16 @@
                       :camera-x camera-x
                       :camera-y camera-y))))))))
 
-(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity] :as state} text position]
+(defn update-uniforms [{:keys [characters] :as text-entity} font-height alpha]
+  (update text-entity :uniforms assoc
+      'u_char_counts (mapv count characters)
+      'u_font_height font-height
+      'u_alpha alpha))
+
+(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height] :as state} text position]
   (let [command-text-entity (when text
-                              (chars/assoc-line base-text-entity 0 (mapv #(chars/crop-char base-font-entity %) (str ":" text))))
+                              (-> (chars/assoc-line base-text-entity 0 (mapv #(chars/crop-char base-font-entity %) (str ":" text)))
+                                  (update-uniforms font-height text-alpha)))
         command-rects-entity (when text
                                (let [line-chars (get-in command-text-entity [:characters 0])]
                                  (-> base-rects-entity
@@ -317,12 +324,6 @@
 
 (defn clojure-buffer? [buffer]
   (-> buffer :path get-extension clojure-exts))
-
-(defn update-uniforms [{:keys [characters] :as text-entity} font-height alpha]
-  (update text-entity :uniforms assoc
-      'u_char_counts (mapv count characters)
-      'u_font_height font-height
-      'u_alpha alpha))
 
 (defn assoc-buffer [{:keys [base-font-entity base-text-entity font-height] :as state} buffer-ptr path lines]
   (assoc-in state [:buffers buffer-ptr]
