@@ -99,16 +99,12 @@
                         (recur (conj chars []))
                         chars))
          line (get characters line-num)
-         prev-chars (subvec line 0 index)
-         prev-xadv (reduce + 0 (map #(-> % :baked-char :xadv) prev-chars))
-         x-total (+ (:xadv baked-char) prev-xadv)
-         y-total (* line-num (:font-height baked-font))
-         prev-lines (subvec characters 0 line-num)
-         prev-count (reduce + 0 (map count prev-lines))
-         replaced-char (get line index)
+         prev-char (get line (dec index))
+         prev-x-total (or (:x-total prev-char) 0)
+         x-total (+ (:xadv baked-char) prev-x-total)
          line (assoc line index (-> char-entity
                                     (assoc :x-total x-total
-                                           :left prev-xadv
+                                           :left prev-x-total
                                            :width (:xadv baked-char)
                                            :height (:font-height baked-font))))]
      (assoc text-entity :characters (assoc characters line-num line)))))
