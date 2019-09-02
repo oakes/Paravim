@@ -10,6 +10,7 @@
             [play-cljc.gl.text :as text]
             [play-cljc.gl.entities-2d :as e]
             [play-cljc.primitives-2d :as primitives]
+            [clojure.core.rrb-vector :as rrb]
             #?(:clj  [play-cljc.macros-java :refer [gl math]]
                :cljs [play-cljc.macros-js :refer-macros [gl math]])
             #?(:clj [paravim.text :refer [load-font-clj]]))
@@ -117,7 +118,7 @@
                  (update characters line-num
                    (fn [char-entities]
                      (if (not= (count char-entities) char-num)
-                       (into [] (subvec char-entities 0 char-num))
+                       (rrb/subvec char-entities 0 char-num)
                        char-entities)))
                  characters))
              (update characters @*line-num
@@ -141,15 +142,11 @@
       new-lines)
     (let [lines-to-remove (if (neg? line-count-change)
                             (+ (* -1 line-count-change) (count new-lines))
-                            (- (count new-lines) line-count-change))
-          lines (->> (subvec lines (+ first-line lines-to-remove))
-                     (into (subvec lines 0 first-line))
-                     (into []))
-          lines (->> (subvec lines first-line)
-                     (into new-lines)
-                     (into (subvec lines 0 first-line))
-                     (into []))]
-      lines)))
+                            (- (count new-lines) line-count-change))]
+      (rrb/catvec
+        (rrb/subvec lines 0 first-line)
+        new-lines
+        (rrb/subvec lines (+ first-line lines-to-remove))))))
 
 (defn replace-lines [text-entity font-entity new-lines first-line line-count-change]
   (let [new-chars (mapv
