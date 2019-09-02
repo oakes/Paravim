@@ -168,11 +168,11 @@
                                        (-> state
                                            (assoc :mode mode)
                                            (c/update-command (v/get-command-text vim) (v/get-command-position vim))
-                                           update-buffers
                                            (as-> state
                                                  (if (c/get-buffer state current-buffer)
                                                    (-> state
                                                        (update-in [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)
+                                                       update-buffers
                                                        (c/update-cursor initial-game current-buffer)
                                                        (c/update-highlight current-buffer)
                                                        (cond-> (v/visual-active? vim)
