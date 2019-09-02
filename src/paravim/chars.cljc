@@ -2,7 +2,8 @@
   (:require [play-cljc.transforms :as t]
             [play-cljc.math :as m]
             [play-cljc.instances :as i]
-            [com.rpl.specter :as specter]))
+            [com.rpl.specter :as specter]
+            [clojure.core.rrb-vector :as rrb]))
 
 (defn- replace-instance-attr [start-index end-index entities instanced-entity attr-name uni-name]
   (let [new-data (into [] (specter/traverse-all [:uniforms uni-name specter/ALL]) entities)
@@ -14,13 +15,9 @@
                  (if attr
                    (update attr :data
                      (fn [data]
-                       (let [v1 (subvec data 0 start-offset)
-                             v2 (subvec data start-offset end-offset)
-                             v3 (subvec data end-offset)]
-                         (->> v3
-                              (into new-data)
-                              (into v1)
-                              (into [])))))
+                       (let [v1 (rrb/subvec data 0 start-offset)
+                             v2 (rrb/subvec data end-offset)]
+                         (rrb/catvec v1 new-data v2))))
                    {:data (vec new-data)
                     :divisor 1})))))
 
@@ -34,10 +31,9 @@
                  (fn [attr]
                      (update attr :data
                              (fn [data]
-                               (let [v1 (subvec data 0 start-offset)
-                                     v2 (subvec data start-offset end-offset)
-                                     v3 (subvec data end-offset)]
-                                 (into (into [] v1) v3)))))))))
+                               (let [v1 (rrb/subvec data 0 start-offset)
+                                     v2 (rrb/subvec data end-offset)]
+                                 (rrb/catvec v1 v2)))))))))
 
 (def ^:const instanced-font-attrs->unis
   '{a_translate_matrix u_translate_matrix
