@@ -75,18 +75,20 @@
 (defn- get-char-code [ch first-char]
   (- #?(:clj (int ch) :cljs (.charCodeAt ch 0)) first-char))
 
-(defn crop-char [{:keys [baked-font] :as font-entity} ch]
-  (let [{:keys [baked-chars baseline first-char]} baked-font
-        char-code (get-char-code ch first-char)
-        baked-char (or (get baked-chars char-code)
-                       (nth baked-chars (get-char-code \space first-char)))
-        baked-char (cond-> baked-char (= ch \tab) (update :xadv * 2))
-        {:keys [x y w h xoff yoff]} baked-char]
-    (-> font-entity
-        (t/crop x y w h)
-        (->> (specter/setval [:uniforms 'u_scale_matrix] (m/scaling-matrix w h))
-             (specter/setval [:uniforms 'u_translate_matrix] (m/translation-matrix xoff (+ baseline yoff))))
-        (assoc :baked-char baked-char :character ch))))
+(def crop-char
+  (memoize
+    (fn [{:keys [baked-font] :as font-entity} ch]
+      (let [{:keys [baked-chars baseline first-char]} baked-font
+            char-code (get-char-code ch first-char)
+            baked-char (or (get baked-chars char-code)
+                           (nth baked-chars (get-char-code \space first-char)))
+            baked-char (cond-> baked-char (= ch \tab) (update :xadv * 2))
+            {:keys [x y w h xoff yoff]} baked-char]
+        (-> font-entity
+            (t/crop x y w h)
+            (->> (specter/setval [:uniforms 'u_scale_matrix] (m/scaling-matrix w h))
+                 (specter/setval [:uniforms 'u_translate_matrix] (m/translation-matrix xoff (+ baseline yoff))))
+            (assoc :baked-char baked-char :character ch))))))
 
 (defn assoc-char
   ([text-entity index char-entity]
