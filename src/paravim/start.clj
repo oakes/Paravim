@@ -92,7 +92,22 @@
           (when (not= 'INSERT mode)
             (v/input vim "i"))
           (doseq [{:keys [line column content action]} diffs]
-            (v/set-cursor-position vim (inc line) column)
+            (let [line-diff (- line (dec (v/get-cursor-line vim)))
+                  column-diff (- column (v/get-cursor-column vim))]
+              (cond
+                (pos? line-diff)
+                (dotimes [_ line-diff]
+                  (v/input vim "<Down>"))
+                (neg? line-diff)
+                (dotimes [_ (* -1 line-diff)]
+                  (v/input vim "<Up>")))
+              (cond
+                (pos? column-diff)
+                (dotimes [_ column-diff]
+                  (v/input vim "<Right>"))
+                (neg? column-diff)
+                (dotimes [_ (* -1 column-diff)]
+                  (v/input vim "<Left>"))))
             (doseq [ch (seq content)]
               (case action
                 :remove
