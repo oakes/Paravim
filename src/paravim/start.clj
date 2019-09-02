@@ -168,6 +168,7 @@
                                        (-> state
                                            (assoc :mode mode)
                                            (c/update-command (v/get-command-text vim) (v/get-command-position vim))
+                                           update-buffers
                                            (as-> state
                                                  (if (c/get-buffer state current-buffer)
                                                    (-> state
@@ -178,8 +179,7 @@
                                                                (c/update-selection current-buffer (-> (v/get-visual-range vim)
                                                                                                       (update :start-line dec)
                                                                                                       (update :end-line dec)))))
-                                                   state))
-                                           (update-buffers))))
+                                                   state)))))
                                    (and (not= 'INSERT mode)
                                         (not= s "u"))
                                    (apply-parinfer! vim current-buffer)))))]
