@@ -323,7 +323,7 @@
   (get-in state [:buffers buffer-ptr]))
 
 (defn clojure-buffer? [buffer]
-  (-> buffer :path get-extension clojure-exts))
+  (some-> buffer :path get-extension clojure-exts))
 
 (defn assoc-buffer [{:keys [base-font-entity base-text-entity font-height] :as state} buffer-ptr path lines]
   (assoc-in state [:buffers buffer-ptr]

@@ -198,8 +198,8 @@
                                          (swap! c/*state
                                            (fn [state]
                                              (as-> state state
-                                                   (assoc state :current-buffer buffer-ptr)
-                                                   (if (nil? (get-in state [:buffers buffer-ptr]))
+                                                   (assoc state :current-buffer (when path buffer-ptr))
+                                                   (if (and path (nil? (c/get-buffer state buffer-ptr)))
                                                      (as-> state state
                                                            (c/assoc-buffer state buffer-ptr path lines)
                                                            (if (c/clojure-buffer? (c/get-buffer state buffer-ptr))
