@@ -36,26 +36,34 @@
               (MemoryUtil/memFree *window-height)
               (assoc state :mouse-x x :mouse-y y))))))))
 
-(defn keycode->keyword [keycode]
-  (condp = keycode
-    GLFW/GLFW_KEY_BACKSPACE :backspace
-    GLFW/GLFW_KEY_TAB :tab
-    GLFW/GLFW_KEY_ENTER :enter
-    GLFW/GLFW_KEY_ESCAPE :escape
-    GLFW/GLFW_KEY_UP :up
-    GLFW/GLFW_KEY_DOWN :down
-    GLFW/GLFW_KEY_LEFT :left
-    GLFW/GLFW_KEY_RIGHT :right
-    nil))
+(def keycode->keyword
+  {GLFW/GLFW_KEY_BACKSPACE :backspace
+   GLFW/GLFW_KEY_TAB :tab
+   GLFW/GLFW_KEY_ENTER :enter
+   GLFW/GLFW_KEY_ESCAPE :escape
+   GLFW/GLFW_KEY_UP :up
+   GLFW/GLFW_KEY_DOWN :down
+   GLFW/GLFW_KEY_LEFT :left
+   GLFW/GLFW_KEY_RIGHT :right})
+
+(def keycode->char
+  {GLFW/GLFW_KEY_D \D
+   GLFW/GLFW_KEY_R \R
+   GLFW/GLFW_KEY_U \U})
 
 (defn listen-for-keys [window callback]
   (GLFW/glfwSetKeyCallback window
     (reify GLFWKeyCallbackI
       (invoke [this window keycode scancode action mods]
-        (when-let [k (keycode->keyword keycode)]
-          (when (= action GLFW/GLFW_PRESS)
+        (when (= action GLFW/GLFW_PRESS)
+          (if-let [k (keycode->keyword keycode)]
             (when-let [key-name (v/keyword->name k)]
-              (callback key-name))))))))
+              (callback key-name))
+            (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
+                  shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))]
+              (when control?
+                (when-let [ch (keycode->char keycode)]
+                  (callback (str "<C-" (when shift? "S-") ch ">")))))))))))
 
 (defn listen-for-chars [window callback]
   (GLFW/glfwSetCharCallback window
