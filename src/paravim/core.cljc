@@ -211,7 +211,9 @@
                         cursor-bottom (+ top height)
                         cursor-right (+ left width)
                         game-width (utils/get-width game)
-                        game-height (- (utils/get-height game) height)
+                        game-height (- (utils/get-height game)
+                                       ;; the top and bottom bar
+                                       (* 2 height))
                         camera-bottom (+ camera-y game-height)
                         camera-right (+ camera-x game-width)
                         camera-x (cond
@@ -229,7 +231,9 @@
                                    :else
                                    camera-y)]
                     (assoc buffer
-                      :camera (t/translate orig-camera camera-x camera-y)
+                      :camera (t/translate orig-camera camera-x
+                                           ;; the top bar
+                                           (- camera-y height))
                       :camera-x camera-x
                       :camera-y camera-y))))))))
 
@@ -243,14 +247,14 @@
   (let [command-text-entity (when text
                               (-> (chars/assoc-line base-text-entity 0 (mapv #(chars/crop-char base-font-entity %) (str ":" text)))
                                   (update-uniforms font-height text-alpha)))
-        command-rects-entity (when text
-                               (let [line-chars (get-in command-text-entity [:characters 0])]
-                                 (-> base-rects-entity
-                                     (i/assoc 0 (->cursor-entity state line-chars 0 (inc position))))))]
+        command-cursor-entity (when text
+                                (let [line-chars (get-in command-text-entity [:characters 0])]
+                                  (-> base-rects-entity
+                                      (i/assoc 0 (->cursor-entity state line-chars 0 (inc position))))))]
     (assoc state
       :command-text text
       :command-text-entity command-text-entity
-      :command-rects-entity command-rects-entity)))
+      :command-cursor-entity command-cursor-entity)))
 
 (defn range->rects [text-entity font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
   (let [{:keys [start-line start-column end-line end-column]}
@@ -489,16 +493,14 @@
                            text-entity
                            (keys chars/instanced-font-attrs->unis))
              rect-entity (e/->entity game primitives/rect)
-             rects-entity (c/compile game (i/->instanced-entity rect-entity))
-             command-bg-entity (c/compile game (t/color (e/->entity game primitives/rect) bg-color))]
+             rects-entity (c/compile game (i/->instanced-entity rect-entity))]
          (swap! *state assoc
            :font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :w)
            :font-height (:font-height baked-font)
            :base-font-entity font-entity
            :base-text-entity text-entity
            :base-rect-entity rect-entity
-           :base-rects-entity rects-entity
-           :command-bg-entity command-bg-entity)
+           :base-rects-entity rects-entity)
          (callback)))))
 
 (def screen-entity
@@ -509,7 +511,8 @@
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
         {:keys [current-buffer buffers
-                command-bg-entity command-text-entity command-rects-entity
+                base-rect-entity base-rects-entity
+                command-text-entity command-cursor-entity
                 font-height mode]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
@@ -527,22 +530,27 @@
                          (t/project game-width game-height)
                          (t/camera camera)
                          (t/scale font-size-multiplier font-size-multiplier))))
-    (when command-bg-entity
-      (c/render game (-> command-bg-entity
+    (c/render game (-> base-rects-entity
+                       (t/project game-width game-height)
+                       (i/assoc 0 (-> base-rect-entity
+                                      (t/color bg-color)
+                                      (t/translate 0 0)
+                                      (t/scale game-width (* font-size-multiplier font-height))))
+                       (i/assoc 1 (-> base-rect-entity
+                                      (t/color bg-color)
+                                      (t/translate 0 (- game-height (* font-size-multiplier font-height)))
+                                      (t/scale game-width (* font-size-multiplier font-height))))))
+    (when (and (= mode 'COMMAND_LINE)
+               command-cursor-entity
+               command-text-entity)
+      (c/render game (-> command-cursor-entity
                          (t/project game-width game-height)
                          (t/translate 0 (- game-height (* font-size-multiplier font-height)))
-                         (t/scale game-width (* font-size-multiplier font-height))))
-      (when (and (= mode 'COMMAND_LINE)
-                 command-rects-entity
-                 command-text-entity)
-        (c/render game (-> command-rects-entity
-                           (t/project game-width game-height)
-                           (t/translate 0 (- game-height (* font-size-multiplier font-height)))
-                           (t/scale font-size-multiplier font-size-multiplier)))
-        (c/render game (-> command-text-entity
-                           (t/project game-width game-height)
-                           (t/translate 0 (- game-height (* font-size-multiplier font-height)))
-                           (t/scale font-size-multiplier font-size-multiplier))))))
+                         (t/scale font-size-multiplier font-size-multiplier)))
+      (c/render game (-> command-text-entity
+                         (t/project game-width game-height)
+                         (t/translate 0 (- game-height (* font-size-multiplier font-height)))
+                         (t/scale font-size-multiplier font-size-multiplier)))))
   ;; return the game map
   game)
 
