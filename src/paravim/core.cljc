@@ -337,10 +337,13 @@
      :path path
      :lines lines}))
 
-(defn parse-clojure-buffer [state buffer-ptr init?]
+(defn parse-clojure-buffer [{:keys [mode] :as state} buffer-ptr init?]
   (update-in state [:buffers buffer-ptr]
     (fn [{:keys [lines cursor-line cursor-column] :as buffer}]
-      (let [parse-opts (if init? {} {:mode :smart :cursor-line cursor-line :cursor-column cursor-column})
+      (let [parse-opts (cond
+                         init? {}
+                         (= 'INSERT mode) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}
+                         :else {:mode :indent})
             parsed-code (ps/parse (str/join "\n" lines) parse-opts)]
         (assoc buffer
           :parsed-code parsed-code
