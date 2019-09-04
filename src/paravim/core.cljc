@@ -600,20 +600,21 @@
                 tab-text-entities bounding-boxes current-tab]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
-    (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]} (get buffers current-buffer)]
-      (c/render game (-> rects-entity
-                         (t/project game-width game-height)
-                         (t/camera camera)
-                         (t/scale font-size-multiplier font-size-multiplier)))
-      (when parinfer-text-entity
-        (c/render game (-> parinfer-text-entity
+    (when (= current-tab :files)
+      (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]} (get buffers current-buffer)]
+        (c/render game (-> rects-entity
                            (t/project game-width game-height)
                            (t/camera camera)
-                           (t/scale font-size-multiplier font-size-multiplier))))
-      (c/render game (-> text-entity
-                         (t/project game-width game-height)
-                         (t/camera camera)
-                         (t/scale font-size-multiplier font-size-multiplier))))
+                           (t/scale font-size-multiplier font-size-multiplier)))
+        (when parinfer-text-entity
+          (c/render game (-> parinfer-text-entity
+                             (t/project game-width game-height)
+                             (t/camera camera)
+                             (t/scale font-size-multiplier font-size-multiplier))))
+        (c/render game (-> text-entity
+                           (t/project game-width game-height)
+                           (t/camera camera)
+                           (t/scale font-size-multiplier font-size-multiplier)))))
     (when (and base-rects-entity base-rect-entity)
       (c/render game (-> base-rects-entity
                          (t/project game-width game-height)
