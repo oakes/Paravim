@@ -538,9 +538,9 @@
                 :roboto-text-entity text-entity
                 :tab-text-entities [files-text-entity repl-in-text-entity repl-out-text-entity])
               (swap! *state update :bounding-boxes assoc
-                :files {:left 0 :right files-right :top 0 :bottom font-height}
-                :repl-in {:left repl-in-left :right repl-in-right :top 0 :bottom font-height}
-                :repl-out {:left repl-out-left :right repl-out-right :top 0 :bototm font-height})
+                :files {:x1 0 :y1 0 :x2 files-right :y2 font-height}
+                :repl-in {:x1 repl-in-left :y1 0 :x2 repl-in-right :y2 font-height}
+                :repl-out {:x1 repl-out-left :y1 0 :x2 repl-out-right :y2 font-height})
               (callback))))))))
 
 (def screen-entity
@@ -586,17 +586,17 @@
         (c/render game (-> files-entity
                            (assoc-in [:uniforms 'u_alpha] text-alpha)
                            (t/project game-width game-height)
-                           (t/translate (-> files :left (* font-size-multiplier)) 0)
+                           (t/translate (-> files :x1 (* font-size-multiplier)) 0)
                            (t/scale font-size-multiplier font-size-multiplier)))
         (c/render game (-> repl-in-entity
                            (assoc-in [:uniforms 'u_alpha] unfocused-alpha)
                            (t/project game-width game-height)
-                           (t/translate (-> repl-in :left (* font-size-multiplier)) 0)
+                           (t/translate (-> repl-in :x1 (* font-size-multiplier)) 0)
                            (t/scale font-size-multiplier font-size-multiplier)))
         (c/render game (-> repl-out-entity
                            (assoc-in [:uniforms 'u_alpha] unfocused-alpha)
                            (t/project game-width game-height)
-                           (t/translate (-> repl-out :left (* font-size-multiplier)) 0)
+                           (t/translate (-> repl-out :x1 (* font-size-multiplier)) 0)
                            (t/scale font-size-multiplier font-size-multiplier)))))
     (when (and (= mode 'COMMAND_LINE)
                command-cursor-entity
