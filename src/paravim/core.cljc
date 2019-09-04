@@ -474,6 +474,12 @@
   ;; allow transparency in images
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
+  ;; create rect entities
+  (let [rect-entity (e/->entity game primitives/rect)
+        rects-entity (c/compile game (i/->instanced-entity rect-entity))]
+    (swap! *state assoc
+      :base-rect-entity rect-entity
+      :base-rects-entity rects-entity))
   ;; load font
   (#?(:clj load-font-clj :cljs load-font-cljs) :firacode
      (fn [{:keys [data]} baked-font]
@@ -491,16 +497,12 @@
                                (assoc-in text-entity [:attribute-lengths attr-name]
                                          (* size iter))))
                            text-entity
-                           (keys chars/instanced-font-attrs->unis))
-             rect-entity (e/->entity game primitives/rect)
-             rects-entity (c/compile game (i/->instanced-entity rect-entity))]
+                           (keys chars/instanced-font-attrs->unis))]
          (swap! *state assoc
            :font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :w)
            :font-height (:font-height baked-font)
            :base-font-entity font-entity
-           :base-text-entity text-entity
-           :base-rect-entity rect-entity
-           :base-rects-entity rects-entity)
+           :base-text-entity text-entity)
          (callback)))))
 
 (def screen-entity
@@ -530,16 +532,17 @@
                          (t/project game-width game-height)
                          (t/camera camera)
                          (t/scale font-size-multiplier font-size-multiplier))))
-    (c/render game (-> base-rects-entity
-                       (t/project game-width game-height)
-                       (i/assoc 0 (-> base-rect-entity
-                                      (t/color bg-color)
-                                      (t/translate 0 0)
-                                      (t/scale game-width (* font-size-multiplier font-height))))
-                       (i/assoc 1 (-> base-rect-entity
-                                      (t/color bg-color)
-                                      (t/translate 0 (- game-height (* font-size-multiplier font-height)))
-                                      (t/scale game-width (* font-size-multiplier font-height))))))
+    (when (and base-rects-entity base-rect-entity)
+      (c/render game (-> base-rects-entity
+                         (t/project game-width game-height)
+                         (i/assoc 0 (-> base-rect-entity
+                                        (t/color bg-color)
+                                        (t/translate 0 0)
+                                        (t/scale game-width (* font-size-multiplier font-height))))
+                         (i/assoc 1 (-> base-rect-entity
+                                        (t/color bg-color)
+                                        (t/translate 0 (- game-height (* font-size-multiplier font-height)))
+                                        (t/scale game-width (* font-size-multiplier font-height)))))))
     (when (and (= mode 'COMMAND_LINE)
                command-cursor-entity
                command-text-entity)
