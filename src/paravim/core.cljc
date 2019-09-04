@@ -525,7 +525,7 @@
     text-entity
     (keys chars/instanced-font-attrs->unis)))
 
-(defn init [game density-ratio callback]
+(defn init [game callback]
   ;; allow transparency in images
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
@@ -534,8 +534,7 @@
         rects-entity (c/compile game (i/->instanced-entity rect-entity))]
     (swap! *state assoc
       :base-rect-entity rect-entity
-      :base-rects-entity rects-entity)
-    (swap! *state update :font-size-multiplier * density-ratio))
+      :base-rects-entity rects-entity))
   ;; load fonts
   (#?(:clj load-font-clj :cljs load-font-cljs) :firacode
      (fn [{:keys [data]} baked-font]

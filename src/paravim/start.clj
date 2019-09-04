@@ -261,8 +261,8 @@
                                                                                      :lines lines
                                                                                      :first-line first-line
                                                                                      :line-count-change line-count-change}))))
-        (c/init initial-game density-ratio (fn []
-                                             (v/open-buffer vim "deps.edn")))
+        (c/init initial-game (fn []
+                               (v/open-buffer vim "deps.edn")))
         (loop [game initial-game]
           (when-not (GLFW/glfwWindowShouldClose window)
             (let [ts (GLFW/glfwGetTime)
