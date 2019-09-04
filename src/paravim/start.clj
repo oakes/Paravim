@@ -11,30 +11,25 @@
             [javax.sound.sampled AudioSystem Clip])
   (:gen-class))
 
-(defn listen-for-mouse [window game]
+(defn get-density-ratio [window]
+  (let [*fb-width (MemoryUtil/memAllocInt 1)
+        *window-width (MemoryUtil/memAllocInt 1)
+        _ (GLFW/glfwGetFramebufferSize window *fb-width nil)
+        _ (GLFW/glfwGetWindowSize window *window-width nil)
+        fb-width (.get *fb-width)
+        window-width (.get *window-width)]
+    (MemoryUtil/memFree *fb-width)
+    (MemoryUtil/memFree *window-width)
+    (/ fb-width window-width)))
+
+(defn listen-for-mouse [window game density-ratio]
   (GLFW/glfwSetCursorPosCallback window
     (reify GLFWCursorPosCallbackI
       (invoke [this window xpos ypos]
         (as-> (swap! c/*state
                 (fn [state]
-                  (let [*fb-width (MemoryUtil/memAllocInt 1)
-                        *fb-height (MemoryUtil/memAllocInt 1)
-                        *window-width (MemoryUtil/memAllocInt 1)
-                        *window-height (MemoryUtil/memAllocInt 1)
-                        _ (GLFW/glfwGetFramebufferSize window *fb-width *fb-height)
-                        _ (GLFW/glfwGetWindowSize window *window-width *window-height)
-                        fb-width (.get *fb-width)
-                        fb-height (.get *fb-height)
-                        window-width (.get *window-width)
-                        window-height (.get *window-height)
-                        width-ratio (/ fb-width window-width)
-                        height-ratio (/ fb-height window-height)
-                        x (* xpos width-ratio)
-                        y (* ypos height-ratio)]
-                    (MemoryUtil/memFree *fb-width)
-                    (MemoryUtil/memFree *fb-height)
-                    (MemoryUtil/memFree *window-width)
-                    (MemoryUtil/memFree *window-height)
+                  (let [x (* xpos density-ratio)
+                        y (* ypos density-ratio)]
                     (c/update-mouse state game x y))))
               state
               (GLFW/glfwSetCursor window
@@ -226,8 +221,9 @@
                                                    state)))))
                                    (and (not= 'INSERT mode)
                                         (not= s "u"))
-                                   (apply-parinfer! vim current-buffer)))))]
-        (listen-for-mouse window initial-game)
+                                   (apply-parinfer! vim current-buffer)))))
+            density-ratio (get-density-ratio window)]
+        (listen-for-mouse window initial-game density-ratio)
         (listen-for-keys window on-input)
         (listen-for-chars window on-input)
         (v/set-on-quit vim (fn [buffer-ptr force?]
@@ -265,8 +261,8 @@
                                                                                      :lines lines
                                                                                      :first-line first-line
                                                                                      :line-count-change line-count-change}))))
-        (c/init initial-game (fn []
-                               (v/open-buffer vim "deps.edn")))
+        (c/init initial-game density-ratio (fn []
+                                             (v/open-buffer vim "deps.edn")))
         (loop [game initial-game]
           (when-not (GLFW/glfwWindowShouldClose window)
             (let [ts (GLFW/glfwGetTime)

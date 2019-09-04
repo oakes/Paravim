@@ -17,7 +17,6 @@
   #?(:cljs (:require-macros [paravim.text :refer [load-font-cljs]])))
 
 (def orig-camera (e/->camera true))
-(def font-size-multiplier (/ 1 2))
 (def tabs [:files :repl-in :repl-out])
 
 (defonce *state (atom {:mouse-x 0
@@ -25,7 +24,8 @@
                        :current-buffer nil
                        :buffers {}
                        :buffer-updates []
-                       :current-tab :files}))
+                       :current-tab :files
+                       :font-size-multiplier (/ 1 2)}))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
 
@@ -180,7 +180,7 @@
                           new-chars)]
         text-entity))))
 
-(defn ->cursor-entity [{:keys [font-width font-height base-rect-entity] :as state} line-chars line column]
+(defn ->cursor-entity [{:keys [font-width font-height base-rect-entity font-size-multiplier] :as state} line-chars line column]
   (let [left-char (get line-chars (dec column))
         curr-char (get line-chars column)
         {:keys [left width height]} curr-char
@@ -200,7 +200,7 @@
                :width (* width font-size-multiplier)
                :height (* height font-size-multiplier)))))
 
-(defn update-cursor [{:keys [base-rects-entity text-box] :as state} game buffer-ptr]
+(defn update-cursor [{:keys [base-rects-entity text-box font-size-multiplier] :as state} game buffer-ptr]
   (update-in state [:buffers buffer-ptr]
     (fn [{:keys [cursor-line cursor-column] :as buffer}]
       (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
@@ -238,7 +238,7 @@
                       :camera-x camera-x
                       :camera-y camera-y))))))))
 
-(defn update-mouse [{:keys [text-box bounding-boxes tab-text-entities] :as state} game x y]
+(defn update-mouse [{:keys [text-box bounding-boxes tab-text-entities font-size-multiplier] :as state} game x y]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
         {:keys [left right top bottom]} text-box
@@ -525,7 +525,7 @@
     text-entity
     (keys chars/instanced-font-attrs->unis)))
 
-(defn init [game callback]
+(defn init [game density-ratio callback]
   ;; allow transparency in images
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
@@ -534,7 +534,8 @@
         rects-entity (c/compile game (i/->instanced-entity rect-entity))]
     (swap! *state assoc
       :base-rect-entity rect-entity
-      :base-rects-entity rects-entity))
+      :base-rects-entity rects-entity)
+    (swap! *state update :font-size-multiplier * density-ratio))
   ;; load fonts
   (#?(:clj load-font-clj :cljs load-font-cljs) :firacode
      (fn [{:keys [data]} baked-font]
@@ -595,7 +596,7 @@
         {:keys [current-buffer buffers
                 base-rect-entity base-rects-entity
                 command-text-entity command-cursor-entity
-                font-height mode
+                font-height mode font-size-multiplier
                 tab-text-entities bounding-boxes current-tab]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
