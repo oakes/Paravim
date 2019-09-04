@@ -14,27 +14,34 @@
   (GLFW/glfwSetCursorPosCallback window
     (reify GLFWCursorPosCallbackI
       (invoke [this window xpos ypos]
-        (swap! c/*state
-          (fn [state]
-            (let [*fb-width (MemoryUtil/memAllocInt 1)
-                  *fb-height (MemoryUtil/memAllocInt 1)
-                  *window-width (MemoryUtil/memAllocInt 1)
-                  *window-height (MemoryUtil/memAllocInt 1)
-                  _ (GLFW/glfwGetFramebufferSize window *fb-width *fb-height)
-                  _ (GLFW/glfwGetWindowSize window *window-width *window-height)
-                  fb-width (.get *fb-width)
-                  fb-height (.get *fb-height)
-                  window-width (.get *window-width)
-                  window-height (.get *window-height)
-                  width-ratio (/ fb-width window-width)
-                  height-ratio (/ fb-height window-height)
-                  x (* xpos width-ratio)
-                  y (* ypos height-ratio)]
-              (MemoryUtil/memFree *fb-width)
-              (MemoryUtil/memFree *fb-height)
-              (MemoryUtil/memFree *window-width)
-              (MemoryUtil/memFree *window-height)
-              (c/update-mouse state game x y))))))))
+        (as-> (swap! c/*state
+                (fn [state]
+                  (let [*fb-width (MemoryUtil/memAllocInt 1)
+                        *fb-height (MemoryUtil/memAllocInt 1)
+                        *window-width (MemoryUtil/memAllocInt 1)
+                        *window-height (MemoryUtil/memAllocInt 1)
+                        _ (GLFW/glfwGetFramebufferSize window *fb-width *fb-height)
+                        _ (GLFW/glfwGetWindowSize window *window-width *window-height)
+                        fb-width (.get *fb-width)
+                        fb-height (.get *fb-height)
+                        window-width (.get *window-width)
+                        window-height (.get *window-height)
+                        width-ratio (/ fb-width window-width)
+                        height-ratio (/ fb-height window-height)
+                        x (* xpos width-ratio)
+                        y (* ypos height-ratio)]
+                    (MemoryUtil/memFree *fb-width)
+                    (MemoryUtil/memFree *fb-height)
+                    (MemoryUtil/memFree *window-width)
+                    (MemoryUtil/memFree *window-height)
+                    (c/update-mouse state game x y))))
+              state
+              (GLFW/glfwSetCursor window
+                                  (GLFW/glfwCreateStandardCursor
+                                    (case (:mouse-type state)
+                                      :ibeam GLFW/GLFW_IBEAM_CURSOR
+                                      :hand GLFW/GLFW_HAND_CURSOR
+                                      GLFW/GLFW_ARROW_CURSOR))))))))
 
 (def keycode->keyword
   {GLFW/GLFW_KEY_BACKSPACE :backspace
