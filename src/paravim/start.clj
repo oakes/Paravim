@@ -71,9 +71,10 @@
       (invoke [this window keycode scancode action mods]
         (when (= action GLFW/GLFW_PRESS)
           (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
+                alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
                 shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))]
             (if-let [k (keycode->keyword keycode)]
-              (if (and control? (= k :tab))
+              (if (and (or control? alt?) (= k :tab))
                 (swap! c/*state c/change-tab (if shift? -1 1))
                 (when-let [key-name (v/keyword->name k)]
                   (callback key-name)))
