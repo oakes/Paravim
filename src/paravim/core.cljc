@@ -475,7 +475,7 @@
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
   ;; load font
-  (#?(:clj load-font-clj :cljs load-font-cljs)
+  (#?(:clj load-font-clj :cljs load-font-cljs) :firacode
      (fn [{:keys [data]} baked-font]
        (let [font-entity (-> (text/->font-entity game data baked-font)
                              (t/color text-color))
