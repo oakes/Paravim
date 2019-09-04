@@ -34,6 +34,7 @@
 (def text-alpha 1.0)
 (def parinfer-alpha 0.15)
 (def highlight-alpha 0.05)
+(def unfocused-alpha 0.5)
 
 (def yellow-color [(/ 255 255) (/ 193 255) (/ 94 255) 1])
 (def tan-color [(/ 209 255) (/ 153 255) (/ 101 255) 1])
@@ -326,15 +327,17 @@
 (defn clojure-buffer? [buffer]
   (some-> buffer :path get-extension clojure-exts))
 
+(defn assoc-lines [text-entity font-entity font-height lines]
+  (-> (reduce-kv
+        (fn [entity line-num line]
+          (chars/assoc-line entity line-num (mapv #(chars/crop-char font-entity %) line)))
+        text-entity
+        lines)
+      (update-uniforms font-height text-alpha)))
+
 (defn assoc-buffer [{:keys [base-font-entity base-text-entity font-height] :as state} buffer-ptr path lines]
   (assoc-in state [:buffers buffer-ptr]
-    {:text-entity
-     (-> (reduce-kv
-           (fn [entity line-num line]
-             (chars/assoc-line entity line-num (mapv #(chars/crop-char base-font-entity %) line)))
-           base-text-entity
-           lines)
-         (update-uniforms font-height text-alpha))
+    {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
      :camera (t/translate orig-camera 0 0)
      :camera-x 0
      :camera-y 0
@@ -500,10 +503,11 @@
                                     :fragment instanced-font-fragment-shader
                                     :characters [])
                              assoc-attr-lengths)
-             text-entity (c/compile game text-entity)]
+             text-entity (c/compile game text-entity)
+             font-height (:font-height baked-font)]
          (swap! *state assoc
            :font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :w)
-           :font-height (:font-height baked-font)
+           :font-height font-height
            :base-font-entity font-entity
            :base-text-entity text-entity)
          (#?(:clj load-font-clj :cljs load-font-cljs) :roboto
@@ -515,10 +519,14 @@
                                          :fragment instanced-font-fragment-shader
                                          :characters [])
                                   assoc-attr-lengths)
-                  text-entity (c/compile game text-entity)]
+                  text-entity (c/compile game text-entity)
+                  files-text-entity (assoc-lines text-entity font-entity font-height ["Files"])
+                  repl-in-text-entity (assoc-lines text-entity font-entity font-height ["REPL In"])
+                  repl-out-text-entity (assoc-lines text-entity font-entity font-height ["REPL Out"])]
               (swap! *state assoc
                 :roboto-font-entity font-entity
-                :roboto-text-entity text-entity)
+                :roboto-text-entity text-entity
+                :tab-text-entities [files-text-entity repl-in-text-entity repl-out-text-entity])
               (callback))))))))
 
 (def screen-entity
@@ -531,7 +539,7 @@
         {:keys [current-buffer buffers
                 base-rect-entity base-rects-entity
                 command-text-entity command-cursor-entity
-                font-height mode]} @*state]
+                tab-text-entities font-height font-width mode]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
     (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]} (get buffers current-buffer)]
@@ -559,6 +567,28 @@
                                         (t/color bg-color)
                                         (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                                         (t/scale game-width (* font-size-multiplier font-height)))))))
+    (when-let [[files repl-in repl-out] tab-text-entities]
+      (let [tab-spacing (* font-width 2)
+            repl-in-left (-> files :characters first last :x-total (+ tab-spacing)
+                             (* font-size-multiplier))
+            repl-out-left (-> repl-in :characters first last :x-total (+ tab-spacing)
+                              (* font-size-multiplier)
+                              (+ repl-in-left))]
+        (c/render game (-> files
+                           (assoc-in [:uniforms 'u_alpha] text-alpha)
+                           (t/project game-width game-height)
+                           (t/translate 0 0)
+                           (t/scale font-size-multiplier font-size-multiplier)))
+        (c/render game (-> repl-in
+                           (assoc-in [:uniforms 'u_alpha] unfocused-alpha)
+                           (t/project game-width game-height)
+                           (t/translate repl-in-left 0)
+                           (t/scale font-size-multiplier font-size-multiplier)))
+        (c/render game (-> repl-out
+                           (assoc-in [:uniforms 'u_alpha] unfocused-alpha)
+                           (t/project game-width game-height)
+                           (t/translate repl-out-left 0)
+                           (t/scale font-size-multiplier font-size-multiplier)))))
     (when (and (= mode 'COMMAND_LINE)
                command-cursor-entity
                command-text-entity)
