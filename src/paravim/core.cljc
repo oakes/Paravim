@@ -23,7 +23,8 @@
                        :mouse-y 0
                        :current-buffer nil
                        :buffers {}
-                       :buffer-updates []}))
+                       :buffer-updates []
+                       :bounding-boxes {}}))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
 
@@ -198,7 +199,7 @@
                :width (* width font-size-multiplier)
                :height (* height font-size-multiplier)))))
 
-(defn update-cursor [{:keys [font-height base-rects-entity] :as state} game buffer-ptr]
+(defn update-cursor [{:keys [base-rects-entity bounding-boxes] :as state} game buffer-ptr]
   (update-in state [:buffers buffer-ptr]
     (fn [{:keys [cursor-line cursor-column] :as buffer}]
       (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
@@ -209,12 +210,13 @@
                                      (assoc :rect-count 1)))
             (as-> buffer
                   (let [{:keys [camera camera-x camera-y]} buffer
+                        text-box (:text bounding-boxes)
+                        text-top (* (:top text-box) font-size-multiplier)
+                        text-bottom (* (:bottom text-box) font-size-multiplier)
                         cursor-bottom (+ top height)
                         cursor-right (+ left width)
                         game-width (utils/get-width game)
-                        game-height (- (utils/get-height game)
-                                       ;; the top and bottom bar
-                                       (* 2 height))
+                        game-height (- (utils/get-height game) (+ text-top text-bottom))
                         camera-bottom (+ camera-y game-height)
                         camera-right (+ camera-x game-width)
                         camera-x (cond
@@ -232,9 +234,7 @@
                                    :else
                                    camera-y)]
                     (assoc buffer
-                      :camera (t/translate orig-camera camera-x
-                                           ;; the top bar
-                                           (- camera-y height))
+                      :camera (t/translate orig-camera camera-x (- camera-y text-top))
                       :camera-x camera-x
                       :camera-y camera-y))))))))
 
@@ -504,12 +504,15 @@
                                     :characters [])
                              assoc-attr-lengths)
              text-entity (c/compile game text-entity)
+             font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :w)
              font-height (:font-height baked-font)]
          (swap! *state assoc
-           :font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :w)
+           :font-width font-width
            :font-height font-height
            :base-font-entity font-entity
            :base-text-entity text-entity)
+         (swap! *state update :bounding-boxes assoc
+           :text {:left 0 :right 0 :top font-height :bottom font-height})
          (#?(:clj load-font-clj :cljs load-font-cljs) :roboto
           (fn [{:keys [data]} baked-font]
             (let [font-entity (-> (text/->font-entity game data baked-font)
@@ -522,11 +525,21 @@
                   text-entity (c/compile game text-entity)
                   files-text-entity (assoc-lines text-entity font-entity font-height ["Files"])
                   repl-in-text-entity (assoc-lines text-entity font-entity font-height ["REPL In"])
-                  repl-out-text-entity (assoc-lines text-entity font-entity font-height ["REPL Out"])]
+                  repl-out-text-entity (assoc-lines text-entity font-entity font-height ["REPL Out"])
+                  tab-spacing (* font-width 2)
+                  files-right (-> files-text-entity :characters first last :x-total)
+                  repl-in-left (-> tab-spacing (+ files-right))
+                  repl-in-right (-> repl-in-text-entity :characters first last :x-total (+ repl-in-left))
+                  repl-out-left (-> tab-spacing (+ repl-in-right))
+                  repl-out-right (-> repl-out-text-entity :characters first last :x-total (+ repl-out-left))]
               (swap! *state assoc
                 :roboto-font-entity font-entity
                 :roboto-text-entity text-entity
                 :tab-text-entities [files-text-entity repl-in-text-entity repl-out-text-entity])
+              (swap! *state update :bounding-boxes assoc
+                :files {:left 0 :right files-right :top 0 :bottom font-height}
+                :repl-in {:left repl-in-left :right repl-in-right :top 0 :bottom font-height}
+                :repl-out {:left repl-out-left :right repl-out-right :top 0 :bototm font-height})
               (callback))))))))
 
 (def screen-entity
@@ -539,7 +552,7 @@
         {:keys [current-buffer buffers
                 base-rect-entity base-rects-entity
                 command-text-entity command-cursor-entity
-                tab-text-entities font-height font-width mode]} @*state]
+                tab-text-entities font-height mode bounding-boxes]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
     (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]} (get buffers current-buffer)]
@@ -567,27 +580,22 @@
                                         (t/color bg-color)
                                         (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                                         (t/scale game-width (* font-size-multiplier font-height)))))))
-    (when-let [[files repl-in repl-out] tab-text-entities]
-      (let [tab-spacing (* font-width 2)
-            repl-in-left (-> files :characters first last :x-total (+ tab-spacing)
-                             (* font-size-multiplier))
-            repl-out-left (-> repl-in :characters first last :x-total (+ tab-spacing)
-                              (* font-size-multiplier)
-                              (+ repl-in-left))]
-        (c/render game (-> files
+    (when-let [[files-entity repl-in-entity repl-out-entity] tab-text-entities]
+      (when-let [{:keys [files repl-in repl-out]} bounding-boxes]
+        (c/render game (-> files-entity
                            (assoc-in [:uniforms 'u_alpha] text-alpha)
                            (t/project game-width game-height)
-                           (t/translate 0 0)
+                           (t/translate (-> files :left (* font-size-multiplier)) 0)
                            (t/scale font-size-multiplier font-size-multiplier)))
-        (c/render game (-> repl-in
+        (c/render game (-> repl-in-entity
                            (assoc-in [:uniforms 'u_alpha] unfocused-alpha)
                            (t/project game-width game-height)
-                           (t/translate repl-in-left 0)
+                           (t/translate (-> repl-in :left (* font-size-multiplier)) 0)
                            (t/scale font-size-multiplier font-size-multiplier)))
-        (c/render game (-> repl-out
+        (c/render game (-> repl-out-entity
                            (assoc-in [:uniforms 'u_alpha] unfocused-alpha)
                            (t/project game-width game-height)
-                           (t/translate repl-out-left 0)
+                           (t/translate (-> repl-out :left (* font-size-multiplier)) 0)
                            (t/scale font-size-multiplier font-size-multiplier)))))
     (when (and (= mode 'COMMAND_LINE)
                command-cursor-entity
