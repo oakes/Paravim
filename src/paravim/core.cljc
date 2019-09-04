@@ -243,9 +243,9 @@
       'u_font_height font-height
       'u_alpha alpha))
 
-(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height] :as state} text position]
+(defn update-command [{:keys [roboto-text-entity roboto-font-entity base-rects-entity font-height] :as state} text position]
   (let [command-text-entity (when text
-                              (-> (chars/assoc-line base-text-entity 0 (mapv #(chars/crop-char base-font-entity %) (str ":" text)))
+                              (-> (chars/assoc-line roboto-text-entity 0 (mapv #(chars/crop-char roboto-font-entity %) (str ":" text)))
                                   (update-uniforms font-height text-alpha)))
         command-cursor-entity (when text
                                 (let [line-chars (get-in command-text-entity [:characters 0])]
@@ -470,6 +470,16 @@
            ("if" (== (.w o_color) "0.0")
              "discard"))}})
 
+(defn assoc-attr-lengths [text-entity]
+  (reduce
+    (fn [text-entity attr-name]
+      (let [type-name (u/get-attribute-type text-entity attr-name)
+            {:keys [size iter]} (merge u/default-opts (u/type->attribute-opts type-name))]
+        (assoc-in text-entity [:attribute-lengths attr-name]
+                  (* size iter))))
+    text-entity
+    (keys chars/instanced-font-attrs->unis)))
+
 (defn init [game callback]
   ;; allow transparency in images
   (gl game enable (gl game BLEND))
@@ -480,30 +490,36 @@
     (swap! *state assoc
       :base-rect-entity rect-entity
       :base-rects-entity rects-entity))
-  ;; load font
+  ;; load fonts
   (#?(:clj load-font-clj :cljs load-font-cljs) :firacode
      (fn [{:keys [data]} baked-font]
        (let [font-entity (-> (text/->font-entity game data baked-font)
                              (t/color text-color))
-             text-entity (c/compile game (assoc (i/->instanced-entity font-entity)
-                                                :vertex instanced-font-vertex-shader
-                                                :fragment instanced-font-fragment-shader
-                                                :characters []))
-             ;; store the attribute lengths so we don't have to calculate them later
-             text-entity (reduce
-                           (fn [text-entity attr-name]
-                             (let [type-name (u/get-attribute-type text-entity attr-name)
-                                   {:keys [size iter]} (merge u/default-opts (u/type->attribute-opts type-name))]
-                               (assoc-in text-entity [:attribute-lengths attr-name]
-                                         (* size iter))))
-                           text-entity
-                           (keys chars/instanced-font-attrs->unis))]
+             text-entity (-> (i/->instanced-entity font-entity)
+                             (assoc :vertex instanced-font-vertex-shader
+                                    :fragment instanced-font-fragment-shader
+                                    :characters [])
+                             assoc-attr-lengths)
+             text-entity (c/compile game text-entity)]
          (swap! *state assoc
            :font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :w)
            :font-height (:font-height baked-font)
            :base-font-entity font-entity
            :base-text-entity text-entity)
-         (callback)))))
+         (#?(:clj load-font-clj :cljs load-font-cljs) :roboto
+          (fn [{:keys [data]} baked-font]
+            (let [font-entity (-> (text/->font-entity game data baked-font)
+                                  (t/color text-color))
+                  text-entity (-> (i/->instanced-entity font-entity)
+                                  (assoc :vertex instanced-font-vertex-shader
+                                         :fragment instanced-font-fragment-shader
+                                         :characters [])
+                                  assoc-attr-lengths)
+                  text-entity (c/compile game text-entity)]
+              (swap! *state assoc
+                :roboto-font-entity font-entity
+                :roboto-text-entity text-entity)
+              (callback))))))))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
