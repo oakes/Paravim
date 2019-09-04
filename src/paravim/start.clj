@@ -20,7 +20,7 @@
         window-width (.get *window-width)]
     (MemoryUtil/memFree *fb-width)
     (MemoryUtil/memFree *window-width)
-    (/ fb-width window-width)))
+    (float (/ fb-width window-width))))
 
 (defn listen-for-mouse [window game density-ratio]
   (GLFW/glfwSetCursorPosCallback window
