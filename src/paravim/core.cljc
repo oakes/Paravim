@@ -18,14 +18,13 @@
 
 (def orig-camera (e/->camera true))
 (def font-size-multiplier (/ 1 2))
+(def tabs [:files :repl-in :repl-out])
 
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
                        :current-buffer nil
                        :buffers {}
                        :buffer-updates []
-                       :bounding-boxes {}
-                       :tabs [:files :repl-in :repl-out]
                        :current-tab :files}))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
@@ -271,7 +270,7 @@
     (assoc state :current-tab mouse-hover)
     state))
 
-(defn change-tab [{:keys [tabs current-tab] :as state} direction]
+(defn change-tab [{:keys [current-tab] :as state} direction]
   (let [index (+ (.indexOf tabs current-tab)
                  direction)
         index (cond
@@ -569,21 +568,21 @@
                   repl-in-text-entity (assoc-lines text-entity font-entity font-height ["REPL In"])
                   repl-out-text-entity (assoc-lines text-entity font-entity font-height ["REPL Out"])
                   tab-spacing (* font-width 2)
-                  files-right (-> files-text-entity :characters first last :x-total)
-                  repl-in-left (-> tab-spacing (+ files-right))
-                  repl-in-right (-> repl-in-text-entity :characters first last :x-total (+ repl-in-left))
-                  repl-out-left (-> tab-spacing (+ repl-in-right))
-                  repl-out-right (-> repl-out-text-entity :characters first last :x-total (+ repl-out-left))]
+                  tab-entities {:files files-text-entity
+                                :repl-in repl-in-text-entity
+                                :repl-out repl-out-text-entity}]
               (swap! *state assoc
                 :roboto-font-entity font-entity
                 :roboto-text-entity text-entity
-                :tab-text-entities {:files files-text-entity
-                                    :repl-in repl-in-text-entity
-                                    :repl-out repl-out-text-entity})
-              (swap! *state update :bounding-boxes assoc
-                :files {:x1 0 :y1 0 :x2 files-right :y2 font-height}
-                :repl-in {:x1 repl-in-left :y1 0 :x2 repl-in-right :y2 font-height}
-                :repl-out {:x1 repl-out-left :y1 0 :x2 repl-out-right :y2 font-height})
+                :tab-text-entities tab-entities
+                :bounding-boxes (reduce-kv
+                                  (fn [m i tab]
+                                    (let [last-tab (some->> (get tabs (dec i)) (get m))
+                                          left (if last-tab (+ (:x2 last-tab) tab-spacing) 0)
+                                          right (-> tab-entities (get tab) :characters first last :x-total (+ left))]
+                                      (assoc m tab {:x1 left :y1 0 :x2 right :y2 font-height})))
+                                  {}
+                                  tabs))
               (callback))))))))
 
 (def screen-entity
