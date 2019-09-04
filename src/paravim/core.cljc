@@ -244,9 +244,10 @@
       'u_font_height font-height
       'u_alpha alpha))
 
-(defn update-command [{:keys [roboto-text-entity roboto-font-entity base-rects-entity font-height] :as state} text position]
+(defn update-command [{:keys [roboto-text-entity roboto-font-entity base-rects-entity font-height command-start] :as state} text position]
   (let [command-text-entity (when text
-                              (-> (chars/assoc-line roboto-text-entity 0 (mapv #(chars/crop-char roboto-font-entity %) (str ":" text)))
+                              (-> (chars/assoc-line roboto-text-entity 0 (mapv #(chars/crop-char roboto-font-entity %)
+                                                                               (str command-start text)))
                                   (update-uniforms font-height text-alpha)))
         command-cursor-entity (when text
                                 (let [line-chars (get-in command-text-entity [:characters 0])]

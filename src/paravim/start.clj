@@ -184,6 +184,7 @@
                                (v/input vim s)))
                            (v/input vim s))
                          (let [current-buffer (v/get-current-buffer vim)
+                               old-mode mode
                                mode (v/get-mode vim)
                                cursor-line (dec (v/get-cursor-line vim))
                                cursor-column (v/get-cursor-column vim)]
@@ -191,6 +192,9 @@
                                      (fn [state]
                                        (-> state
                                            (assoc :mode mode)
+                                           (cond-> (and (not= old-mode 'COMMAND_LINE)
+                                                        (= mode 'COMMAND_LINE))
+                                                   (assoc :command-start s))
                                            (c/update-command (v/get-command-text vim) (v/get-command-position vim))
                                            (as-> state
                                                  (if (c/get-buffer state current-buffer)
