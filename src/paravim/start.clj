@@ -4,7 +4,8 @@
             [clojure.string :as str]
             [play-cljc.gl.core :as pc]
             [parinferish.core :as par])
-  (:import  [org.lwjgl.glfw GLFW Callbacks GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWCharCallbackI]
+  (:import  [org.lwjgl.glfw GLFW Callbacks
+             GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWCharCallbackI GLFWMouseButtonCallbackI]
             [org.lwjgl.opengl GL GL41]
             [org.lwjgl.system MemoryUtil]
             [javax.sound.sampled AudioSystem Clip])
@@ -41,7 +42,13 @@
                                     (case (:mouse-type state)
                                       :ibeam GLFW/GLFW_IBEAM_CURSOR
                                       :hand GLFW/GLFW_HAND_CURSOR
-                                      GLFW/GLFW_ARROW_CURSOR))))))))
+                                      GLFW/GLFW_ARROW_CURSOR)))))))
+  (GLFW/glfwSetMouseButtonCallback window
+    (reify GLFWMouseButtonCallbackI
+      (invoke [this window button action mods]
+        (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
+                   (= action GLFW/GLFW_PRESS))
+          (swap! c/*state c/click-mouse))))))
 
 (def keycode->keyword
   {GLFW/GLFW_KEY_BACKSPACE :backspace

@@ -265,6 +265,11 @@
                     (contains? tab-text-entities hover)
                     :hand))))
 
+(defn click-mouse [{:keys [mouse-hover tab-text-entities] :as state}]
+  (if (contains? tab-text-entities mouse-hover)
+    (assoc state :current-tab mouse-hover)
+    state))
+
 (defn update-uniforms [{:keys [characters] :as text-entity} font-height alpha]
   (update text-entity :uniforms assoc
       'u_char_counts (mapv count characters)
