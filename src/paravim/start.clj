@@ -10,7 +10,7 @@
             [javax.sound.sampled AudioSystem Clip])
   (:gen-class))
 
-(defn listen-for-mouse [window]
+(defn listen-for-mouse [window game]
   (GLFW/glfwSetCursorPosCallback window
     (reify GLFWCursorPosCallbackI
       (invoke [this window xpos ypos]
@@ -34,7 +34,7 @@
               (MemoryUtil/memFree *fb-height)
               (MemoryUtil/memFree *window-width)
               (MemoryUtil/memFree *window-height)
-              (assoc state :mouse-x x :mouse-y y))))))))
+              (c/update-mouse state game x y))))))))
 
 (def keycode->keyword
   {GLFW/GLFW_KEY_BACKSPACE :backspace
@@ -148,7 +148,6 @@
       (GLFW/glfwSwapInterval 1)
       (GLFW/glfwShowWindow window)
       (GL/createCapabilities)
-      (listen-for-mouse window)
       (let [initial-game (assoc (pc/->game window)
                                 :delta-time 0
                                 :total-time 0)
@@ -211,6 +210,7 @@
                                    (and (not= 'INSERT mode)
                                         (not= s "u"))
                                    (apply-parinfer! vim current-buffer)))))]
+        (listen-for-mouse window initial-game)
         (listen-for-keys window on-input)
         (listen-for-chars window on-input)
         (v/set-on-quit vim (fn [buffer-ptr force?]

@@ -238,6 +238,29 @@
                       :camera-x camera-x
                       :camera-y camera-y))))))))
 
+(defn update-mouse [{:keys [bounding-boxes] :as state} game x y]
+  (let [game-width (utils/get-width game)
+        game-height (utils/get-height game)]
+    (assoc state
+      :mouse-x x
+      :mouse-y y
+      :mouse-hover
+      (some
+        (fn [[k box]]
+          (if (= k :text)
+            (let [{:keys [left right top bottom]} box]
+              (when (and (<= left x (- game-width right))
+                         (<= top y (- game-height bottom)))
+                k))
+            (let [{:keys [x1 y1 x2 y2]} box
+                  x1 (* x1 font-size-multiplier)
+                  y1 (* y1 font-size-multiplier)
+                  x2 (* x2 font-size-multiplier)
+                  y2 (* y2 font-size-multiplier)]
+              (when (and (<= x1 x x2) (<= y1 y y2))
+                k))))
+        bounding-boxes))))
+
 (defn update-uniforms [{:keys [characters] :as text-entity} font-height alpha]
   (update text-entity :uniforms assoc
       'u_char_counts (mapv count characters)
