@@ -24,7 +24,8 @@
                        :current-buffer nil
                        :buffers {}
                        :buffer-updates []
-                       :bounding-boxes {}}))
+                       :bounding-boxes {}
+                       :current-tab :files}))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
 
@@ -559,7 +560,9 @@
               (swap! *state assoc
                 :roboto-font-entity font-entity
                 :roboto-text-entity text-entity
-                :tab-text-entities [files-text-entity repl-in-text-entity repl-out-text-entity])
+                :tab-text-entities {:files files-text-entity
+                                    :repl-in repl-in-text-entity
+                                    :repl-out repl-out-text-entity})
               (swap! *state update :bounding-boxes assoc
                 :files {:x1 0 :y1 0 :x2 files-right :y2 font-height}
                 :repl-in {:x1 repl-in-left :y1 0 :x2 repl-in-right :y2 font-height}
@@ -576,7 +579,8 @@
         {:keys [current-buffer buffers
                 base-rect-entity base-rects-entity
                 command-text-entity command-cursor-entity
-                tab-text-entities font-height mode bounding-boxes]} @*state]
+                font-height mode
+                tab-text-entities bounding-boxes current-tab]} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
     (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]} (get buffers current-buffer)]
@@ -604,23 +608,12 @@
                                         (t/color bg-color)
                                         (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                                         (t/scale game-width (* font-size-multiplier font-height)))))))
-    (when-let [[files-entity repl-in-entity repl-out-entity] tab-text-entities]
-      (when-let [{:keys [files repl-in repl-out]} bounding-boxes]
-        (c/render game (-> files-entity
-                           (assoc-in [:uniforms 'u_alpha] text-alpha)
-                           (t/project game-width game-height)
-                           (t/translate (-> files :x1 (* font-size-multiplier)) 0)
-                           (t/scale font-size-multiplier font-size-multiplier)))
-        (c/render game (-> repl-in-entity
-                           (assoc-in [:uniforms 'u_alpha] unfocused-alpha)
-                           (t/project game-width game-height)
-                           (t/translate (-> repl-in :x1 (* font-size-multiplier)) 0)
-                           (t/scale font-size-multiplier font-size-multiplier)))
-        (c/render game (-> repl-out-entity
-                           (assoc-in [:uniforms 'u_alpha] unfocused-alpha)
-                           (t/project game-width game-height)
-                           (t/translate (-> repl-out :x1 (* font-size-multiplier)) 0)
-                           (t/scale font-size-multiplier font-size-multiplier)))))
+    (doseq [[k entity] tab-text-entities]
+      (c/render game (-> entity
+                         (assoc-in [:uniforms 'u_alpha] (if (= k current-tab) text-alpha unfocused-alpha))
+                         (t/project game-width game-height)
+                         (t/translate (-> bounding-boxes k :x1 (* font-size-multiplier)) 0)
+                         (t/scale font-size-multiplier font-size-multiplier))))
     (when (and (= mode 'COMMAND_LINE)
                command-cursor-entity
                command-text-entity)
