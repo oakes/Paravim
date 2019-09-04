@@ -200,7 +200,7 @@
                :width (* width font-size-multiplier)
                :height (* height font-size-multiplier)))))
 
-(defn update-cursor [{:keys [base-rects-entity bounding-boxes] :as state} game buffer-ptr]
+(defn update-cursor [{:keys [base-rects-entity text-box] :as state} game buffer-ptr]
   (update-in state [:buffers buffer-ptr]
     (fn [{:keys [cursor-line cursor-column] :as buffer}]
       (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
@@ -211,7 +211,6 @@
                                      (assoc :rect-count 1)))
             (as-> buffer
                   (let [{:keys [camera camera-x camera-y]} buffer
-                        text-box (:text bounding-boxes)
                         text-top (* (:top text-box) font-size-multiplier)
                         text-bottom (* (:bottom text-box) font-size-multiplier)
                         cursor-bottom (+ top height)
@@ -239,24 +238,23 @@
                       :camera-x camera-x
                       :camera-y camera-y))))))))
 
-(defn update-mouse [{:keys [bounding-boxes tab-text-entities] :as state} game x y]
+(defn update-mouse [{:keys [text-box bounding-boxes tab-text-entities] :as state} game x y]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
-        hover (some
-                (fn [[k box]]
-                  (if (= k :text)
-                    (let [{:keys [left right top bottom]} box]
-                      (when (and (<= left x (- game-width right))
-                                 (<= top y (- game-height bottom)))
-                        k))
+        {:keys [left right top bottom]} text-box
+        hover (if (and (<= left x (- game-width right))
+                       (<= top y (- game-height bottom)))
+                :text
+                (some
+                  (fn [[k box]]
                     (let [{:keys [x1 y1 x2 y2]} box
                           x1 (* x1 font-size-multiplier)
                           y1 (* y1 font-size-multiplier)
                           x2 (* x2 font-size-multiplier)
                           y2 (* y2 font-size-multiplier)]
                       (when (and (<= x1 x x2) (<= y1 y y2))
-                        k))))
-                bounding-boxes)]
+                        k)))
+                  bounding-boxes))]
     (assoc state
       :mouse-x x
       :mouse-y y
@@ -540,9 +538,8 @@
            :font-width font-width
            :font-height font-height
            :base-font-entity font-entity
-           :base-text-entity text-entity)
-         (swap! *state update :bounding-boxes assoc
-           :text {:left 0 :right 0 :top font-height :bottom font-height})
+           :base-text-entity text-entity
+           :text-box {:left 0 :right 0 :top font-height :bottom font-height})
          (#?(:clj load-font-clj :cljs load-font-cljs) :roboto
           (fn [{:keys [data]} baked-font]
             (let [font-entity (-> (text/->font-entity game data baked-font)
