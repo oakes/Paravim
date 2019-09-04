@@ -25,6 +25,7 @@
                        :buffers {}
                        :buffer-updates []
                        :bounding-boxes {}
+                       :tabs [:files :repl-in :repl-out]
                        :current-tab :files}))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
@@ -269,6 +270,15 @@
   (if (contains? tab-text-entities mouse-hover)
     (assoc state :current-tab mouse-hover)
     state))
+
+(defn change-tab [{:keys [tabs current-tab] :as state} direction]
+  (let [index (+ (.indexOf tabs current-tab)
+                 direction)
+        index (cond
+                (neg? index) (dec (count tabs))
+                (= index (count tabs)) 0
+                :else index)]
+    (assoc state :current-tab (nth tabs index))))
 
 (defn update-uniforms [{:keys [characters] :as text-entity} font-height alpha]
   (update text-entity :uniforms assoc

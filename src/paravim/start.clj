@@ -70,11 +70,13 @@
     (reify GLFWKeyCallbackI
       (invoke [this window keycode scancode action mods]
         (when (= action GLFW/GLFW_PRESS)
-          (if-let [k (keycode->keyword keycode)]
-            (when-let [key-name (v/keyword->name k)]
-              (callback key-name))
-            (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
-                  shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))]
+          (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
+                shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))]
+            (if-let [k (keycode->keyword keycode)]
+              (if (and control? (= k :tab))
+                (swap! c/*state c/change-tab (if shift? -1 1))
+                (when-let [key-name (v/keyword->name k)]
+                  (callback key-name)))
               (when control?
                 (when-let [ch (keycode->char keycode)]
                   (callback (str "<C-" (when shift? "S-") ch ">")))))))))))
