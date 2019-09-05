@@ -530,14 +530,14 @@
             max-y (- game-height (top game-height font-size-multiplier))]
         (when parinfer-text-entity
           (c/render game (-> parinfer-text-entity
-                             (assoc-in [:uniforms 'u_min_y] min-y)
-                             (assoc-in [:uniforms 'u_max_y] max-y)
+                             (update :uniforms assoc 'u_min_y min-y 'u_max_y max-y)
                              (t/project game-width game-height)
                              (t/camera camera)
                              (t/scale font-size-multiplier font-size-multiplier))))
         (c/render game (-> text-entity
-                           (assoc-in [:uniforms 'u_min_y] min-y)
-                           (assoc-in [:uniforms 'u_max_y] max-y)
+                           (update :uniforms assoc 'u_min_y min-y 'u_max_y max-y)
+                           (cond-> (not show-cursor?)
+                                   (assoc-in [:uniforms 'u_alpha] unfocused-alpha))
                            (t/project game-width game-height)
                            (t/camera camera)
                            (t/scale font-size-multiplier font-size-multiplier)))))))
