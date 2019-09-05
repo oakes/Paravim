@@ -1,7 +1,6 @@
 (ns paravim.start
   (:require [paravim.core :as c]
             [libvim-clj.core :as v]
-            [libvim-clj.constants :as vc]
             [clojure.string :as str]
             [play-cljc.gl.core :as pc]
             [parinferish.core :as par])
@@ -76,6 +75,18 @@
    GLFW/GLFW_KEY_R \R
    GLFW/GLFW_KEY_U \U})
 
+;; https://vim.fandom.com/wiki/Mapping_keys_in_Vim_-_Tutorial_%28Part_2%29
+
+(def keyword->name
+  {:backspace "<BS>"
+   :tab "<Tab>"
+   :enter "<Enter>"
+   :escape "<Esc>"
+   :up "<Up>"
+   :down "<Down>"
+   :left "<Left>"
+   :right "<Right>"})
+
 (defn listen-for-keys [window callback vim]
   (GLFW/glfwSetKeyCallback window
     (reify GLFWKeyCallbackI
@@ -87,7 +98,7 @@
             (if-let [k (keycode->keyword keycode)]
               (if (and (or control? alt?) (= k :tab))
                 (open-buffer-for-tab! vim (swap! c/*state c/change-tab (if shift? -1 1)))
-                (when-let [key-name (vc/keyword->name k)]
+                (when-let [key-name (keyword->name k)]
                   (callback key-name)))
               (when control?
                 (when-let [ch (keycode->char keycode)]
