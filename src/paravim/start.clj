@@ -1,6 +1,7 @@
 (ns paravim.start
   (:require [paravim.core :as c]
             [libvim-clj.core :as v]
+            [libvim-clj.constants :as vc]
             [clojure.string :as str]
             [play-cljc.gl.core :as pc]
             [parinferish.core :as par])
@@ -86,7 +87,7 @@
             (if-let [k (keycode->keyword keycode)]
               (if (and (or control? alt?) (= k :tab))
                 (open-buffer-for-tab! vim (swap! c/*state c/change-tab (if shift? -1 1)))
-                (when-let [key-name (v/keyword->name k)]
+                (when-let [key-name (vc/keyword->name k)]
                   (callback key-name)))
               (when control?
                 (when-let [ch (keycode->char keycode)]
