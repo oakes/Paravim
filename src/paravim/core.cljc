@@ -25,6 +25,7 @@
                        :buffers {}
                        :buffer-updates []
                        :current-tab :files
+                       :tab->buffer {}
                        :font-size-multiplier (float (/ 1 2))}))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])

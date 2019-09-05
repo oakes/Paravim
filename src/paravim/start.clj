@@ -11,6 +11,16 @@
             [javax.sound.sampled AudioSystem Clip])
   (:gen-class))
 
+(def tab->path {:repl-in "repl.in.clj"
+                :repl-out "repl.out"})
+
+(defn open-buffer-for-tab! [vim {:keys [current-buffer current-tab tab->buffer] :as state}]
+  (if-let [buffer-for-tab (tab->buffer current-tab)]
+    (when (not= current-buffer buffer-for-tab)
+      (v/set-current-buffer vim buffer-for-tab))
+    (when-let [path (tab->path current-tab)]
+      (v/open-buffer vim path))))
+
 (defn get-density-ratio [window]
   (let [*fb-width (MemoryUtil/memAllocInt 1)
         *window-width (MemoryUtil/memAllocInt 1)
@@ -22,7 +32,7 @@
     (MemoryUtil/memFree *window-width)
     (float (/ fb-width window-width))))
 
-(defn listen-for-mouse [window game]
+(defn listen-for-mouse [window game vim]
   (GLFW/glfwSetCursorPosCallback window
     (reify GLFWCursorPosCallbackI
       (invoke [this window xpos ypos]
@@ -44,7 +54,7 @@
       (invoke [this window button action mods]
         (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
                    (= action GLFW/GLFW_PRESS))
-          (swap! c/*state c/click-mouse))))))
+          (open-buffer-for-tab! vim (swap! c/*state c/click-mouse)))))))
 
 (def keycode->keyword
   {GLFW/GLFW_KEY_BACKSPACE :backspace
@@ -61,7 +71,7 @@
    GLFW/GLFW_KEY_R \R
    GLFW/GLFW_KEY_U \U})
 
-(defn listen-for-keys [window callback]
+(defn listen-for-keys [window callback vim]
   (GLFW/glfwSetKeyCallback window
     (reify GLFWKeyCallbackI
       (invoke [this window keycode scancode action mods]
@@ -71,7 +81,7 @@
                 shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))]
             (if-let [k (keycode->keyword keycode)]
               (if (and (or control? alt?) (= k :tab))
-                (swap! c/*state c/change-tab (if shift? -1 1))
+                (open-buffer-for-tab! vim (swap! c/*state c/change-tab (if shift? -1 1)))
                 (when-let [key-name (v/keyword->name k)]
                   (callback key-name)))
               (when control?
@@ -223,8 +233,8 @@
                                    (and (not= 'INSERT mode)
                                         (not= s "u"))
                                    (apply-parinfer! vim current-buffer)))))]
-        (listen-for-mouse window initial-game)
-        (listen-for-keys window on-input)
+        (listen-for-mouse window initial-game vim)
+        (listen-for-keys window on-input vim)
         (listen-for-chars window on-input)
         (v/set-on-quit vim (fn [buffer-ptr force?]
                              (System/exit 0)))
@@ -237,9 +247,20 @@
                                              lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
                                                      (v/get-line vim buffer-ptr (inc i))))]
                                          (swap! c/*state
-                                           (fn [state]
+                                           (fn [{:keys [tab->buffer] :as state}]
                                              (as-> state state
-                                                   (assoc state :current-buffer (when path buffer-ptr))
+                                                   (if path
+                                                     (let [canon-path (-> path java.io.File. .getCanonicalPath)
+                                                           current-tab (or (some
+                                                                             (fn [[tab path]]
+                                                                               (when (= canon-path (-> path java.io.File. .getCanonicalPath))
+                                                                                 tab))
+                                                                             tab->path)
+                                                                           :files)]
+                                                       (-> state
+                                                           (assoc :current-buffer buffer-ptr :current-tab current-tab)
+                                                           (update :tab->buffer assoc current-tab buffer-ptr)))
+                                                     state)
                                                    (if (and path (nil? (c/get-buffer state buffer-ptr)))
                                                      (as-> state state
                                                            (c/assoc-buffer state buffer-ptr path lines)
@@ -261,8 +282,7 @@
                                                                                      :lines lines
                                                                                      :first-line first-line
                                                                                      :line-count-change line-count-change}))))
-        (c/init initial-game (fn []
-                               (v/open-buffer vim "deps.edn")))
+        (c/init initial-game (fn []))
         (loop [game initial-game]
           (when-not (GLFW/glfwWindowShouldClose window)
             (let [ts (GLFW/glfwGetTime)
