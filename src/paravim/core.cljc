@@ -479,7 +479,9 @@
   {:precision "mediump float"
    :uniforms
    '{u_image sampler2D
-     u_alpha float}
+     u_alpha float
+     u_min_y float
+     u_max_y float}
    :inputs
    '{v_tex_coord vec2
      v_color vec4}
@@ -489,6 +491,11 @@
    '{main ([] void)}
    :functions
    '{main ([]
+           ;; discard if outside the y boundary
+           ("if" (&& (> u_max_y 0)
+                     (|| (< (.y gl_FragCoord) u_min_y)
+                         (> (.y gl_FragCoord) u_max_y)))
+             "discard")
            ;; get the color from the attributes
            (=vec4 input_color v_color)
            ;; set its alpha color if necessary
@@ -617,21 +624,31 @@
 
 (defn render-buffer [game {:keys [buffers text-boxes font-size-multiplier] :as state} game-width game-height current-tab buffer-ptr show-cursor?]
   (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]} (get buffers buffer-ptr)]
-    (when-let [{:keys [left right top bottom]} (get text-boxes current-tab)]
+    (when-let [{:keys [top bottom]} (get text-boxes current-tab)]
       (when (and rects-entity show-cursor?)
         (c/render game (-> rects-entity
                            (t/project game-width game-height)
                            (t/camera camera)
                            (t/scale font-size-multiplier font-size-multiplier))))
-      (when parinfer-text-entity
-        (c/render game (-> parinfer-text-entity
+      (let [min-y (if (= current-tab :files)
+                    0
+                    (- game-height (bottom game-height font-size-multiplier)))
+            max-y (if (= current-tab :files)
+                    game-height
+                    (- game-height (top game-height font-size-multiplier)))]
+        (when parinfer-text-entity
+          (c/render game (-> parinfer-text-entity
+                             (assoc-in [:uniforms 'u_min_y] min-y)
+                             (assoc-in [:uniforms 'u_max_y] max-y)
+                             (t/project game-width game-height)
+                             (t/camera camera)
+                             (t/scale font-size-multiplier font-size-multiplier))))
+        (c/render game (-> text-entity
+                           (assoc-in [:uniforms 'u_min_y] min-y)
+                           (assoc-in [:uniforms 'u_max_y] max-y)
                            (t/project game-width game-height)
                            (t/camera camera)
-                           (t/scale font-size-multiplier font-size-multiplier))))
-      (c/render game (-> text-entity
-                         (t/project game-width game-height)
-                         (t/camera camera)
-                         (t/scale font-size-multiplier font-size-multiplier))))))
+                           (t/scale font-size-multiplier font-size-multiplier)))))))
 
 (defn tick [game]
   (let [game-width (utils/get-width game)
