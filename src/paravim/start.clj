@@ -1,5 +1,6 @@
 (ns paravim.start
   (:require [paravim.core :as c]
+            [paravim.repl :as repl]
             [libvim-clj.core :as v]
             [clojure.string :as str]
             [play-cljc.gl.core :as pc]
