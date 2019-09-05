@@ -411,13 +411,13 @@
   (update-in state [:buffers buffer-ptr]
     (fn [{:keys [lines cursor-line cursor-column] :as buffer}]
       (let [parse-opts (cond
-                         init? {}
+                         init? {:mode :paren}
                          (= 'INSERT mode) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}
                          :else {:mode :indent})
             parsed-code (ps/parse (str/join "\n" lines) parse-opts)]
         (assoc buffer
           :parsed-code parsed-code
-          :needs-parinfer? (not init?))))))
+          :needs-parinfer? true)))))
 
 (defn update-clojure-buffer [{:keys [base-font-entity font-height] :as state} buffer-ptr]
   (update-in state [:buffers buffer-ptr]
