@@ -18,7 +18,7 @@
 
 (def orig-camera (e/->camera true))
 (def tabs [:files :repl-in :repl-out])
-(def tab->path {:files "scratch"
+(def tab->path {:files "scratch.clj"
                 :repl-in "repl.in"
                 :repl-out "repl.out"})
 
@@ -615,32 +615,42 @@
   {:viewport {:x 0 :y 0 :width 0 :height 0}
    :clear {:color bg-color :depth 1}})
 
+(defn render-buffer [game {:keys [buffers text-boxes font-size-multiplier] :as state} game-width game-height current-tab buffer-ptr show-cursor?]
+  (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]} (get buffers buffer-ptr)]
+    (when-let [{:keys [left right top bottom]} (get text-boxes current-tab)]
+      (when (and rects-entity show-cursor?)
+        (c/render game (-> rects-entity
+                           (t/project game-width game-height)
+                           (t/camera camera)
+                           (t/scale font-size-multiplier font-size-multiplier))))
+      (when parinfer-text-entity
+        (c/render game (-> parinfer-text-entity
+                           (t/project game-width game-height)
+                           (t/camera camera)
+                           (t/scale font-size-multiplier font-size-multiplier))))
+      (c/render game (-> text-entity
+                         (t/project game-width game-height)
+                         (t/camera camera)
+                         (t/scale font-size-multiplier font-size-multiplier))))))
+
 (defn tick [game]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
-        {:keys [current-buffer buffers
+        {:keys [current-buffer
                 base-rect-entity base-rects-entity
                 command-text-entity command-cursor-entity
                 font-height mode font-size-multiplier
-                tab-text-entities text-boxes bounding-boxes current-tab]} @*state]
+                tab-text-entities bounding-boxes current-tab tab->buffer]
+         :as state} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
-    (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]} (get buffers current-buffer)]
-      (when-let [{:keys [left right top bottom]} (get text-boxes current-tab)]
-        (when rects-entity
-          (c/render game (-> rects-entity
-                             (t/project game-width game-height)
-                             (t/camera camera)
-                             (t/scale font-size-multiplier font-size-multiplier))))
-        (when parinfer-text-entity
-          (c/render game (-> parinfer-text-entity
-                             (t/project game-width game-height)
-                             (t/camera camera)
-                             (t/scale font-size-multiplier font-size-multiplier))))
-        (c/render game (-> text-entity
-                           (t/project game-width game-height)
-                           (t/camera camera)
-                           (t/scale font-size-multiplier font-size-multiplier)))))
+    (render-buffer game state game-width game-height current-tab current-buffer true)
+    (case current-tab
+      :repl-in (when-let [buffer-ptr (tab->buffer :repl-out)]
+                 (render-buffer game state game-width game-height :repl-out buffer-ptr false))
+      :repl-out (when-let [buffer-ptr (tab->buffer :repl-in)]
+                  (render-buffer game state game-width game-height :repl-in buffer-ptr false))
+      nil)
     (when (and base-rects-entity base-rect-entity)
       (c/render game (-> base-rects-entity
                          (t/project game-width game-height)

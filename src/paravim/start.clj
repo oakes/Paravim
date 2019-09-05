@@ -287,7 +287,9 @@
                                                                                      :lines lines
                                                                                      :first-line first-line
                                                                                      :line-count-change line-count-change}))))
-        (c/init initial-game (fn []))
+        (c/init initial-game (fn []
+                               (run! #(v/open-buffer vim (c/tab->path %))
+                                 [:repl-in :repl-out :files])))
         (loop [game initial-game]
           (when-not (GLFW/glfwWindowShouldClose window)
             (let [ts (GLFW/glfwGetTime)
