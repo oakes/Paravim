@@ -11,14 +11,11 @@
             [javax.sound.sampled AudioSystem Clip])
   (:gen-class))
 
-(def tab->path {:repl-in "repl.in.clj"
-                :repl-out "repl.out"})
-
 (defn open-buffer-for-tab! [vim {:keys [current-buffer current-tab tab->buffer] :as state}]
   (if-let [buffer-for-tab (tab->buffer current-tab)]
     (when (not= current-buffer buffer-for-tab)
       (v/set-current-buffer vim buffer-for-tab))
-    (when-let [path (tab->path current-tab)]
+    (when-let [path (c/tab->path current-tab)]
       (v/open-buffer vim path))))
 
 (defn get-density-ratio [window]
@@ -105,7 +102,7 @@
               updates)
             (assoc state :buffer-updates [])
             (reduce (fn [state buffer-ptr]
-                      (if (c/clojure-buffer? (c/get-buffer state buffer-ptr))
+                      (if (:clojure? (c/get-buffer state buffer-ptr))
                         (-> state
                             (c/parse-clojure-buffer buffer-ptr false)
                             (c/update-clojure-buffer buffer-ptr))
@@ -255,7 +252,7 @@
                                                                              (fn [[tab path]]
                                                                                (when (= canon-path (-> path java.io.File. .getCanonicalPath))
                                                                                  tab))
-                                                                             tab->path)
+                                                                             c/tab->path)
                                                                            :files)]
                                                        (-> state
                                                            (assoc :current-buffer buffer-ptr :current-tab current-tab)
@@ -264,7 +261,7 @@
                                                    (if (and path (nil? (c/get-buffer state buffer-ptr)))
                                                      (as-> state state
                                                            (c/assoc-buffer state buffer-ptr path lines)
-                                                           (if (c/clojure-buffer? (c/get-buffer state buffer-ptr))
+                                                           (if (:clojure? (c/get-buffer state buffer-ptr))
                                                              (-> state
                                                                  (c/parse-clojure-buffer buffer-ptr true)
                                                                  (c/update-clojure-buffer buffer-ptr))

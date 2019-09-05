@@ -18,6 +18,8 @@
 
 (def orig-camera (e/->camera true))
 (def tabs [:files :repl-in :repl-out])
+(def tab->path {:repl-in "repl.in"
+                :repl-out "repl.out"})
 
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
@@ -367,8 +369,8 @@
 (defn get-buffer [state buffer-ptr]
   (get-in state [:buffers buffer-ptr]))
 
-(defn clojure-buffer? [buffer]
-  (some-> buffer :path get-extension clojure-exts))
+(defn clojure-path? [path]
+  (-> path get-extension clojure-exts))
 
 (defn assoc-lines [text-entity font-entity font-height lines]
   (-> (reduce-kv
@@ -378,14 +380,16 @@
         lines)
       (update-uniforms font-height text-alpha)))
 
-(defn assoc-buffer [{:keys [base-font-entity base-text-entity font-height] :as state} buffer-ptr path lines]
+(defn assoc-buffer [{:keys [base-font-entity base-text-entity font-height current-tab] :as state} buffer-ptr path lines]
   (assoc-in state [:buffers buffer-ptr]
     {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
      :camera (t/translate orig-camera 0 0)
      :camera-x 0
      :camera-y 0
      :path path
-     :lines lines}))
+     :lines lines
+     :clojure? (or (= current-tab :repl-in)
+                   (clojure-path? path))}))
 
 (defn parse-clojure-buffer [{:keys [mode] :as state} buffer-ptr init?]
   (update-in state [:buffers buffer-ptr]
