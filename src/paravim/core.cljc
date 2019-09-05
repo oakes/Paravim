@@ -578,7 +578,7 @@
              font-height (:font-height baked-font)
              snap-to-top (fn [game-height multiplier] (* font-height multiplier))
              snap-to-bottom (fn [game-height multiplier] (- game-height (* font-height multiplier)))
-             repl-edge (fn [game-height multiplier] (- game-height 200))]
+             repl-edge (fn [game-height multiplier] (- game-height (* 5 font-height multiplier)))]
          (swap! *state assoc
            :font-width font-width
            :font-height font-height
