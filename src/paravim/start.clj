@@ -5,11 +5,18 @@
             [play-cljc.gl.core :as pc]
             [parinferish.core :as par])
   (:import  [org.lwjgl.glfw GLFW Callbacks
-             GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWCharCallbackI GLFWMouseButtonCallbackI]
+             GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWCharCallbackI
+             GLFWMouseButtonCallbackI GLFWWindowSizeCallbackI]
             [org.lwjgl.opengl GL GL41]
             [org.lwjgl.system MemoryUtil]
             [javax.sound.sampled AudioSystem Clip])
   (:gen-class))
+
+(defn listen-for-resize [window game]
+  (GLFW/glfwSetWindowSizeCallback window
+    (reify GLFWWindowSizeCallbackI
+      (invoke [this window width height]
+        (swap! c/*state c/update-cursor game)))))
 
 (defn open-buffer-for-tab! [vim {:keys [current-buffer current-tab tab->buffer] :as state}]
   (if-let [buffer-for-tab (tab->buffer current-tab)]
@@ -230,6 +237,7 @@
                                    (and (not= 'INSERT mode)
                                         (not= s "u"))
                                    (apply-parinfer! vim current-buffer)))))]
+        (listen-for-resize window initial-game)
         (listen-for-mouse window initial-game vim)
         (listen-for-keys window on-input vim)
         (listen-for-chars window on-input)
@@ -266,9 +274,9 @@
                                                                  (c/parse-clojure-buffer buffer-ptr true)
                                                                  (c/update-clojure-buffer buffer-ptr))
                                                              state)
-                                                           (update-in state [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column)
-                                                           (c/update-cursor state initial-game buffer-ptr))
-                                                     state)))))
+                                                           (update-in state [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column))
+                                                     state)
+                                                   (c/update-cursor state initial-game buffer-ptr)))))
                                        nil)))
         (v/set-on-buffer-update vim (fn [buffer-ptr start-line end-line line-count-change]
                                       (let [first-line (dec start-line)

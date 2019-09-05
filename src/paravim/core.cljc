@@ -206,46 +206,51 @@
                :width (* width font-size-multiplier)
                :height (* height font-size-multiplier)))))
 
-(defn update-cursor [{:keys [base-rects-entity font-size-multiplier text-boxes current-tab] :as state} game buffer-ptr]
-  (if-let [text-box (get text-boxes current-tab)]
-    (update-in state [:buffers buffer-ptr]
-      (fn [{:keys [cursor-line cursor-column] :as buffer}]
-        (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
-              {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars cursor-line cursor-column)]
-          (-> buffer
-              (assoc :rects-entity (-> base-rects-entity
-                                       (i/assoc 0 cursor-entity)
-                                       (assoc :rect-count 1)))
-              (as-> buffer
-                    (let [{:keys [camera camera-x camera-y]} buffer
-                          game-width (utils/get-width game)
-                          game-height (utils/get-height game)
-                          text-top ((:top text-box) game-height font-size-multiplier)
-                          text-bottom ((:bottom text-box) game-height font-size-multiplier)
-                          cursor-bottom (+ top height)
-                          cursor-right (+ left width)
-                          text-height (- text-bottom text-top)
-                          camera-bottom (+ camera-y text-height)
-                          camera-right (+ camera-x game-width)
-                          camera-x (cond
-                                     (< left camera-x)
-                                     left
-                                     (> cursor-right camera-right)
-                                     (- cursor-right game-width)
-                                     :else
-                                     camera-x)
-                          camera-y (cond
-                                     (< top camera-y)
-                                     top
-                                     (> cursor-bottom camera-bottom)
-                                     (- cursor-bottom text-height)
-                                     :else
-                                     camera-y)]
-                      (assoc buffer
-                        :camera (t/translate orig-camera camera-x (- camera-y text-top))
-                        :camera-x camera-x
-                        :camera-y camera-y)))))))
-    state))
+(defn update-cursor
+  ([state game]
+   (if-let [buffer-ptr (:current-buffer state)]
+     (update-cursor state game buffer-ptr)
+     state))
+  ([{:keys [base-rects-entity font-size-multiplier text-boxes current-tab] :as state} game buffer-ptr]
+   (if-let [text-box (get text-boxes current-tab)]
+     (update-in state [:buffers buffer-ptr]
+       (fn [{:keys [cursor-line cursor-column] :as buffer}]
+         (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
+               {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars cursor-line cursor-column)]
+           (-> buffer
+               (assoc :rects-entity (-> base-rects-entity
+                                        (i/assoc 0 cursor-entity)
+                                        (assoc :rect-count 1)))
+               (as-> buffer
+                     (let [{:keys [camera camera-x camera-y]} buffer
+                           game-width (utils/get-width game)
+                           game-height (utils/get-height game)
+                           text-top ((:top text-box) game-height font-size-multiplier)
+                           text-bottom ((:bottom text-box) game-height font-size-multiplier)
+                           cursor-bottom (+ top height)
+                           cursor-right (+ left width)
+                           text-height (- text-bottom text-top)
+                           camera-bottom (+ camera-y text-height)
+                           camera-right (+ camera-x game-width)
+                           camera-x (cond
+                                      (< left camera-x)
+                                      left
+                                      (> cursor-right camera-right)
+                                      (- cursor-right game-width)
+                                      :else
+                                      camera-x)
+                           camera-y (cond
+                                      (< top camera-y)
+                                      top
+                                      (> cursor-bottom camera-bottom)
+                                      (- cursor-bottom text-height)
+                                      :else
+                                      camera-y)]
+                       (assoc buffer
+                         :camera (t/translate orig-camera camera-x (- camera-y text-top))
+                         :camera-x camera-x
+                         :camera-y camera-y)))))))
+     state)))
 
 (defn update-mouse [{:keys [text-boxes current-tab bounding-boxes tab-text-entities font-size-multiplier] :as state} game x y]
   (let [game-width (utils/get-width game)
