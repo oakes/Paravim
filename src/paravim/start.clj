@@ -22,13 +22,14 @@
     (MemoryUtil/memFree *window-width)
     (float (/ fb-width window-width))))
 
-(defn listen-for-mouse [window game density-ratio]
+(defn listen-for-mouse [window game]
   (GLFW/glfwSetCursorPosCallback window
     (reify GLFWCursorPosCallbackI
       (invoke [this window xpos ypos]
         (as-> (swap! c/*state
                 (fn [state]
-                  (let [x (* xpos density-ratio)
+                  (let [density-ratio (get-density-ratio window)
+                        x (* xpos density-ratio)
                         y (* ypos density-ratio)]
                     (c/update-mouse state game x y))))
               state
@@ -221,9 +222,8 @@
                                                    state)))))
                                    (and (not= 'INSERT mode)
                                         (not= s "u"))
-                                   (apply-parinfer! vim current-buffer)))))
-            density-ratio (get-density-ratio window)]
-        (listen-for-mouse window initial-game density-ratio)
+                                   (apply-parinfer! vim current-buffer)))))]
+        (listen-for-mouse window initial-game)
         (listen-for-keys window on-input)
         (listen-for-chars window on-input)
         (v/set-on-quit vim (fn [buffer-ptr force?]
