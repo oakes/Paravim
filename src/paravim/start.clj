@@ -50,7 +50,7 @@
               (GLFW/glfwSetCursor window
                                   (GLFW/glfwCreateStandardCursor
                                     (case (:mouse-type state)
-                                      :ibeam GLFW/GLFW_IBEAM_CURSOR
+                                      ;:ibeam GLFW/GLFW_IBEAM_CURSOR
                                       :hand GLFW/GLFW_HAND_CURSOR
                                       GLFW/GLFW_ARROW_CURSOR)))))))
   (GLFW/glfwSetMouseButtonCallback window
