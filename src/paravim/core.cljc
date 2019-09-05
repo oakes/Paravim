@@ -630,12 +630,8 @@
                            (t/project game-width game-height)
                            (t/camera camera)
                            (t/scale font-size-multiplier font-size-multiplier))))
-      (let [min-y (if (= current-tab :files)
-                    0
-                    (- game-height (bottom game-height font-size-multiplier)))
-            max-y (if (= current-tab :files)
-                    game-height
-                    (- game-height (top game-height font-size-multiplier)))]
+      (let [min-y (- game-height (bottom game-height font-size-multiplier))
+            max-y (- game-height (top game-height font-size-multiplier))]
         (when parinfer-text-entity
           (c/render game (-> parinfer-text-entity
                              (assoc-in [:uniforms 'u_min_y] min-y)
