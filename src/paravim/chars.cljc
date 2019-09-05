@@ -5,6 +5,116 @@
             [com.rpl.specter :as specter]
             [clojure.core.rrb-vector :as rrb]))
 
+(def instanced-font-vertex-shader
+  {:inputs
+   '{a_position vec2
+     a_color vec4
+     a_translate_matrix mat3
+     a_texture_matrix mat3
+     a_scale_matrix mat3}
+   :uniforms
+   '{u_matrix mat3
+     u_char_counts [int 1000]
+     u_font_height float}
+   :outputs
+   '{v_tex_coord vec2
+     v_color vec4}
+   :signatures
+   '{main ([] void)}
+   :functions
+   '{main ([]
+           (=int total_char_count 0)
+           (=int current_line 0)
+           ("for" "(int i=0; i<1000; ++i)"
+             (+= total_char_count [u_char_counts i])
+             ("if" (> total_char_count gl_InstanceID) "break")
+             ("else" (+= current_line 1)))
+           (=mat3 translate_matrix a_translate_matrix)
+           (+= [translate_matrix 2 1] (* u_font_height current_line))
+           (= gl_Position
+              (vec4
+                (.xy (* u_matrix
+                        translate_matrix
+                        a_scale_matrix
+                        (vec3 a_position 1)))
+                0 1))
+           (= v_tex_coord (.xy (* a_texture_matrix (vec3 a_position 1))))
+           (= v_color a_color))}})
+
+(def instanced-font-fragment-shader
+  {:precision "mediump float"
+   :uniforms
+   '{u_image sampler2D
+     u_alpha float
+     u_min_y float
+     u_max_y float}
+   :inputs
+   '{v_tex_coord vec2
+     v_color vec4}
+   :outputs
+   '{o_color vec4}
+   :signatures
+   '{main ([] void)}
+   :functions
+   '{main ([]
+           ;; discard if outside the y boundary
+           ("if" (&& (> u_max_y 0)
+                     (|| (< (.y gl_FragCoord) u_min_y)
+                         (> (.y gl_FragCoord) u_max_y)))
+             "discard")
+           ;; get the color from the attributes
+           (=vec4 input_color v_color)
+           ;; set its alpha color if necessary
+           ("if" (== (.w input_color) "1.0")
+             (= (.w input_color) u_alpha))
+           ;; get the color from the texture
+           (= o_color (texture u_image v_tex_coord))
+           ;; if it's black, make it a transparent pixel
+           ("if" (== (.rgb o_color) (vec3 "0.0" "0.0" "0.0"))
+             (= o_color (vec4 "0.0" "0.0" "0.0" "0.0")))
+           ;; otherwise, use the input color
+           ("else"
+             (= o_color input_color))
+           ;; the size of one pixel
+           (=vec2 one_pixel (/ (vec2 1) (vec2 (textureSize u_image 0))))
+           ;; left
+           (=vec4 left_color (texture u_image (+ v_tex_coord (vec2 (.x one_pixel) "0.0"))))
+           ("if" (== (.rgb left_color) (vec3 "0.0" "0.0" "0.0"))
+             (= left_color (vec4 "0.0" "0.0" "0.0" "0.0")))
+           ("else"
+             (= left_color input_color))
+           ;; right
+           (=vec4 right_color (texture u_image (+ v_tex_coord (vec2 (- 0 (.x one_pixel)) "0.0"))))
+           ("if" (== (.rgb right_color) (vec3 "0.0" "0.0" "0.0"))
+             (= right_color (vec4 "0.0" "0.0" "0.0" "0.0")))
+           ("else"
+             (= right_color input_color))
+           ;; top
+           (=vec4 top_color (texture u_image (+ v_tex_coord (vec2 "0.0" (.y one_pixel)))))
+           ("if" (== (.rgb top_color) (vec3 "0.0" "0.0" "0.0"))
+             (= top_color (vec4 "0.0" "0.0" "0.0" "0.0")))
+           ("else"
+             (= top_color input_color))
+           ;; bottom
+           (=vec4 bottom_color (texture u_image (+ v_tex_coord (vec2 "0.0" (- 0 (.y one_pixel))))))
+           ("if" (== (.rgb bottom_color) (vec3 "0.0" "0.0" "0.0"))
+             (= bottom_color (vec4 "0.0" "0.0" "0.0" "0.0")))
+           ("else"
+             (= bottom_color input_color))
+           ;; average
+           (= o_color
+             (/ (+ o_color left_color right_color top_color bottom_color)
+                "5.0"))
+           ;; discard transparent pixels
+           ("if" (== (.w o_color) "0.0")
+             "discard"))}})
+
+(def ^:const instanced-font-attrs->unis
+  '{a_translate_matrix u_translate_matrix
+    a_scale_matrix u_scale_matrix
+    a_texture_matrix u_texture_matrix
+    a_color u_color})
+
 (defn- replace-instance-attr [start-index end-index entities instanced-entity attr-name uni-name]
   (let [new-data (into [] (specter/traverse-all [:uniforms uni-name specter/ALL]) entities)
         data-len (specter/select-any [:attribute-lengths attr-name] instanced-entity)
@@ -34,12 +144,6 @@
                                (let [v1 (rrb/subvec data 0 start-offset)
                                      v2 (rrb/subvec data end-offset)]
                                  (rrb/catvec v1 v2)))))))))
-
-(def ^:const instanced-font-attrs->unis
-  '{a_translate_matrix u_translate_matrix
-    a_scale_matrix u_scale_matrix
-    a_texture_matrix u_texture_matrix
-    a_color u_color})
 
 (defn- assoc-line* [instanced-entity i entities]
   (let [characters (:characters instanced-entity)
