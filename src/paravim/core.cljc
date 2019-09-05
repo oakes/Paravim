@@ -84,13 +84,15 @@
                (clojurify-lines characters font-entity *line-num *char-num *collections nil -1 data parinfer?))
              (:characters text-entity)
              $)
-           (reduce-kv
-             (fn [entity line-num char-entities]
-               (if (not= (get-in entity [:characters line-num]) char-entities)
-                 (chars/assoc-line entity line-num char-entities)
-                 entity))
-             text-entity
-             $)
+           (if (seq $)
+             (reduce-kv
+               (fn [entity line-num char-entities]
+                 (if (not= (get-in entity [:characters line-num]) char-entities)
+                   (chars/assoc-line entity line-num char-entities)
+                   entity))
+               text-entity
+               $)
+             text-entity)
            (assoc $ :collections @*collections))))
   ([characters font-entity *line-num *char-num *collections class-name depth data parinfer?]
    (if (vector? data)
