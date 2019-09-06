@@ -290,7 +290,9 @@
                                                        (-> state
                                                            (assoc :current-buffer buffer-ptr :current-tab current-tab)
                                                            (update :tab->buffer assoc current-tab buffer-ptr)))
-                                                     state)
+                                                     (-> state
+                                                         (assoc :current-buffer nil)
+                                                         (update :tab->buffer assoc :files nil)))
                                                    (if (and path (nil? (c/get-buffer state buffer-ptr)))
                                                      (as-> state state
                                                            (c/assoc-buffer state buffer-ptr path lines)
@@ -301,7 +303,9 @@
                                                              state)
                                                            (update-in state [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column))
                                                      state)
-                                                   (c/update-cursor state initial-game (:current-tab state) buffer-ptr)))))
+                                                   (if path
+                                                     (c/update-cursor state initial-game (:current-tab state) buffer-ptr)
+                                                     state)))))
                                        nil)))
         (v/set-on-buffer-update vim (fn [buffer-ptr start-line end-line line-count-change]
                                       (let [first-line (dec start-line)
