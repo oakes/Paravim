@@ -274,9 +274,9 @@
 
 (def ^:dynamic *update-ui?* true)
 
-(defn on-inputs [game vim {:keys [buffer string]}]
-  (let [mode (v/get-mode vim)
-        current-buffer (v/get-current-buffer vim)
+(defn on-inputs [game vim current-buffer {:keys [buffer string]}]
+  (let [cursor-line (v/get-cursor-line vim)
+        cursor-column (v/get-cursor-column vim)
         line-count (v/get-line-count vim buffer)
         char-count (count (v/get-line vim buffer line-count))]
     (binding [*update-ui?* false]
@@ -286,16 +286,29 @@
       (doseq [ch string]
         (on-input game vim (str ch)))
       (v/input vim "<Esc>")
-      (v/set-current-buffer vim current-buffer))))
+      (v/set-current-buffer vim current-buffer)
+      (v/set-cursor-position vim cursor-line cursor-column))))
+
+(defn split-inputs [vim inputs]
+  (when (and (seq inputs) (= 'NORMAL (v/get-mode vim)))
+    (let [current-buffer (v/get-current-buffer vim)
+          *inputs-to-run (volatile! [])
+          *inputs-to-delay (volatile! [])]
+      (doseq [input inputs]
+        (if (= (:buffer input) current-buffer)
+          (vswap! *inputs-to-delay conj input)
+          (vswap! *inputs-to-run conj input)))
+      (let [inputs-to-run @*inputs-to-run]
+        (when (seq inputs-to-run)
+          [inputs-to-run @*inputs-to-delay current-buffer])))))
 
 (defn poll-input [game vim c]
   (async/go-loop [delayed-inputs []]
-    (if (and (seq delayed-inputs)
-             (= 'NORMAL (v/get-mode vim)))
+    (if-let [[inputs-to-run inputs-to-delay current-buffer] (split-inputs vim delayed-inputs)]
       (do
-        (doseq [input delayed-inputs]
-          (on-inputs game vim input))
-        (recur []))
+        (doseq [input inputs-to-run]
+          (on-inputs game vim current-buffer input))
+        (recur inputs-to-delay))
       (let [input (async/<! c)]
         (if (string? input)
           (do
