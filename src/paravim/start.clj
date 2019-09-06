@@ -110,32 +110,20 @@
       (invoke [this window codepoint]
         (callback (str (char codepoint)))))))
 
-(defn on-input [game vim s]
-  (let [{:keys [mode] :as state} @c/*state]
-    (when (and (= 'INSERT mode) (= s "<Esc>"))
-      (-> (swap! c/*state c/update-buffers)
-          (vim/apply-parinfer! vim)))
-    (vim/input state vim s)
-    (as-> (swap! c/*state vim/update-state-after-input game vim s)
-          state
-          (and (not= 'INSERT (:mode state))
-               (not= s "u"))
-          (vim/apply-parinfer! state vim))))
-
 (def ^:dynamic *update-ui?* true)
 
 (defn poll-input [game vim c]
   (async/go-loop [delayed-inputs []]
-    (if-let [[inputs-to-run inputs-to-delay current-buffer] (vim/split-inputs vim delayed-inputs)]
+    (if-let [[inputs-to-run inputs-to-delay] (vim/split-inputs vim delayed-inputs)]
       (do
         (binding [*update-ui?* false]
           (doseq [input inputs-to-run]
-            (vim/append-to-buffer! (partial on-input game vim) vim current-buffer input)))
+            (vim/append-to-buffer! game vim input)))
         (recur inputs-to-delay))
       (let [input (async/<! c)]
         (if (string? input)
           (do
-            (on-input game vim input)
+            (vim/on-input game vim input)
             (recur delayed-inputs))
           (recur (conj delayed-inputs input)))))))
 
