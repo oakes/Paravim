@@ -301,7 +301,7 @@
 
 (defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start] :as state} text position]
   (let [command-text-entity (when text
-                              (-> (chars/assoc-line base-text-entity 0 (mapv #(chars/crop-char base-font-entity %)
+                              (-> (chars/assoc-line base-text-entity 0 (mapv #(-> base-font-entity (chars/crop-char %) (t/color bg-color))
                                                                          (str command-start text)))
                                   (update-uniforms font-height text-alpha)))
         command-cursor-entity (when text
@@ -563,7 +563,7 @@
                                         (t/translate 0 0)
                                         (t/scale game-width (* font-size-multiplier font-height))))
                          (i/assoc 1 (-> base-rect-entity
-                                        (t/color bg-color)
+                                        (t/color (if (= 'COMMAND_LINE mode) tan-color bg-color))
                                         (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                                         (t/scale game-width (* font-size-multiplier font-height)))))))
     (doseq [[k entity] tab-text-entities]
