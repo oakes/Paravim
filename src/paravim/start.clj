@@ -101,7 +101,20 @@
    :left "<Left>"
    :right "<Right>"})
 
-(defn listen-for-keys [window callback vim]
+(defn repl-enter! [vim callback {:keys [out out-pipe]}]
+  (let [buffer-ptr (v/get-current-buffer vim)
+        lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
+                (v/get-line vim buffer-ptr (inc i))))
+        text (str (str/join \newline lines) \newline)]
+    (run! callback ["g" "g" "d" "G"])
+    (doto out
+      (.write text)
+      .flush)
+    (doto out-pipe
+      (.write text)
+      .flush)))
+
+(defn listen-for-keys [window callback vim pipes]
   (GLFW/glfwSetKeyCallback window
     (reify GLFWKeyCallbackI
       (invoke [this window keycode scancode action mods]
@@ -110,8 +123,14 @@
                 alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
                 shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))]
             (if-let [k (keycode->keyword keycode)]
-              (if (and (or control? alt?) (= k :tab))
+              (cond
+                (and (or control? alt?) (= k :tab))
                 (open-buffer-for-tab! vim (swap! c/*state c/change-tab (if shift? -1 1)))
+                (and (= k :enter)
+                     (= 'NORMAL (v/get-mode vim))
+                     (= :repl-in (:current-tab @c/*state)))
+                (repl-enter! vim callback pipes)
+                :else
                 (when-let [key-name (keyword->name k)]
                   (callback key-name)))
               (when control?
@@ -282,7 +301,7 @@
     (binding [*update-ui?* false]
       (v/set-current-buffer vim buffer)
       (v/set-cursor-position vim line-count (dec char-count))
-      (v/input vim "i")
+      (v/input vim "a")
       (doseq [ch string]
         (on-input game vim (str ch)))
       (v/input vim "<Esc>")
@@ -351,7 +370,7 @@
             pipes (repl/create-pipes)]
         (listen-for-resize window initial-game)
         (listen-for-mouse window initial-game vim)
-        (listen-for-keys window send-input! vim)
+        (listen-for-keys window send-input! vim pipes)
         (listen-for-chars window send-input!)
         (v/set-on-quit vim (fn [buffer-ptr force?]
                              (System/exit 0)))

@@ -157,7 +157,9 @@
       (rrb/catvec
         (rrb/subvec lines 0 first-line)
         new-lines
-        (rrb/subvec lines (+ first-line lines-to-remove))))))
+        (if (seq lines) ;; fix for gg dG
+          (rrb/subvec lines (+ first-line lines-to-remove))
+          [])))))
 
 (defn replace-lines [text-entity font-entity new-lines first-line line-count-change]
   (let [new-chars (mapv
@@ -176,11 +178,13 @@
       (let [lines-to-remove (if (neg? line-count-change)
                               (+ (* -1 line-count-change) (count new-lines))
                               (- (count new-lines) line-count-change))
-            text-entity (reduce
-                          (fn [text-entity _]
-                            (chars/dissoc-line text-entity first-line))
-                          text-entity
-                          (range 0 lines-to-remove))
+            text-entity (if (seq (:characters text-entity)) ;; fix for gg dG
+                          (reduce
+                            (fn [text-entity _]
+                              (chars/dissoc-line text-entity first-line))
+                            text-entity
+                            (range 0 lines-to-remove))
+                          text-entity)
             text-entity (reduce-kv
                           (fn [text-entity line-offset char-entities]
                             (chars/insert-line text-entity (+ first-line line-offset) char-entities))
