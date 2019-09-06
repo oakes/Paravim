@@ -17,7 +17,19 @@
   (GLFW/glfwSetWindowSizeCallback window
     (reify GLFWWindowSizeCallbackI
       (invoke [this window width height]
-        (swap! c/*state c/update-cursor game)))))
+        (swap! c/*state
+               (fn [{:keys [current-buffer current-tab tab->buffer] :as state}]
+                 (as-> state state
+                       (if current-buffer
+                         (c/update-cursor state game current-tab current-buffer)
+                         state)
+                       ;; if we're in the repl, make sure both the input and output are refreshed
+                       (if-let [other-tab (case current-tab
+                                            :repl-in :repl-out
+                                            :repl-out :repl-in
+                                            nil)]
+                         (c/update-cursor state game other-tab (tab->buffer other-tab))
+                         state))))))))
 
 (defn open-buffer-for-tab! [vim {:keys [current-buffer current-tab tab->buffer] :as state}]
   (if-let [buffer-for-tab (tab->buffer current-tab)]
@@ -240,7 +252,7 @@
                                                    (-> state
                                                        (update-in [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)
                                                        update-buffers
-                                                       (c/update-cursor initial-game current-buffer)
+                                                       (c/update-cursor initial-game (:current-tab state) current-buffer)
                                                        (c/update-highlight current-buffer)
                                                        (cond-> (v/visual-active? vim)
                                                                (c/update-selection current-buffer (-> (v/get-visual-range vim)
@@ -289,7 +301,7 @@
                                                              state)
                                                            (update-in state [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column))
                                                      state)
-                                                   (c/update-cursor state initial-game buffer-ptr)))))
+                                                   (c/update-cursor state initial-game (:current-tab state) buffer-ptr)))))
                                        nil)))
         (v/set-on-buffer-update vim (fn [buffer-ptr start-line end-line line-count-change]
                                       (let [first-line (dec start-line)
