@@ -439,6 +439,25 @@
                         (replace-lines base-font-entity new-lines first-line line-count-change)
                         (update-uniforms font-height text-alpha))))))))
 
+(defn update-buffers [state]
+  (if-let [updates (not-empty (:buffer-updates state))]
+    (let [buffer-ptrs (set (map :buffer-ptr updates))]
+      (as-> state state
+            (reduce
+              (fn [state {:keys [buffer-ptr lines first-line line-count-change]}]
+                (update-text state buffer-ptr lines first-line line-count-change))
+              state
+              updates)
+            (assoc state :buffer-updates [])
+            (reduce (fn [state buffer-ptr]
+                      (if (:clojure? (get-buffer state buffer-ptr))
+                        (-> state
+                            (parse-clojure-buffer buffer-ptr false)
+                            (update-clojure-buffer buffer-ptr))
+                        state))
+                    state buffer-ptrs)))
+    state))
+
 (defn assoc-attr-lengths [text-entity]
   (reduce
     (fn [text-entity attr-name]
