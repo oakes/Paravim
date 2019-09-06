@@ -444,7 +444,7 @@
     text-entity
     (keys chars/instanced-font-attrs->unis)))
 
-(defn init [game callback]
+(defn init [game]
   ;; allow transparency in images
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
@@ -506,8 +506,7 @@
                                           right (-> tab-entities (get tab) :characters first last :x-total (+ left))]
                                       (assoc m tab {:x1 left :y1 0 :x2 right :y2 font-height})))
                                   {}
-                                  tabs))
-              (callback))))))))
+                                  tabs)))))))))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}

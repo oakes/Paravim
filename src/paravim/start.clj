@@ -4,7 +4,8 @@
             [libvim-clj.core :as v]
             [clojure.string :as str]
             [play-cljc.gl.core :as pc]
-            [parinferish.core :as par])
+            [parinferish.core :as par]
+            [clojure.core.async :as async])
   (:import  [org.lwjgl.glfw GLFW Callbacks
              GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWCharCallbackI
              GLFWMouseButtonCallbackI GLFWWindowSizeCallbackI]
@@ -184,6 +185,60 @@
               (assoc-in [:buffers buffer-ptr :needs-parinfer?] false)
               (update-buffers)))))))
 
+(defn on-input [game vim s]
+  (let [{:keys [mode command-text command-text-entity current-buffer]} @c/*state]
+    (when (and (= 'INSERT mode) (= s "<Esc>"))
+      (-> (swap! c/*state update-buffers)
+          (apply-parinfer! vim current-buffer)))
+    (if (and (= mode 'COMMAND_LINE) command-text)
+      (let [pos (v/get-command-position vim)]
+        (case s
+          "<Tab>"
+          (when (= (count command-text) pos)
+            (when-let [completion-text (v/get-command-completion vim)]
+              (when-let [first-part (str/last-index-of command-text " ")]
+                (dotimes [_ (- (count command-text) (inc first-part))]
+                  (v/input vim "<BS>"))
+                (doseq [ch completion-text]
+                  (v/input vim (str ch))))))
+          ("<Right>" "<Left>" "<Up>" "<Down>")
+          nil
+          (v/input vim s)))
+      (v/input vim s))
+    (let [current-buffer (v/get-current-buffer vim)
+          old-mode mode
+          mode (v/get-mode vim)
+          cursor-line (dec (v/get-cursor-line vim))
+          cursor-column (v/get-cursor-column vim)]
+      (cond-> (swap! c/*state
+                (fn [state]
+                  (-> state
+                      (assoc :mode mode)
+                      (cond-> (and (not= old-mode 'COMMAND_LINE)
+                                   (= mode 'COMMAND_LINE))
+                              (assoc :command-start s))
+                      (c/update-command (v/get-command-text vim) (v/get-command-position vim))
+                      (as-> state
+                            (if (c/get-buffer state current-buffer)
+                              (-> state
+                                  (update-in [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)
+                                  update-buffers
+                                  (c/update-cursor game (:current-tab state) current-buffer)
+                                  (c/update-highlight current-buffer)
+                                  (cond-> (v/visual-active? vim)
+                                          (c/update-selection current-buffer (-> (v/get-visual-range vim)
+                                                                                 (update :start-line dec)
+                                                                                 (update :end-line dec)))))
+                              state)))))
+              (and (not= 'INSERT mode)
+                   (not= s "u"))
+              (apply-parinfer! vim current-buffer)))))
+
+(defn poll-input [game vim c]
+  (async/go-loop []
+    (on-input game vim (async/<! c))
+    (recur)))
+
 (defn -main [& args]
   (when-not (GLFW/glfwInit)
     (throw (Exception. "Unable to initialize GLFW")))
@@ -214,58 +269,12 @@
                   (v/execute "set shiftwidth=2")
                   (v/execute "set expandtab")
                   (v/execute "filetype plugin indent on"))
-            on-input (fn [s]
-                       (let [{:keys [mode command-text command-text-entity current-buffer]} @c/*state]
-                         (when (and (= 'INSERT mode) (= s "<Esc>"))
-                           (-> (swap! c/*state update-buffers)
-                               (apply-parinfer! vim current-buffer)))
-                         (if (and (= mode 'COMMAND_LINE) command-text)
-                           (let [pos (v/get-command-position vim)]
-                             (case s
-                               "<Tab>"
-                               (when (= (count command-text) pos)
-                                 (when-let [completion-text (v/get-command-completion vim)]
-                                   (when-let [first-part (str/last-index-of command-text " ")]
-                                     (dotimes [_ (- (count command-text) (inc first-part))]
-                                       (v/input vim "<BS>"))
-                                     (doseq [ch completion-text]
-                                       (v/input vim (str ch))))))
-                               ("<Right>" "<Left>" "<Up>" "<Down>")
-                               nil
-                               (v/input vim s)))
-                           (v/input vim s))
-                         (let [current-buffer (v/get-current-buffer vim)
-                               old-mode mode
-                               mode (v/get-mode vim)
-                               cursor-line (dec (v/get-cursor-line vim))
-                               cursor-column (v/get-cursor-column vim)]
-                           (cond-> (swap! c/*state
-                                     (fn [state]
-                                       (-> state
-                                           (assoc :mode mode)
-                                           (cond-> (and (not= old-mode 'COMMAND_LINE)
-                                                        (= mode 'COMMAND_LINE))
-                                                   (assoc :command-start s))
-                                           (c/update-command (v/get-command-text vim) (v/get-command-position vim))
-                                           (as-> state
-                                                 (if (c/get-buffer state current-buffer)
-                                                   (-> state
-                                                       (update-in [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)
-                                                       update-buffers
-                                                       (c/update-cursor initial-game (:current-tab state) current-buffer)
-                                                       (c/update-highlight current-buffer)
-                                                       (cond-> (v/visual-active? vim)
-                                                               (c/update-selection current-buffer (-> (v/get-visual-range vim)
-                                                                                                      (update :start-line dec)
-                                                                                                      (update :end-line dec)))))
-                                                   state)))))
-                                   (and (not= 'INSERT mode)
-                                        (not= s "u"))
-                                   (apply-parinfer! vim current-buffer)))))]
+            vim-chan (async/chan)
+            send-input! (partial async/put! vim-chan)]
         (listen-for-resize window initial-game)
         (listen-for-mouse window initial-game vim)
-        (listen-for-keys window on-input vim)
-        (listen-for-chars window on-input)
+        (listen-for-keys window send-input! vim)
+        (listen-for-chars window send-input!)
         (v/set-on-quit vim (fn [buffer-ptr force?]
                              (System/exit 0)))
         (v/set-on-auto-command vim (fn [buffer-ptr event]
@@ -316,9 +325,10 @@
                                                                                      :lines lines
                                                                                      :first-line first-line
                                                                                      :line-count-change line-count-change}))))
-        (c/init initial-game (fn []
-                               (run! #(v/open-buffer vim (c/tab->path %))
-                                 [:repl-in :repl-out :files])))
+        (c/init initial-game)
+        (run! #(v/open-buffer vim (c/tab->path %))
+          [:repl-in :repl-out :files])
+        (poll-input initial-game vim vim-chan)
         (loop [game initial-game]
           (when-not (GLFW/glfwWindowShouldClose window)
             (let [ts (GLFW/glfwGetTime)
