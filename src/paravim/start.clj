@@ -22,14 +22,14 @@
                (fn [{:keys [current-buffer current-tab tab->buffer] :as state}]
                  (as-> state state
                        (if current-buffer
-                         (c/update-cursor state game current-tab current-buffer)
+                         (c/update-cursor state game current-buffer)
                          state)
                        ;; if we're in the repl, make sure both the input and output are refreshed
                        (if-let [other-tab (case current-tab
                                             :repl-in :repl-out
                                             :repl-out :repl-in
                                             nil)]
-                         (c/update-cursor state game other-tab (tab->buffer other-tab))
+                         (c/update-cursor state game (tab->buffer other-tab))
                          state))))))))
 
 (defn open-buffer-for-tab! [vim {:keys [current-buffer current-tab tab->buffer] :as state}]
@@ -224,7 +224,7 @@
                               (-> state
                                   (update-in [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)
                                   update-buffers
-                                  (c/update-cursor game (:current-tab state) current-buffer)
+                                  (c/update-cursor game current-buffer)
                                   (c/update-highlight current-buffer)
                                   (cond-> (v/visual-active? vim)
                                           (c/update-selection current-buffer (-> (v/get-visual-range vim)
@@ -269,7 +269,7 @@
                       (update-in state [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column))
                 state)
               (if path
-                (c/update-cursor state game (:current-tab state) buffer-ptr)
+                (c/update-cursor state game buffer-ptr)
                 state))))))
 
 (def ^:dynamic *update-ui?* true)
