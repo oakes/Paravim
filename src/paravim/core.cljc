@@ -299,10 +299,10 @@
       'u_font_height font-height
       'u_alpha alpha))
 
-(defn update-command [{:keys [roboto-text-entity roboto-font-entity base-rects-entity font-height command-start] :as state} text position]
+(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start] :as state} text position]
   (let [command-text-entity (when text
-                              (-> (chars/assoc-line roboto-text-entity 0 (mapv #(chars/crop-char roboto-font-entity %)
-                                                                               (str command-start text)))
+                              (-> (chars/assoc-line base-text-entity 0 (mapv #(chars/crop-char base-font-entity %)
+                                                                         (str command-start text)))
                                   (update-uniforms font-height text-alpha)))
         command-cursor-entity (when text
                                 (let [line-chars (get-in command-text-entity [:characters 0])]
@@ -580,6 +580,7 @@
                          (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                          (t/scale font-size-multiplier font-size-multiplier)))
       (c/render game (-> command-text-entity
+                         (update :uniforms assoc 'u_min_y 0 'u_max_y font-height)
                          (t/project game-width game-height)
                          (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                          (t/scale font-size-multiplier font-size-multiplier)))))
