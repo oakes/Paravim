@@ -7,17 +7,22 @@
 (defn remove-returns [^String s]
   (str/escape s {\return ""}))
 
-(defn pipe-into-console! [in-pipe channel]
+(defn pipe-into-console! [in-pipe callback]
   (let [ca (char-array 256)]
     (.start
       (Thread.
         (fn []
           (loop []
+            #_
+            (do
+              (Thread/sleep 300)
+              (callback (str i "\n"))
+              (recur (inc i)))
             (when-let [read (try (.read in-pipe ca)
                               (catch Exception _))]
               (when (pos? read)
                 (let [s (remove-returns (String. ca 0 read))]
-                  ;(send! channel s)
+                  (callback s)
                   (Thread/sleep 100) ; prevent thread from being flooded
                   (recur))))))))))
 
@@ -29,9 +34,9 @@
         in-pipe (PipedReader. pout)]
     {:in in :out out :in-pipe in-pipe :out-pipe out-pipe}))
 
-(defn start-repl-thread! [main-ns channel pipes]
+(defn start-repl-thread! [main-ns pipes callback]
   (let [{:keys [in-pipe in out]} pipes]
-    (pipe-into-console! in-pipe channel)
+    (pipe-into-console! in-pipe callback)
     (.start
       (Thread.
         (fn []

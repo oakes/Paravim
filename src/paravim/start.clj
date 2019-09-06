@@ -235,10 +235,73 @@
                    (not= s "u"))
               (apply-parinfer! vim current-buffer)))))
 
+(defn on-buf-enter [game vim buffer-ptr]
+  (let [cursor-line (dec (v/get-cursor-line vim))
+        cursor-column (v/get-cursor-column vim)
+        path (v/get-file-name vim buffer-ptr)
+        lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
+                (v/get-line vim buffer-ptr (inc i))))]
+    (swap! c/*state
+      (fn [{:keys [tab->buffer] :as state}]
+        (as-> state state
+              (if path
+                (let [canon-path (-> path java.io.File. .getCanonicalPath)
+                      current-tab (or (some
+                                        (fn [[tab path]]
+                                          (when (= canon-path (-> path java.io.File. .getCanonicalPath))
+                                            tab))
+                                        c/tab->path)
+                                      :files)]
+                  (-> state
+                      (assoc :current-buffer buffer-ptr :current-tab current-tab)
+                      (update :tab->buffer assoc current-tab buffer-ptr)))
+                (-> state
+                    (assoc :current-buffer nil)
+                    (update :tab->buffer assoc :files nil)))
+              (if (and path (nil? (c/get-buffer state buffer-ptr)))
+                (as-> state state
+                      (c/assoc-buffer state buffer-ptr path lines)
+                      (if (:clojure? (c/get-buffer state buffer-ptr))
+                        (-> state
+                            (c/parse-clojure-buffer buffer-ptr true)
+                            (c/update-clojure-buffer buffer-ptr))
+                        state)
+                      (update-in state [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column))
+                state)
+              (if path
+                (c/update-cursor state game (:current-tab state) buffer-ptr)
+                state))))))
+
+(def ^:dynamic *update-ui?* true)
+
+(defn on-inputs [game vim {:keys [buffer string]}]
+  (let [mode (v/get-mode vim)
+        current-buffer (v/get-current-buffer vim)
+        line-count (v/get-line-count vim buffer)
+        char-count (count (v/get-line vim buffer line-count))]
+    (binding [*update-ui?* false]
+      (v/set-current-buffer vim buffer)
+      (v/set-cursor-position vim line-count (dec char-count))
+      (v/input vim "i")
+      (doseq [ch string]
+        (on-input game vim (str ch)))
+      (v/input vim "<Esc>")
+      (v/set-current-buffer vim current-buffer))))
+
 (defn poll-input [game vim c]
-  (async/go-loop []
-    (on-input game vim (async/<! c))
-    (recur)))
+  (async/go-loop [delayed-inputs []]
+    (if (and (seq delayed-inputs)
+             (= 'NORMAL (v/get-mode vim)))
+      (do
+        (doseq [input delayed-inputs]
+          (on-inputs game vim input))
+        (recur []))
+      (let [input (async/<! c)]
+        (if (string? input)
+          (do
+            (on-input game vim input)
+            (recur delayed-inputs))
+          (recur (conj delayed-inputs input)))))))
 
 (defn -main [& args]
   (when-not (GLFW/glfwInit)
@@ -271,7 +334,8 @@
                   (v/execute "set expandtab")
                   (v/execute "filetype plugin indent on"))
             vim-chan (async/chan)
-            send-input! (partial async/put! vim-chan)]
+            send-input! (partial async/put! vim-chan)
+            pipes (repl/create-pipes)]
         (listen-for-resize window initial-game)
         (listen-for-mouse window initial-game vim)
         (listen-for-keys window send-input! vim)
@@ -281,41 +345,8 @@
         (v/set-on-auto-command vim (fn [buffer-ptr event]
                                      (case event
                                        EVENT_BUFENTER
-                                       (let [cursor-line (dec (v/get-cursor-line vim))
-                                             cursor-column (v/get-cursor-column vim)
-                                             path (v/get-file-name vim buffer-ptr)
-                                             lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
-                                                     (v/get-line vim buffer-ptr (inc i))))]
-                                         (swap! c/*state
-                                           (fn [{:keys [tab->buffer] :as state}]
-                                             (as-> state state
-                                                   (if path
-                                                     (let [canon-path (-> path java.io.File. .getCanonicalPath)
-                                                           current-tab (or (some
-                                                                             (fn [[tab path]]
-                                                                               (when (= canon-path (-> path java.io.File. .getCanonicalPath))
-                                                                                 tab))
-                                                                             c/tab->path)
-                                                                           :files)]
-                                                       (-> state
-                                                           (assoc :current-buffer buffer-ptr :current-tab current-tab)
-                                                           (update :tab->buffer assoc current-tab buffer-ptr)))
-                                                     (-> state
-                                                         (assoc :current-buffer nil)
-                                                         (update :tab->buffer assoc :files nil)))
-                                                   (if (and path (nil? (c/get-buffer state buffer-ptr)))
-                                                     (as-> state state
-                                                           (c/assoc-buffer state buffer-ptr path lines)
-                                                           (if (:clojure? (c/get-buffer state buffer-ptr))
-                                                             (-> state
-                                                                 (c/parse-clojure-buffer buffer-ptr true)
-                                                                 (c/update-clojure-buffer buffer-ptr))
-                                                             state)
-                                                           (update-in state [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column))
-                                                     state)
-                                                   (if path
-                                                     (c/update-cursor state initial-game (:current-tab state) buffer-ptr)
-                                                     state)))))
+                                       (when *update-ui?*
+                                         (on-buf-enter initial-game vim buffer-ptr))
                                        nil)))
         (v/set-on-buffer-update vim (fn [buffer-ptr start-line end-line line-count-change]
                                       (let [first-line (dec start-line)
@@ -330,6 +361,8 @@
         (run! #(v/open-buffer vim (c/tab->path %))
           [:repl-in :repl-out :files])
         (poll-input initial-game vim vim-chan)
+        (when-let [buffer (-> @c/*state :tab->buffer :repl-out)]
+          (repl/start-repl-thread! nil pipes #(async/put! vim-chan {:buffer buffer :string %})))
         (loop [game initial-game]
           (when-not (GLFW/glfwWindowShouldClose window)
             (let [ts (GLFW/glfwGetTime)
