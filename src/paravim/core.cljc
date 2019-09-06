@@ -297,7 +297,9 @@
   (update text-entity :uniforms assoc
       'u_char_counts (mapv count characters)
       'u_font_height font-height
-      'u_alpha alpha))
+      'u_alpha alpha
+      'u_min_y 0
+      'u_max_y 0))
 
 (defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start] :as state} text position]
   (let [command-text-entity (when text
@@ -579,7 +581,6 @@
                          (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                          (t/scale font-size-multiplier font-size-multiplier)))
       (c/render game (-> command-text-entity
-                         (update :uniforms assoc 'u_min_y 0 'u_max_y font-height)
                          (t/project game-width game-height)
                          (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                          (t/scale font-size-multiplier font-size-multiplier)))))
