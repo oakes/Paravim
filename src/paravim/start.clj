@@ -145,12 +145,13 @@
 
 (defn apply-parinfer! [{:keys [mode] :as state} vim buffer-ptr]
   (let [{:keys [parsed-code needs-parinfer?]} (get-in state [:buffers buffer-ptr])]
-    (when needs-parinfer?
+    (when (and needs-parinfer?
+               ('#{NORMAL INSERT} mode))
       (let [cursor-line (v/get-cursor-line vim)
             cursor-column (v/get-cursor-column vim)
             diffs (par/diff parsed-code)]
         (when (seq diffs)
-          (when (not= 'INSERT mode)
+          (when (= 'NORMAL mode)
             (v/input vim "i"))
           (doseq [{:keys [line column content action]} diffs]
             ;; move all the way to the first column
@@ -177,7 +178,7 @@
                 (v/input vim (str ch)))))
           ;; go back to the original position
           (v/set-cursor-position vim cursor-line cursor-column)
-          (when (not= 'INSERT mode)
+          (when (= 'NORMAL mode)
             (v/input vim "<Esc>"))))
       (swap! c/*state
         (fn [state]
@@ -190,7 +191,7 @@
     (when (and (= 'INSERT mode) (= s "<Esc>"))
       (-> (swap! c/*state update-buffers)
           (apply-parinfer! vim current-buffer)))
-    (if (and (= mode 'COMMAND_LINE) command-text)
+    (if (and (= 'COMMAND_LINE mode) command-text)
       (let [pos (v/get-command-position vim)]
         (case s
           "<Tab>"
