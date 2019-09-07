@@ -139,15 +139,11 @@
                 state)))))
 
 (defn on-input [game vim s]
-  (let [{:keys [mode] :as state} @c/*state]
-    (when (and (= 'INSERT mode) (= s "<Esc>"))
-      (-> (swap! c/*state c/update-buffers)
-          (apply-parinfer! vim)))
-    (input state vim s)
-    (let [state (swap! c/*state update-state-after-input game vim s)]
-      (when (and (= 'NORMAL (:mode state))
-                 (not= s "u"))
-        (apply-parinfer! state vim)))))
+  (input @c/*state vim s)
+  (let [state (swap! c/*state update-state-after-input game vim s)]
+    (when (and (= 'NORMAL (:mode state))
+               (not= s "u"))
+      (apply-parinfer! state vim))))
 
 (defn append-to-buffer! [game vim {:keys [buffer string]}]
   (let [current-buffer (v/get-current-buffer vim)
