@@ -157,7 +157,7 @@
       (rrb/catvec
         (rrb/subvec lines 0 first-line)
         new-lines
-        (if (seq lines) ;; fix for gg dG
+        (if (seq lines) ;; see test: delete-all-lines-and-undo
           (rrb/subvec lines (+ first-line lines-to-remove))
           [])))))
 
@@ -178,7 +178,7 @@
       (let [lines-to-remove (if (neg? line-count-change)
                               (+ (* -1 line-count-change) (count new-lines))
                               (- (count new-lines) line-count-change))
-            text-entity (if (seq (:characters text-entity)) ;; fix for gg dG
+            text-entity (if (seq (:characters text-entity)) ;; see test: delete-all-lines-and-undo
                           (reduce
                             (fn [text-entity _]
                               (chars/dissoc-line text-entity first-line))
