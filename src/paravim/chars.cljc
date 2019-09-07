@@ -208,11 +208,14 @@
      (assoc text-entity :characters (assoc characters line-num line)))))
 
 (defn assoc-line [text-entity line-num char-entities]
-  (let [new-text-entity (reduce-kv
-                          (fn [text-entity char-num char-entity]
-                            (assoc-char text-entity line-num char-num char-entity))
-                          (specter/setval [:characters line-num] [] text-entity)
-                          char-entities)
+  (let [new-text-entity (specter/setval [:characters line-num] [] text-entity)
+        new-text-entity (if (seq char-entities)
+                          (reduce-kv
+                            (fn [new-text-entity char-num char-entity]
+                              (assoc-char new-text-entity line-num char-num char-entity))
+                            new-text-entity
+                            char-entities)
+                          new-text-entity)
         new-line (specter/select-any [:characters line-num] new-text-entity)
         adjusted-new-line (specter/transform
                             [specter/ALL (specter/collect-one :left) :uniforms 'u_translate_matrix]

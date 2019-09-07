@@ -77,24 +77,39 @@
   ([text-entity font-entity parsed-code parinfer?]
    (let [*line-num (volatile! 0)
          *char-num (volatile! -1)
-         *collections (volatile! [])]
-     (as-> parsed-code $
-           (reduce
-             (fn [characters data]
-               (clojurify-lines characters font-entity *line-num *char-num *collections nil -1 data parinfer?))
-             (:characters text-entity)
-             $)
-           (if (seq $)
-             (reduce-kv
-               (fn [entity line-num char-entities]
-                 (if (not= (get-in entity [:characters line-num]) char-entities)
-                   (chars/assoc-line entity line-num char-entities)
-                   entity))
-               text-entity
-               $)
-             text-entity)
-           (assoc $ :collections @*collections))))
-  ([characters font-entity *line-num *char-num *collections class-name depth data parinfer?]
+         *char-counts (volatile! [])
+         *collections (volatile! [])
+         characters (reduce
+                      (fn [characters data]
+                        (clojurify-lines characters font-entity *line-num *char-num *char-counts *collections nil -1 data parinfer?))
+                      (:characters text-entity)
+                      parsed-code)
+         ;; the last line's char count
+         char-counts (vswap! *char-counts conj (inc @*char-num))
+         ;; make sure the parinfer entity doesn't render any trailing characters it removed
+         characters (if (and (seq characters) parinfer?)
+                      (reduce-kv
+                        (fn [characters line-num char-count]
+                          (update characters line-num
+                                  (fn [char-entities]
+                                    (if (> (count char-entities) char-count)
+                                      (rrb/subvec char-entities 0 char-count)
+                                      char-entities))))
+                        characters
+                        char-counts)
+                      characters)
+         ;; add characters to the attributes
+         text-entity (if (seq characters)
+                       (reduce-kv
+                         (fn [entity line-num char-entities]
+                           (if (not= (get-in entity [:characters line-num]) char-entities)
+                             (chars/assoc-line entity line-num char-entities)
+                             entity))
+                         text-entity
+                         characters)
+                       text-entity)]
+     (assoc text-entity :collections @*collections)))
+  ([characters font-entity *line-num *char-num *char-counts *collections class-name depth data parinfer?]
    (if (vector? data)
      (let [[class-name & children] data
            depth (cond-> depth
@@ -107,7 +122,7 @@
                         characters
                         (reduce
                           (fn [characters child]
-                            (clojurify-lines characters font-entity *line-num *char-num *collections class-name depth child parinfer?))
+                            (clojurify-lines characters font-entity *line-num *char-num *char-counts *collections class-name depth child parinfer?))
                           characters
                           children))]
        (when (= class-name :collection)
@@ -121,17 +136,11 @@
        (reduce
          (fn [characters ch]
            (if (= ch \newline)
-             (let [line-num @*line-num
-                   char-num (inc @*char-num)]
+             (do
+               (vswap! *char-counts conj (inc @*char-num))
                (vswap! *line-num inc)
                (vreset! *char-num -1)
-               (if parinfer?
-                 (update characters line-num
-                   (fn [char-entities]
-                     (if (not= (count char-entities) char-num)
-                       (rrb/subvec char-entities 0 char-num)
-                       char-entities)))
-                 characters))
+               characters)
              (update characters @*line-num
                (fn [char-entities]
                  (update char-entities (vswap! *char-num inc)
