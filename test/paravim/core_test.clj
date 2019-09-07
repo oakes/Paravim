@@ -12,13 +12,39 @@
 (def buffer-ptr (v/open-buffer vim "test/resources/core.clj"))
 (v/set-current-buffer vim buffer-ptr)
 
-(defn count-lines []
-  (count (get-in @c/*state [:buffers buffer-ptr :text-entity :characters])))
+(defn get-characters [buffer-ptr entity-key]
+  (get-in @c/*state [:buffers buffer-ptr entity-key :characters]))
+
+(defn count-lines [buffer-ptr]
+  (count (get-characters buffer-ptr :text-entity)))
+
+(defn get-line [buffer-ptr line-num]
+  (get-in @c/*state [:buffers buffer-ptr :lines line-num]))
 
 (deftest delete-all-lines
-  (is (= 5 (count-lines)))
+  (is (= 5 (count-lines buffer-ptr)))
   (run! (partial vim/on-input game vim) ["g" "g" "d" "G"])
-  (is (= 0 (count-lines)))
+  (is (= 0 (count-lines buffer-ptr)))
   (vim/on-input game vim "u")
-  (is (= 5 (count-lines))))
+  (is (= 5 (count-lines buffer-ptr))))
+
+(deftest dedent-function-body
+  (is (= "(defn -main []" (get-line buffer-ptr 3)))
+  (is (= "  (println \"Hello, World!\"))" (get-line buffer-ptr 4)))
+  ;; dedent
+  (v/set-cursor-position vim 5 0)
+  (run! (partial vim/on-input game vim) ["i" "<Del>" "<Del>"])
+  ;; make sure only the characters on those two lines changed
+  (let [chars-before-parinfer (get-characters buffer-ptr :text-entity)
+        chars-after-parinfer (get-characters buffer-ptr :parinfer-text-entity)]
+    (dotimes [line-num (count-lines buffer-ptr)]
+      (let [line-before-parinfer (nth chars-before-parinfer line-num)
+            line-after-parinfer (nth chars-after-parinfer line-num)]
+        (if (#{3 4} line-num)
+          (is (not= line-before-parinfer line-after-parinfer))
+          (is (= line-before-parinfer line-after-parinfer))))))
+  ;; execute parinfer
+  (vim/on-input game vim "<Esc>")
+  (is (= "(defn -main [])" (get-line buffer-ptr 3)))
+  (is (= "(println \"Hello, World!\")" (get-line buffer-ptr 4))))
 
