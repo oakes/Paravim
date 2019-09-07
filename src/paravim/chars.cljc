@@ -15,6 +15,7 @@
    :uniforms
    '{u_matrix mat3
      u_char_counts [int 1000]
+     u_start_line int
      u_font_height float}
    :outputs
    '{v_tex_coord vec2
@@ -30,7 +31,7 @@
              ("if" (> total_char_count gl_InstanceID) "break")
              ("else" (+= current_line 1)))
            (=mat3 translate_matrix a_translate_matrix)
-           (+= [translate_matrix 2 1] (* u_font_height current_line))
+           (+= [translate_matrix 2 1] (* u_font_height (+ u_start_line current_line)))
            (= gl_Position
               (vec4
                 (.xy (* u_matrix
@@ -45,9 +46,7 @@
   {:precision "mediump float"
    :uniforms
    '{u_image sampler2D
-     u_alpha float
-     u_min_y float
-     u_max_y float}
+     u_alpha float}
    :inputs
    '{v_tex_coord vec2
      v_color vec4}
@@ -57,11 +56,6 @@
    '{main ([] void)}
    :functions
    '{main ([]
-           ;; discard if outside the y boundary
-           ("if" (&& (> u_max_y 0)
-                     (|| (< (.y gl_FragCoord) u_min_y)
-                         (> (.y gl_FragCoord) u_max_y)))
-             "discard")
            ;; get the color from the attributes
            (=vec4 input_color v_color)
            ;; set its alpha color if necessary
