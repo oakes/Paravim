@@ -6,7 +6,7 @@
         org.lwjgl/lwjgl-opengl {:mvn/version "3.2.3"}
         org.lwjgl/lwjgl-stb {:mvn/version "3.2.3"}
         libvim-clj {:local/root "../libvim-clj"}
-        parinferish {:mvn/version "0.6.1"}
+        parinferish {:mvn/version "0.6.2"}
         com.rpl/specter {:mvn/version "1.1.2"}
         org.clojars.oakes/core.rrb-vector {:mvn/version "0.0.15-2019.09.02"}
         org.clojure/core.async {:mvn/version "0.4.500"}}
