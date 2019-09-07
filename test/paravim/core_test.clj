@@ -46,5 +46,9 @@
   ;; execute parinfer
   (vim/on-input game vim "<Esc>")
   (is (= "(defn -main [])" (get-line buffer-ptr 3)))
-  (is (= "(println \"Hello, World!\")" (get-line buffer-ptr 4))))
+  (is (= "(println \"Hello, World!\")" (get-line buffer-ptr 4)))
+  ;; undo
+  (run! (partial vim/on-input game vim) ["u" "u" "u"])
+  (is (= "(defn -main []" (get-line buffer-ptr 3)))
+  (is (= "  (println \"Hello, World!\"))" (get-line buffer-ptr 4))))
 
