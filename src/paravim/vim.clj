@@ -8,6 +8,7 @@
 
 (def keyword->name
   {:backspace "<BS>"
+   :delete "<Del>"
    :tab "<Tab>"
    :enter "<Enter>"
    :escape "<Esc>"

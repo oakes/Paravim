@@ -68,6 +68,7 @@
 
 (def keycode->keyword
   {GLFW/GLFW_KEY_BACKSPACE :backspace
+   GLFW/GLFW_KEY_DELETE :delete
    GLFW/GLFW_KEY_TAB :tab
    GLFW/GLFW_KEY_ENTER :enter
    GLFW/GLFW_KEY_ESCAPE :escape
