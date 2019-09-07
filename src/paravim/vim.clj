@@ -145,7 +145,7 @@
           (apply-parinfer! vim)))
     (input state vim s)
     (let [state (swap! c/*state update-state-after-input game vim s)]
-      (when (and (not= 'INSERT (:mode state))
+      (when (and (= 'NORMAL (:mode state))
                  (not= s "u"))
         (apply-parinfer! state vim)))))
 
