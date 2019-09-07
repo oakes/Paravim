@@ -15,6 +15,8 @@
                  :main-opts ["dev.clj"]}
            :prod {:extra-deps {leiningen {:mvn/version "2.9.0"}}
                   :main-opts ["prod.clj"]}
+           :test {:extra-paths ["test"]
+                  :main-opts ["test.clj"]}
            :linux {:extra-deps {org.lwjgl/lwjgl$natives-linux {:mvn/version "3.2.3"}
                                 org.lwjgl/lwjgl-glfw$natives-linux {:mvn/version "3.2.3"}
                                 org.lwjgl/lwjgl-opengl$natives-linux {:mvn/version "3.2.3"}
