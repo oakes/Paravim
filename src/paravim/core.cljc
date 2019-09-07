@@ -87,6 +87,7 @@
          ;; the last line's char count
          char-counts (vswap! *char-counts conj (inc @*char-num))
          ;; make sure the parinfer entity doesn't render any trailing characters it removed
+         ;; see test: dedent-function-body
          characters (if (and (seq characters) parinfer?)
                       (reduce-kv
                         (fn [characters line-num char-count]
