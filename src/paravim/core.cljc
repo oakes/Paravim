@@ -420,7 +420,7 @@
   (update-in state [:buffers buffer-ptr]
     (fn [{:keys [lines cursor-line cursor-column] :as buffer}]
       (let [parse-opts (cond
-                         init? {:mode :paren}
+                         init? {:mode :paren} ;; see test: fix-bad-indentation
                          (= 'INSERT mode) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}
                          :else {:mode :indent})
             parsed-code (ps/parse (str/join "\n" lines) parse-opts)]
