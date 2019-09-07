@@ -545,10 +545,10 @@
   {:viewport {:x 0 :y 0 :width 0 :height 0}
    :clear {:color bg-color :depth 1}})
 
-(defn crop-text-entity [{:keys [characters] :as text-entity} game-height camera-y font-height font-size-multiplier]
+(defn crop-text-entity [{:keys [characters] :as text-entity} text-height camera-y font-height font-size-multiplier]
   (let [char-height (* font-height font-size-multiplier)
-        lines-to-skip-count (/ camera-y char-height)
-        lines-to-crop-count (min (/ (+ game-height camera-y) char-height)
+        lines-to-skip-count (int (/ camera-y char-height))
+        lines-to-crop-count (min (int (/ (+ text-height camera-y) char-height))
                                  (count characters))
         char-counts (get-in text-entity [:uniforms 'u_char_counts])
         chars-to-skip-count (reduce + 0 (subvec char-counts 0 lines-to-skip-count))
@@ -561,7 +561,7 @@
                    (* length chars-to-crop-count)))
       (update text-entity :uniforms assoc
               'u_char_counts char-counts
-              'u_start_line (int lines-to-skip-count))
+              'u_start_line lines-to-skip-count)
       (:attribute-lengths text-entity))))
 
 (defn render-buffer [game {:keys [buffers text-boxes font-height font-size-multiplier] :as state} game-width game-height current-tab buffer-ptr show-cursor?]
@@ -572,19 +572,21 @@
                            (t/project game-width game-height)
                            (t/camera camera)
                            (t/scale font-size-multiplier font-size-multiplier))))
-      (when parinfer-text-entity
-        (c/render game (-> parinfer-text-entity
-                           (crop-text-entity game-height camera-y font-height font-size-multiplier)
+      (let [text-height (- (bottom game-height font-size-multiplier)
+                           (top game-height font-size-multiplier))]
+        (when parinfer-text-entity
+          (c/render game (-> parinfer-text-entity
+                             (crop-text-entity text-height camera-y font-height font-size-multiplier)
+                             (t/project game-width game-height)
+                             (t/camera camera)
+                             (t/scale font-size-multiplier font-size-multiplier))))
+        (c/render game (-> text-entity
+                           (crop-text-entity text-height camera-y font-height font-size-multiplier)
+                           (cond-> (not show-cursor?)
+                                   (assoc-in [:uniforms 'u_alpha] unfocused-alpha))
                            (t/project game-width game-height)
                            (t/camera camera)
-                           (t/scale font-size-multiplier font-size-multiplier))))
-      (c/render game (-> text-entity
-                         (crop-text-entity game-height camera-y font-height font-size-multiplier)
-                         (cond-> (not show-cursor?)
-                                 (assoc-in [:uniforms 'u_alpha] unfocused-alpha))
-                         (t/project game-width game-height)
-                         (t/camera camera)
-                         (t/scale font-size-multiplier font-size-multiplier))))))
+                           (t/scale font-size-multiplier font-size-multiplier)))))))
 
 (defn tick [game]
   (let [game-width (utils/get-width game)
