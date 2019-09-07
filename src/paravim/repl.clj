@@ -13,11 +13,6 @@
       (Thread.
         (fn []
           (loop []
-            #_
-            (do
-              (Thread/sleep 300)
-              (callback (str i "\n"))
-              (recur (inc i)))
             (when-let [read (try (.read in-pipe ca)
                               (catch Exception _))]
               (when (pos? read)
