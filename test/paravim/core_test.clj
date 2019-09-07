@@ -39,10 +39,10 @@
         chars-after-parinfer (get-characters buffer-ptr :parinfer-text-entity)]
     (dotimes [line-num (count-lines buffer-ptr)]
       (let [line-before-parinfer (nth chars-before-parinfer line-num)
-            line-after-parinfer (nth chars-after-parinfer line-num)]
-        (if (#{3 4} line-num)
-          (is (not= line-before-parinfer line-after-parinfer))
-          (is (= line-before-parinfer line-after-parinfer))))))
+            line-after-parinfer (nth chars-after-parinfer line-num)
+            should-be-equal? (not (#{3 4} line-num))
+            comparison ((if should-be-equal? = not=) line-before-parinfer line-after-parinfer)]
+        (is comparison (str "Line " line-num " should be " (if should-be-equal? "equal" "different"))))))
   ;; execute parinfer
   (vim/on-input game vim "<Esc>")
   (is (= "(defn -main [])" (get-line buffer-ptr 3)))
