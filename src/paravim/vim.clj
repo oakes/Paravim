@@ -112,9 +112,9 @@
         (v/input vim s)))
     (v/input vim s)))
 
-(defn update-state-after-input [{:keys [mode] :as state} game vim s]
+(defn update-state-after-input [state game vim s]
   (let [current-buffer (v/get-current-buffer vim)
-        old-mode mode
+        old-mode (:mode state)
         mode (v/get-mode vim)
         cursor-line (dec (v/get-cursor-line vim))
         cursor-column (v/get-cursor-column vim)]
@@ -143,11 +143,10 @@
       (-> (swap! c/*state c/update-buffers)
           (apply-parinfer! vim)))
     (input state vim s)
-    (as-> (swap! c/*state update-state-after-input game vim s)
-          state
-          (and (not= 'INSERT (:mode state))
-               (not= s "u"))
-          (apply-parinfer! state vim))))
+    (let [state (swap! c/*state update-state-after-input game vim s)]
+      (when (and (not= 'INSERT (:mode state))
+                 (not= s "u"))
+        (apply-parinfer! state vim)))))
 
 (defn append-to-buffer! [game vim {:keys [buffer string]}]
   (let [current-buffer (v/get-current-buffer vim)
