@@ -53,16 +53,14 @@
         (when (seq inputs-to-run)
           [inputs-to-run @*inputs-to-delay])))))
 
-(defn apply-parinfer! [{:keys [mode current-buffer] :as state} vim]
+(defn apply-parinfer! [{:keys [current-buffer] :as state} vim]
   (let [{:keys [parsed-code needs-parinfer?]} (get-in state [:buffers current-buffer])]
-    (when (and needs-parinfer?
-               ('#{NORMAL INSERT} mode))
+    (when needs-parinfer?
       (let [cursor-line (v/get-cursor-line vim)
             cursor-column (v/get-cursor-column vim)
             diffs (par/diff parsed-code)]
         (when (seq diffs)
-          (when (= 'NORMAL mode)
-            (v/input vim "i"))
+          (v/input vim "i")
           (doseq [{:keys [line column content action]} diffs]
             ;; move all the way to the first column
             (dotimes [_ (v/get-cursor-column vim)]
@@ -88,8 +86,7 @@
                 (v/input vim (str ch)))))
           ;; go back to the original position
           (v/set-cursor-position vim cursor-line cursor-column)
-          (when (= 'NORMAL mode)
-            (v/input vim "<Esc>"))))
+          (v/input vim "<Esc>")))
       (swap! c/*state
         (fn [state]
           (-> state
