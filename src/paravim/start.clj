@@ -127,7 +127,7 @@
             (recur delayed-inputs))
           (recur (conj delayed-inputs input)))))))
 
-(defn -main [& args]
+(defn ->window []
   (when-not (GLFW/glfwInit)
     (throw (Exception. "Unable to initialize GLFW")))
   (GLFW/glfwWindowHint GLFW/GLFW_VISIBLE GLFW/GLFW_FALSE)
@@ -137,44 +137,50 @@
   (GLFW/glfwWindowHint GLFW/GLFW_OPENGL_FORWARD_COMPAT GL41/GL_TRUE)
   (GLFW/glfwWindowHint GLFW/GLFW_OPENGL_PROFILE GLFW/GLFW_OPENGL_CORE_PROFILE)
   (GLFW/glfwWindowHint GLFW/GLFW_TRANSPARENT_FRAMEBUFFER GLFW/GLFW_TRUE)
-  (if-let [window (GLFW/glfwCreateWindow 1024 768 "Paravim" 0 0)]
+  (when-let [window (GLFW/glfwCreateWindow 1024 768 "Paravim" 0 0)]
+    (GLFW/glfwMakeContextCurrent window)
+    (GLFW/glfwSwapInterval 1)
+    (GL/createCapabilities)
+    window))
+
+(defn ->game [window vim]
+  (let [initial-game (assoc (pc/->game window)
+                            :delta-time 0
+                            :total-time 0)
+        vim-chan (async/chan)
+        send-input! (partial async/put! vim-chan)
+        pipes (repl/create-pipes)]
+    (listen-for-resize window initial-game)
+    (listen-for-mouse window initial-game vim)
+    (listen-for-keys window send-input! vim pipes)
+    (listen-for-chars window send-input!)
+    (c/init initial-game)
+    (poll-input initial-game vim vim-chan)
+    (vim/init vim (fn [buffer-ptr event]
+                    (case event
+                      EVENT_BUFENTER
+                      (when *update-ui?*
+                        (vim/on-buf-enter initial-game vim buffer-ptr))
+                      nil)))
+    (if-let [buffer (-> @c/*state :tab->buffer :repl-out)]
+      (repl/start-repl-thread! nil pipes #(async/put! vim-chan {:buffer buffer :string %}))
+      (throw (ex-info "REPL output buffer not found" {})))
+    initial-game))
+
+(defn -main [& args]
+  (if-let [window (->window)]
     (do
-      (GLFW/glfwMakeContextCurrent window)
-      (GLFW/glfwSwapInterval 1)
       (GLFW/glfwShowWindow window)
-      (GL/createCapabilities)
-      (let [initial-game (assoc (pc/->game window)
-                                :delta-time 0
-                                :total-time 0)
-            vim (vim/->vim)
-            vim-chan (async/chan)
-            send-input! (partial async/put! vim-chan)
-            pipes (repl/create-pipes)]
-        (listen-for-resize window initial-game)
-        (listen-for-mouse window initial-game vim)
-        (listen-for-keys window send-input! vim pipes)
-        (listen-for-chars window send-input!)
-        (c/init initial-game)
-        (poll-input initial-game vim vim-chan)
-        (vim/init vim (fn [buffer-ptr event]
-                        (case event
-                          EVENT_BUFENTER
-                          (when *update-ui?*
-                            (vim/on-buf-enter initial-game vim buffer-ptr))
-                          nil)))
-        (if-let [buffer (-> @c/*state :tab->buffer :repl-out)]
-          (repl/start-repl-thread! nil pipes #(async/put! vim-chan {:buffer buffer :string %}))
-          (throw (ex-info "REPL output buffer not found" {})))
-        (loop [game initial-game]
-          (when-not (GLFW/glfwWindowShouldClose window)
-            (let [ts (GLFW/glfwGetTime)
-                  game (assoc game
-                              :delta-time (- ts (:total-time game))
-                              :total-time ts)
-                  game (c/tick game)]
-              (GLFW/glfwSwapBuffers window)
-              (GLFW/glfwPollEvents)
-              (recur game)))))
+      (loop [game (->game window (vim/->vim))]
+        (when-not (GLFW/glfwWindowShouldClose window)
+          (let [ts (GLFW/glfwGetTime)
+                game (assoc game
+                            :delta-time (- ts (:total-time game))
+                            :total-time ts)
+                game (c/tick game)]
+            (GLFW/glfwSwapBuffers window)
+            (GLFW/glfwPollEvents)
+            (recur game))))
       (Callbacks/glfwFreeCallbacks window)
       (GLFW/glfwDestroyWindow window)
       (GLFW/glfwTerminate))
