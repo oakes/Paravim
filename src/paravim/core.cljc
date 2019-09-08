@@ -18,6 +18,7 @@
 
 (def orig-camera (e/->camera true))
 (def tabs [:files :repl-in :repl-out])
+(def buttons [:reload-file :font-inc :font-dec])
 (def tab->path {:files "scratch.clj"
                 :repl-in "repl.in"
                 :repl-out "repl.out"})
@@ -273,10 +274,14 @@
                 :text
                 (some
                   (fn [[k box]]
-                    (let [{:keys [x1 y1 x2 y2]} box
-                          x1 (* x1 font-size-multiplier)
+                    (let [{:keys [x1 y1 x2 y2 align]} box
+                          x1 (cond->> (* x1 font-size-multiplier)
+                                      (= :right align)
+                                      (- game-width))
                           y1 (* y1 font-size-multiplier)
-                          x2 (* x2 font-size-multiplier)
+                          x2 (cond->> (* x2 font-size-multiplier)
+                                      (= :right align)
+                                      (- game-width))
                           y2 (* y2 font-size-multiplier)]
                       (when (and (<= x1 x x2) (<= y1 y y2))
                         k)))
@@ -419,11 +424,11 @@
 (defn assoc-ascii [{:keys [base-font-entity base-text-entity font-height current-tab text-boxes] :as state} ascii-key lines]
   (assoc-in state [:buffers ascii-key]
      {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
-     :camera (t/translate orig-camera 0 0)
-     :camera-x 0
-     :camera-y 0
-     :lines lines
-     :text-box (get text-boxes current-tab)}))
+      :camera (t/translate orig-camera 0 0)
+      :camera-x 0
+      :camera-y 0
+      :lines lines
+      :text-box (get text-boxes current-tab)}))
 
 (defn parse-clojure-buffer [{:keys [mode] :as state} buffer-ptr init?]
   (update-in state [:buffers buffer-ptr]
@@ -536,19 +541,35 @@
                   tab-spacing (* font-width 2)
                   tab-entities {:files files-text-entity
                                 :repl-in repl-in-text-entity
-                                :repl-out repl-out-text-entity}]
+                                :repl-out repl-out-text-entity}
+                  bounding-boxes (reduce-kv
+                                   (fn [m i tab]
+                                     (let [last-tab (some->> (get tabs (dec i)) (get m))
+                                           left (if last-tab (+ (:x2 last-tab) tab-spacing) 0)
+                                           right (-> tab-entities (get tab) :characters first last :x-total (+ left))]
+                                       (assoc m tab {:x1 left :y1 0 :x2 right :y2 font-height})))
+                                   {}
+                                   tabs)
+                  reload-file-entity (assoc-lines text-entity font-entity font-height ["Reload File"])
+                  font-inc-entity (assoc-lines text-entity font-entity font-height ["Font +"])
+                  font-dec-entity (assoc-lines text-entity font-entity font-height ["Font -"])
+                  tab-entities (assoc tab-entities
+                                 :reload-file reload-file-entity
+                                 :font-inc font-inc-entity
+                                 :font-dec font-dec-entity)
+                  bounding-boxes (reduce-kv
+                                   (fn [m i button]
+                                     (let [last-button (some->> (get buttons (dec i)) (get m))
+                                           right (if last-button (+ (:x1 last-button) tab-spacing) 0)
+                                           left (-> tab-entities (get button) :characters first last :x-total (+ right))]
+                                      (assoc m button {:x1 left :y1 0 :x2 right :y2 font-height :align :right})))
+                                   bounding-boxes
+                                   buttons)]
               (swap! *state assoc
                 :roboto-font-entity font-entity
                 :roboto-text-entity text-entity
                 :tab-text-entities tab-entities
-                :bounding-boxes (reduce-kv
-                                  (fn [m i tab]
-                                    (let [last-tab (some->> (get tabs (dec i)) (get m))
-                                          left (if last-tab (+ (:x2 last-tab) tab-spacing) 0)
-                                          right (-> tab-entities (get tab) :characters first last :x-total (+ left))]
-                                      (assoc m tab {:x1 left :y1 0 :x2 right :y2 font-height})))
-                                  {}
-                                  tabs)))))))))
+                :bounding-boxes bounding-boxes))))))))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
@@ -628,11 +649,15 @@
                                         (t/color (if (= 'COMMAND_LINE mode) tan-color bg-color))
                                         (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                                         (t/scale game-width (* font-size-multiplier font-height)))))))
-    (doseq [[k entity] tab-text-entities]
+    (doseq [[k entity] tab-text-entities
+            :let [bounding-box (k bounding-boxes)]]
       (c/render game (-> entity
                          (assoc-in [:uniforms 'u_alpha] (if (= k current-tab) text-alpha unfocused-alpha))
                          (t/project game-width game-height)
-                         (t/translate (-> bounding-boxes k :x1 (* font-size-multiplier)) 0)
+                         (t/translate (-> bounding-box :x1 (* font-size-multiplier)
+                                          (cond->> (= :right (:align bounding-box))
+                                                   (- game-width)))
+                                      (:y1 bounding-box))
                          (t/scale font-size-multiplier font-size-multiplier))))
     (when (and (= mode 'COMMAND_LINE)
                command-cursor-entity
