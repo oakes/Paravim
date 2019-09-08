@@ -208,37 +208,36 @@
         cursor-column (v/get-cursor-column vim)
         path (v/get-file-name vim buffer-ptr)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
-                     (v/get-line vim buffer-ptr (inc i))))]
-    (swap! c/*state
-      (fn [state]
-        (as-> state state
-              (if path
-                (let [canon-path (-> path java.io.File. .getCanonicalPath)
-                      current-tab (or (some
-                                        (fn [[tab path]]
-                                          (when (= canon-path (-> path java.io.File. .getCanonicalPath))
-                                            tab))
-                                        c/tab->path)
-                                      :files)]
-                  (-> state
-                      (assoc :current-buffer buffer-ptr :current-tab current-tab)
-                      (update :tab->buffer assoc current-tab buffer-ptr)))
-                (-> state
-                    (assoc :current-buffer nil)
-                    (update :tab->buffer assoc :files nil)))
-              (if (and path (nil? (c/get-buffer state buffer-ptr)))
-                (as-> state state
-                      (c/assoc-buffer state buffer-ptr path lines)
-                      (if (:clojure? (c/get-buffer state buffer-ptr))
+                     (v/get-line vim buffer-ptr (inc i))))
+        state (as-> @c/*state state
+                    (if path
+                      (let [canon-path (-> path java.io.File. .getCanonicalPath)
+                            current-tab (or (some
+                                              (fn [[tab path]]
+                                                (when (= canon-path (-> path java.io.File. .getCanonicalPath))
+                                                  tab))
+                                              c/tab->path)
+                                            :files)]
                         (-> state
-                            (c/parse-clojure-buffer buffer-ptr true)
-                            (c/update-clojure-buffer buffer-ptr))
-                        state)
-                      (update-in state [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column))
-                state)
-              (if path
-                (c/update-cursor state game buffer-ptr)
-                state))))))
+                            (assoc :current-buffer buffer-ptr :current-tab current-tab)
+                            (update :tab->buffer assoc current-tab buffer-ptr)))
+                      (-> state
+                          (assoc :current-buffer nil)
+                          (update :tab->buffer assoc :files nil)))
+                    (if (and path (nil? (c/get-buffer state buffer-ptr)))
+                      (as-> state state
+                            (c/assoc-buffer state buffer-ptr path lines)
+                            (if (:clojure? (c/get-buffer state buffer-ptr))
+                              (-> state
+                                  (c/parse-clojure-buffer buffer-ptr true)
+                                  (c/update-clojure-buffer buffer-ptr))
+                              state)
+                            (update-in state [:buffers buffer-ptr] assoc :cursor-line cursor-line :cursor-column cursor-column))
+                      state)
+                    (if path
+                      (c/update-cursor state game buffer-ptr)
+                      state))]
+    (swap! c/*state merge state)))
 
 (defn on-buf-update [vim buffer-ptr start-line end-line line-count-change]
   (let [first-line (dec start-line)
