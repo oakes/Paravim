@@ -210,9 +210,8 @@
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
                      (v/get-line vim buffer-ptr (inc i))))]
     (swap! c/*state
-      (fn [{:keys [tab->buffer] :as state}]
+      (fn [state]
         (as-> state state
-              (assoc state :ascii nil)
               (if path
                 (let [canon-path (-> path java.io.File. .getCanonicalPath)
                       current-tab (or (some
