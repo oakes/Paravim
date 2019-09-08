@@ -1,0 +1,16 @@
+
+
+                     Welcome to Paravim
+
+                       by Zach Oakes
+
+              Vim was created by Bram Moolenaar
+
+                    To open a file, type:
+
+                    :e path/to/myfile.txt
+
+            To quit, just throw your computer away
+
+                  Paravim isn't for quitters
+

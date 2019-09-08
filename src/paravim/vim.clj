@@ -102,6 +102,7 @@
 
 (def current-year (.getYear (LocalDate/now)))
 (def ascii-art {"smile" nil
+                "intro" nil
                 "cat" (LocalDate/of current-year 8 8)
                 "usa" (LocalDate/of current-year 7 4)
                 "christmas" (LocalDate/of current-year 12 25)})
@@ -130,10 +131,11 @@
 
 (defn init-ascii []
   (let [now (LocalDate/now)]
-    (some->> (some (fn [[ascii date]]
-                     (when (= now date)
-                       ascii))
-                   ascii-art)
+    (some->> (or (some (fn [[ascii date]]
+                         (when (= now date)
+                           ascii))
+                       ascii-art)
+                 "intro")
              (swap! c/*state assoc-ascii))))
 
 (defn input [{:keys [mode command-text command-start] :as state} vim s]
