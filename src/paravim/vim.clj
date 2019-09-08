@@ -97,17 +97,19 @@
 (defn read-text-resource [path]
   (-> path io/resource slurp str/split-lines))
 
+(def ascii? #{"smile" "usa" "christmas"})
+
 (defn ascii! [{:keys [mode command-text command-start ascii]} s]
   (cond
     (and (= 'COMMAND_LINE mode)
          (= s "<Enter>")
          (= command-start ":")
-         (= command-text "smile"))
+         (ascii? command-text))
     (swap! c/*state
       (fn [state]
         (-> state
-            (c/assoc-ascii :smile (read-text-resource "ascii/smile.txt"))
-            (assoc :ascii :smile))))
+            (c/assoc-ascii command-text (read-text-resource (str "ascii/" command-text ".txt")))
+            (assoc :ascii command-text))))
     ascii
     (swap! c/*state assoc :ascii nil)))
 
