@@ -64,7 +64,22 @@
       (invoke [this window button action mods]
         (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
                    (= action GLFW/GLFW_PRESS))
-          (vim/open-buffer-for-tab! vim (swap! c/*state c/click-mouse game pipes)))))))
+          (vim/open-buffer-for-tab! vim (swap! c/*state c/click-mouse game
+                                               (fn [state]
+                                                 (let [{:keys [current-tab current-buffer buffers tab->buffer]} state
+                                                       {:keys [out-pipe]} pipes
+                                                       {:keys [lines file-name clojure?] :as buffer} (get buffers current-buffer)]
+                                                   (if (and clojure? (= current-tab :files))
+                                                     (do
+                                                       (doto out-pipe
+                                                         (.write (str "(do "
+                                                                      (pr-str '(println))
+                                                                      (pr-str (list 'println "Reloading" file-name))
+                                                                      (str/join \newline lines)
+                                                                      ")\n"))
+                                                         .flush)
+                                                       (assoc state :current-tab :repl-in))
+                                                     state))))))))))
 
 (def keycode->keyword
   {GLFW/GLFW_KEY_BACKSPACE :backspace

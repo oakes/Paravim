@@ -306,22 +306,13 @@
         (update-in state [:buffers current-buffer] update-cursor state game))
       state)))
 
-(defn click-mouse [{:keys [mouse-hover tab-text-entities current-buffer buffers] :as state} game pipes]
+(defn click-mouse [{:keys [mouse-hover] :as state} game reload-file]
   (if (tab? mouse-hover)
     (assoc state :current-tab mouse-hover)
     (case mouse-hover
       :font-dec (change-font-size state game (- font-size-step))
       :font-inc (change-font-size state game font-size-step)
-      #?@(:clj [:reload-file (let [{:keys [out-pipe]} pipes
-                                   {:keys [lines file-name] :as buffer} (get buffers current-buffer)]
-                               (doto out-pipe
-                                 (.write (str "(do "
-                                              (pr-str '(println))
-                                              (pr-str (list 'println "Reloading" file-name))
-                                              (str/join \newline lines)
-                                              ")\n"))
-                                 .flush)
-                               state)])
+      :reload-file (reload-file state)
       state)))
 
 (defn change-tab [{:keys [current-tab] :as state} direction]
