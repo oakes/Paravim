@@ -111,13 +111,11 @@
       (invoke [this window codepoint]
         (callback (str (char codepoint)))))))
 
-(def ^:dynamic *update-ui?* true)
-
 (defn poll-input [game vim c]
   (async/go-loop [delayed-inputs []]
     (if-let [[inputs-to-run inputs-to-delay] (vim/split-inputs vim delayed-inputs)]
       (do
-        (binding [*update-ui?* false]
+        (binding [vim/*update-ui?* false]
           (doseq [input inputs-to-run]
             (vim/append-to-buffer! game vim input)))
         (recur inputs-to-delay))
@@ -162,7 +160,7 @@
     (vim/init vim (fn [buffer-ptr event]
                     (case event
                       EVENT_BUFENTER
-                      (when *update-ui?*
+                      (when vim/*update-ui?*
                         (vim/on-buf-enter initial-game vim buffer-ptr))
                       nil)))
     (when vim-chan

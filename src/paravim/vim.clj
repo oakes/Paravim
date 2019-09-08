@@ -3,7 +3,8 @@
             [libvim-clj.core :as v]
             [clojure.string :as str]
             [clojure.java.io :as io]
-            [parinferish.core :as par]))
+            [parinferish.core :as par])
+  (:import [java.time LocalDate]))
 
 ;; https://vim.fandom.com/wiki/Mapping_keys_in_Vim_-_Tutorial_%28Part_2%29
 
@@ -17,6 +18,8 @@
    :down "<Down>"
    :left "<Left>"
    :right "<Right>"})
+
+(def ^:dynamic *update-ui?* true)
 
 (defn open-buffer-for-tab! [vim {:keys [current-buffer current-tab tab->buffer] :as state}]
   (if-let [buffer-for-tab (tab->buffer current-tab)]
@@ -97,23 +100,37 @@
 (defn read-text-resource [path]
   (-> path io/resource slurp str/split-lines))
 
-(def ascii? #{"smile" "usa" "christmas"})
+(def current-year (.getYear (LocalDate/now)))
+(def ascii-art {"smile" nil
+                "usa" (LocalDate/of current-year 7 4)
+                "christmas" (LocalDate/of current-year 12 25)})
 
-(defn ascii! [{:keys [mode command-text command-start ascii]} s]
+(defn assoc-ascii [state ascii-name]
+  (-> state
+      (c/assoc-ascii ascii-name (read-text-resource (str "ascii/" ascii-name ".txt")))
+      (assoc :ascii ascii-name)))
+
+(defn change-ascii [{:keys [mode command-text command-start ascii] :as state} s]
   (cond
-    (and (= 'COMMAND_LINE mode)
+    (and ascii *update-ui?*)
+    (assoc state :ascii nil)
+    (and (= mode 'COMMAND_LINE)
          (= s "<Enter>")
          (= command-start ":")
-         (ascii? command-text))
-    (swap! c/*state
-      (fn [state]
-        (-> state
-            (c/assoc-ascii command-text (read-text-resource (str "ascii/" command-text ".txt")))
-            (assoc :ascii command-text))))
-    ascii
-    (swap! c/*state assoc :ascii nil)))
+         (contains? ascii-art command-text))
+    (assoc-ascii state command-text)
+    :else
+    state))
 
-(defn input [{:keys [mode command-text command-start]} vim s]
+(defn init-ascii []
+  (let [now (LocalDate/now)]
+    (some->> (some (fn [[ascii date]]
+                     (when (= now date)
+                       ascii))
+                   ascii-art)
+             (swap! c/*state assoc-ascii))))
+
+(defn input [{:keys [mode command-text command-start] :as state} vim s]
   (if (and (= 'COMMAND_LINE mode) command-text)
     (let [pos (v/get-command-position vim)]
       (case s
@@ -137,6 +154,7 @@
         cursor-line (dec (v/get-cursor-line vim))
         cursor-column (v/get-cursor-column vim)]
     (-> state
+        (change-ascii s)
         (assoc :mode mode)
         (cond-> (and (not= 'COMMAND_LINE old-mode)
                      (= mode 'COMMAND_LINE))
@@ -156,9 +174,7 @@
                 state)))))
 
 (defn on-input [game vim s]
-  (let [state @c/*state]
-    (ascii! state s)
-    (input state vim s))
+  (input @c/*state vim s)
   (let [state (swap! c/*state update-state-after-input game vim s)]
     (when (and (= 'NORMAL (:mode state))
                (not= s "u"))
@@ -245,5 +261,6 @@
                        (System/exit 0)))
   (v/set-on-auto-command vim on-auto-command)
   (v/set-on-buffer-update vim (partial on-buf-update vim))
-  (run! #(v/open-buffer vim (c/tab->path %)) [:repl-in :repl-out :files]))
+  (run! #(v/open-buffer vim (c/tab->path %)) [:repl-in :repl-out :files])
+  (init-ascii))
 
