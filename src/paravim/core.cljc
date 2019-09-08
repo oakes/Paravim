@@ -416,6 +416,15 @@
      :clojure? (or (= current-tab :repl-in)
                    (clojure-path? path))}))
 
+(defn assoc-ascii [{:keys [base-font-entity base-text-entity font-height current-tab text-boxes] :as state} ascii-key lines]
+  (assoc-in state [:buffers ascii-key]
+     {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
+     :camera (t/translate orig-camera 0 0)
+     :camera-x 0
+     :camera-y 0
+     :lines lines
+     :text-box (get text-boxes current-tab)}))
+
 (defn parse-clojure-buffer [{:keys [mode] :as state} buffer-ptr init?]
   (update-in state [:buffers buffer-ptr]
     (fn [{:keys [lines cursor-line cursor-column] :as buffer}]
@@ -594,12 +603,14 @@
         {:keys [current-buffer
                 base-rect-entity base-rects-entity
                 command-text-entity command-cursor-entity
-                font-height mode font-size-multiplier
+                font-height mode font-size-multiplier ascii
                 tab-text-entities bounding-boxes current-tab tab->buffer]
          :as state} @*state]
     (c/render game (update screen-entity :viewport
                            assoc :width game-width :height game-height))
-    (render-buffer game state game-width game-height current-tab current-buffer true)
+    (if (and ascii (= current-tab :files))
+      (render-buffer game state game-width game-height current-tab ascii false)
+      (render-buffer game state game-width game-height current-tab current-buffer true))
     (case current-tab
       :repl-in (when-let [buffer-ptr (tab->buffer :repl-out)]
                  (render-buffer game state game-width game-height :repl-out buffer-ptr false))

@@ -2,6 +2,7 @@
   (:require [paravim.core :as c]
             [libvim-clj.core :as v]
             [clojure.string :as str]
+            [clojure.java.io :as io]
             [parinferish.core :as par]))
 
 ;; https://vim.fandom.com/wiki/Mapping_keys_in_Vim_-_Tutorial_%28Part_2%29
@@ -27,7 +28,7 @@
 (defn repl-enter! [vim callback {:keys [out out-pipe]}]
   (let [buffer-ptr (v/get-current-buffer vim)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
-                (v/get-line vim buffer-ptr (inc i))))
+                     (v/get-line vim buffer-ptr (inc i))))
         text (str (str/join \newline lines) \newline)]
     (run! callback ["g" "g" "d" "G"])
     (doto out
@@ -93,7 +94,24 @@
               (assoc-in [:buffers current-buffer :needs-parinfer?] false)
               (c/update-buffers)))))))
 
-(defn input [{:keys [mode command-text]} vim s]
+(defn read-text-resource [path]
+  (-> path io/resource slurp str/split-lines))
+
+(defn ascii! [{:keys [mode command-text command-start ascii]} s]
+  (cond
+    (and (= 'COMMAND_LINE mode)
+         (= s "<Enter>")
+         (= command-start ":")
+         (= command-text "smile"))
+    (swap! c/*state
+      (fn [state]
+        (-> state
+            (c/assoc-ascii :smile (read-text-resource "ascii/smile.txt"))
+            (assoc :ascii :smile))))
+    ascii
+    (swap! c/*state assoc :ascii nil)))
+
+(defn input [{:keys [mode command-text command-start]} vim s]
   (if (and (= 'COMMAND_LINE mode) command-text)
     (let [pos (v/get-command-position vim)]
       (case s
@@ -118,7 +136,7 @@
         cursor-column (v/get-cursor-column vim)]
     (-> state
         (assoc :mode mode)
-        (cond-> (and (not= old-mode 'COMMAND_LINE)
+        (cond-> (and (not= 'COMMAND_LINE old-mode)
                      (= mode 'COMMAND_LINE))
                 (assoc :command-start s))
         (c/update-command (v/get-command-text vim) (v/get-command-position vim))
@@ -136,7 +154,9 @@
                 state)))))
 
 (defn on-input [game vim s]
-  (input @c/*state vim s)
+  (let [state @c/*state]
+    (ascii! state s)
+    (input state vim s))
   (let [state (swap! c/*state update-state-after-input game vim s)]
     (when (and (= 'NORMAL (:mode state))
                (not= s "u"))
@@ -162,10 +182,11 @@
         cursor-column (v/get-cursor-column vim)
         path (v/get-file-name vim buffer-ptr)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
-                (v/get-line vim buffer-ptr (inc i))))]
+                     (v/get-line vim buffer-ptr (inc i))))]
     (swap! c/*state
       (fn [{:keys [tab->buffer] :as state}]
         (as-> state state
+              (assoc state :ascii nil)
               (if path
                 (let [canon-path (-> path java.io.File. .getCanonicalPath)
                       current-tab (or (some
