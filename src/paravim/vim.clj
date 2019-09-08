@@ -111,10 +111,15 @@
       (c/assoc-ascii ascii-name (read-text-resource (str "ascii/" ascii-name ".txt")))
       (assoc :ascii ascii-name)))
 
+(defn dissoc-ascii [state ascii-name]
+  (-> state
+      (update :buffers dissoc ascii-name)
+      (assoc :ascii nil)))
+
 (defn change-ascii [{:keys [mode command-text command-start ascii] :as state} s]
   (cond
     (and ascii *update-ui?*)
-    (assoc state :ascii nil)
+    (dissoc-ascii state ascii)
     (and (= mode 'COMMAND_LINE)
          (= s "<Enter>")
          (= command-start ":")
