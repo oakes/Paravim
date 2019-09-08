@@ -215,7 +215,9 @@
                      (v/get-line vim buffer-ptr (inc i))))]
     (if path
       ;; create or update the buffer
-      (let [canon-path (-> path java.io.File. .getCanonicalPath)
+      (let [file (java.io.File. path)
+            file-name (.getName file)
+            canon-path (.getCanonicalPath file)
             current-tab (or (some
                               (fn [[tab path]]
                                 (when (= canon-path (-> path java.io.File. .getCanonicalPath))
@@ -224,7 +226,7 @@
                             :files)
             state @c/*state
             buffer (or (c/get-buffer state buffer-ptr)
-                       (c/->buffer state path lines current-tab))
+                       (c/->buffer state path file-name lines current-tab))
             buffer (assoc buffer
                      :cursor-line cursor-line
                      :cursor-column cursor-column)

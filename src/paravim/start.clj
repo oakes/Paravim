@@ -42,7 +42,7 @@
     (MemoryUtil/memFree *window-width)
     (float (/ fb-width window-width))))
 
-(defn listen-for-mouse [window game vim]
+(defn listen-for-mouse [window game vim pipes]
   (GLFW/glfwSetCursorPosCallback window
     (reify GLFWCursorPosCallbackI
       (invoke [this window xpos ypos]
@@ -64,7 +64,7 @@
       (invoke [this window button action mods]
         (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
                    (= action GLFW/GLFW_PRESS))
-          (vim/open-buffer-for-tab! vim (swap! c/*state c/click-mouse game)))))))
+          (vim/open-buffer-for-tab! vim (swap! c/*state c/click-mouse game pipes)))))))
 
 (def keycode->keyword
   {GLFW/GLFW_KEY_BACKSPACE :backspace
@@ -151,7 +151,7 @@
                       #(vim/on-input initial-game vim %))
         pipes (repl/create-pipes)]
     (listen-for-resize window initial-game)
-    (listen-for-mouse window initial-game vim)
+    (listen-for-mouse window initial-game vim pipes)
     (listen-for-keys window send-input! vim pipes)
     (listen-for-chars window send-input!)
     (c/init initial-game)

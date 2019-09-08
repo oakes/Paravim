@@ -306,12 +306,22 @@
         (update-in state [:buffers current-buffer] update-cursor state game))
       state)))
 
-(defn click-mouse [{:keys [mouse-hover tab-text-entities] :as state} game]
+(defn click-mouse [{:keys [mouse-hover tab-text-entities current-buffer buffers] :as state} game pipes]
   (if (tab? mouse-hover)
     (assoc state :current-tab mouse-hover)
     (case mouse-hover
       :font-dec (change-font-size state game (- font-size-step))
       :font-inc (change-font-size state game font-size-step)
+      #?@(:clj [:reload-file (let [{:keys [out-pipe]} pipes
+                                   {:keys [lines file-name] :as buffer} (get buffers current-buffer)]
+                               (doto out-pipe
+                                 (.write (str "(do "
+                                              (pr-str '(println))
+                                              (pr-str (list 'println "Reloading" file-name))
+                                              (str/join \newline lines)
+                                              ")\n"))
+                                 .flush)
+                               state)])
       state)))
 
 (defn change-tab [{:keys [current-tab] :as state} direction]
@@ -418,12 +428,13 @@
         lines)
       (update-uniforms font-height text-alpha)))
 
-(defn ->buffer [{:keys [base-font-entity base-text-entity font-height text-boxes] :as state} path lines current-tab]
+(defn ->buffer [{:keys [base-font-entity base-text-entity font-height text-boxes] :as state} path file-name lines current-tab]
   {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
    :camera (t/translate orig-camera 0 0)
    :camera-x 0
    :camera-y 0
    :path path
+   :file-name file-name
    :lines lines
    :text-box (get text-boxes current-tab)
    :clojure? (or (= current-tab :repl-in)
