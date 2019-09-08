@@ -102,6 +102,7 @@
 
 (def current-year (.getYear (LocalDate/now)))
 (def ascii-art {"smile" nil
+                "cat" (LocalDate/of current-year 8 8)
                 "usa" (LocalDate/of current-year 7 4)
                 "christmas" (LocalDate/of current-year 12 25)})
 
