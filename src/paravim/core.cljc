@@ -18,10 +18,15 @@
 
 (def orig-camera (e/->camera true))
 (def tabs [:files :repl-in :repl-out])
-(def buttons [:reload-file :font-inc :font-dec])
+(def buttons [:font-inc :font-dec :reload-file])
+(def tab? (set tabs))
 (def tab->path {:files "scratch.clj"
                 :repl-in "repl.in"
                 :repl-out "repl.out"})
+
+(def font-size-step (float (/ 1 8)))
+(def min-font-size (float (/ 1 4)))
+(def max-font-size (float 1))
 
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
@@ -296,10 +301,19 @@
                     (contains? tab-text-entities hover)
                     :hand))))
 
+(defn change-font-size [old-val diff]
+  (let [new-val (+ old-val diff)]
+    (if (<= min-font-size new-val max-font-size)
+      new-val
+      old-val)))
+
 (defn click-mouse [{:keys [mouse-hover tab-text-entities] :as state}]
-  (if (contains? tab-text-entities mouse-hover)
+  (if (tab? mouse-hover)
     (assoc state :current-tab mouse-hover)
-    state))
+    (case mouse-hover
+      :font-dec (update state :font-size-multiplier change-font-size (- font-size-step))
+      :font-inc (update state :font-size-multiplier change-font-size font-size-step)
+      state)))
 
 (defn change-tab [{:keys [current-tab] :as state} direction]
   (let [index (+ (.indexOf tabs current-tab)
