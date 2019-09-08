@@ -418,7 +418,7 @@
         lines)
       (update-uniforms font-height text-alpha)))
 
-(defn ->buffer [{:keys [base-font-entity base-text-entity font-height current-tab text-boxes] :as state} path lines]
+(defn ->buffer [{:keys [base-font-entity base-text-entity font-height text-boxes] :as state} path lines current-tab]
   {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
    :camera (t/translate orig-camera 0 0)
    :camera-x 0

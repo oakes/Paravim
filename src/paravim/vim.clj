@@ -212,36 +212,39 @@
         cursor-column (v/get-cursor-column vim)
         path (v/get-file-name vim buffer-ptr)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
-                     (v/get-line vim buffer-ptr (inc i))))
-        state (swap! c/*state
-                (fn [state]
-                  (if path
-                    (let [canon-path (-> path java.io.File. .getCanonicalPath)
-                          current-tab (or (some
-                                            (fn [[tab path]]
-                                              (when (= canon-path (-> path java.io.File. .getCanonicalPath))
-                                                tab))
-                                            c/tab->path)
-                                          :files)]
-                      (-> state
-                          (assoc :current-buffer buffer-ptr :current-tab current-tab)
-                          (update :tab->buffer assoc current-tab buffer-ptr)))
-                    (-> state
-                        (assoc :current-buffer nil)
-                        (update :tab->buffer assoc :files nil)))))]
-    ;; if it's a new buffer, create it
-    (when (and path (nil? (c/get-buffer state buffer-ptr)))
-      (swap! c/*state assoc-in [:buffers buffer-ptr]
-        (let [buffer (assoc (c/->buffer state path lines)
-                            :cursor-line cursor-line
-                            :cursor-column cursor-column)]
-          (if (:clojure? buffer)
-            (-> buffer
-                (c/parse-clojure-buffer state true)
-                (c/update-clojure-buffer state))
-            buffer))))
-    ;; update the cursor
-    (swap! c/*state update-in [:buffers buffer-ptr] c/update-cursor state game)))
+                     (v/get-line vim buffer-ptr (inc i))))]
+    (if path
+      ;; create or update the buffer
+      (let [canon-path (-> path java.io.File. .getCanonicalPath)
+            current-tab (or (some
+                              (fn [[tab path]]
+                                (when (= canon-path (-> path java.io.File. .getCanonicalPath))
+                                  tab))
+                              c/tab->path)
+                            :files)
+            state @c/*state
+            buffer (or (c/get-buffer state buffer-ptr)
+                       (c/->buffer state path lines current-tab))
+            buffer (assoc buffer
+                     :cursor-line cursor-line
+                     :cursor-column cursor-column)
+            buffer (if (:clojure? buffer)
+                      (-> buffer
+                          (c/parse-clojure-buffer state true)
+                          (c/update-clojure-buffer state))
+                      buffer)]
+        (swap! c/*state
+          (fn [state]
+            (-> state
+                (assoc :current-buffer buffer-ptr :current-tab current-tab)
+                (update :tab->buffer assoc current-tab buffer-ptr)
+                (assoc-in [:buffers buffer-ptr] (c/update-cursor buffer state game))))))
+      ;; clear the files tab
+      (swap! c/*state
+        (fn [state]
+          (-> state
+              (assoc :current-buffer nil)
+              (update :tab->buffer assoc :files nil)))))))
 
 (defn on-buf-update [vim buffer-ptr start-line end-line line-count-change]
   (let [first-line (dec start-line)
