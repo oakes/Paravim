@@ -301,18 +301,20 @@
                     (contains? tab-text-entities hover)
                     :hand))))
 
-(defn change-font-size [old-val diff]
-  (let [new-val (+ old-val diff)]
+(defn change-font-size [{:keys [font-size-multiplier current-buffer] :as state} game diff]
+  (let [new-val (+ font-size-multiplier diff)]
     (if (<= min-font-size new-val max-font-size)
-      new-val
-      old-val)))
+      (-> state
+          (assoc :font-size-multiplier new-val)
+          (update-cursor game current-buffer))
+      state)))
 
-(defn click-mouse [{:keys [mouse-hover tab-text-entities] :as state}]
+(defn click-mouse [{:keys [mouse-hover tab-text-entities] :as state} game]
   (if (tab? mouse-hover)
     (assoc state :current-tab mouse-hover)
     (case mouse-hover
-      :font-dec (update state :font-size-multiplier change-font-size (- font-size-step))
-      :font-inc (update state :font-size-multiplier change-font-size font-size-step)
+      :font-dec (change-font-size state game (- font-size-step))
+      :font-inc (change-font-size state game font-size-step)
       state)))
 
 (defn change-tab [{:keys [current-tab] :as state} direction]

@@ -64,7 +64,7 @@
       (invoke [this window button action mods]
         (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
                    (= action GLFW/GLFW_PRESS))
-          (vim/open-buffer-for-tab! vim (swap! c/*state c/click-mouse)))))))
+          (vim/open-buffer-for-tab! vim (swap! c/*state c/click-mouse game)))))))
 
 (def keycode->keyword
   {GLFW/GLFW_KEY_BACKSPACE :backspace
