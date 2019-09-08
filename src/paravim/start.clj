@@ -21,14 +21,14 @@
                (fn [{:keys [current-buffer current-tab tab->buffer] :as state}]
                  (as-> state state
                        (if current-buffer
-                         (c/update-cursor state game current-buffer)
+                         (update-in state [:buffers current-buffer] c/update-cursor state game)
                          state)
                        ;; if we're in the repl, make sure both the input and output are refreshed
                        (if-let [other-tab (case current-tab
                                             :repl-in :repl-out
                                             :repl-out :repl-in
                                             nil)]
-                         (c/update-cursor state game (tab->buffer other-tab))
+                         (update-in state [:buffers (tab->buffer other-tab)] c/update-cursor state game)
                          state))))))))
 
 (defn get-density-ratio [window]

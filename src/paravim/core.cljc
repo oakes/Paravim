@@ -228,44 +228,42 @@
                :width (* width font-size-multiplier)
                :height (* height font-size-multiplier)))))
 
-(defn update-cursor [{:keys [base-rects-entity font-size-multiplier] :as state} game buffer-ptr]
-  (update-in state [:buffers buffer-ptr]
-    (fn [{:keys [cursor-line cursor-column text-box] :as buffer}]
-      (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
-            {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars cursor-line cursor-column)]
-        (-> buffer
-            (assoc :rects-entity (-> base-rects-entity
-                                     (i/assoc 0 cursor-entity)
-                                     (assoc :rect-count 1)))
-            (as-> buffer
-                  (let [{:keys [camera camera-x camera-y]} buffer
-                        game-width (utils/get-width game)
-                        game-height (utils/get-height game)
-                        text-top ((:top text-box) game-height font-size-multiplier)
-                        text-bottom ((:bottom text-box) game-height font-size-multiplier)
-                        cursor-bottom (+ top height)
-                        cursor-right (+ left width)
-                        text-height (- text-bottom text-top)
-                        camera-bottom (+ camera-y text-height)
-                        camera-right (+ camera-x game-width)
-                        camera-x (cond
-                                   (< left camera-x)
-                                   left
-                                   (> cursor-right camera-right)
-                                   (- cursor-right game-width)
-                                   :else
-                                   camera-x)
-                        camera-y (cond
-                                   (< top camera-y)
-                                   top
-                                   (> cursor-bottom camera-bottom)
-                                   (- cursor-bottom text-height)
-                                   :else
-                                   camera-y)]
-                    (assoc buffer
-                      :camera (t/translate orig-camera camera-x (- camera-y text-top))
-                      :camera-x camera-x
-                      :camera-y camera-y))))))))
+(defn update-cursor [{:keys [cursor-line cursor-column text-box] :as buffer} {:keys [base-rects-entity font-size-multiplier] :as state} game]
+  (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
+        {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars cursor-line cursor-column)]
+    (-> buffer
+        (assoc :rects-entity (-> base-rects-entity
+                                 (i/assoc 0 cursor-entity)
+                                 (assoc :rect-count 1)))
+        (as-> buffer
+              (let [{:keys [camera camera-x camera-y]} buffer
+                    game-width (utils/get-width game)
+                    game-height (utils/get-height game)
+                    text-top ((:top text-box) game-height font-size-multiplier)
+                    text-bottom ((:bottom text-box) game-height font-size-multiplier)
+                    cursor-bottom (+ top height)
+                    cursor-right (+ left width)
+                    text-height (- text-bottom text-top)
+                    camera-bottom (+ camera-y text-height)
+                    camera-right (+ camera-x game-width)
+                    camera-x (cond
+                               (< left camera-x)
+                               left
+                               (> cursor-right camera-right)
+                               (- cursor-right game-width)
+                               :else
+                               camera-x)
+                    camera-y (cond
+                               (< top camera-y)
+                               top
+                               (> cursor-bottom camera-bottom)
+                               (- cursor-bottom text-height)
+                               :else
+                               camera-y)]
+                (assoc buffer
+                  :camera (t/translate orig-camera camera-x (- camera-y text-top))
+                  :camera-x camera-x
+                  :camera-y camera-y))))))
 
 (defn update-mouse [{:keys [text-boxes current-tab bounding-boxes tab-text-entities font-size-multiplier] :as state} game x y]
   (let [game-width (utils/get-width game)
@@ -304,9 +302,8 @@
 (defn change-font-size [{:keys [font-size-multiplier current-buffer] :as state} game diff]
   (let [new-val (+ font-size-multiplier diff)]
     (if (<= min-font-size new-val max-font-size)
-      (-> state
-          (assoc :font-size-multiplier new-val)
-          (update-cursor game current-buffer))
+      (let [state (assoc state :font-size-multiplier new-val)]
+        (update-in state [:buffers current-buffer] update-cursor state game))
       state)))
 
 (defn click-mouse [{:keys [mouse-hover tab-text-entities] :as state} game]
@@ -379,28 +376,24 @@
     (update rects-entity :rect-count + (count rects))
     rects))
 
-(defn update-highlight [{:keys [font-height base-rect-entity] :as state} buffer-ptr]
-  (update-in state [:buffers buffer-ptr]
-    (fn [{:keys [text-entity cursor-line cursor-column] :as buffer}]
-      (if-let [coll (->> (:collections text-entity)
-                         (filter (fn [{:keys [start-line start-column end-line end-column]}]
-                                   (and (or (< start-line cursor-line)
-                                            (and (= start-line cursor-line)
-                                                 (<= start-column cursor-column)))
-                                        (or (> end-line cursor-line)
-                                            (and (= end-line cursor-line)
-                                                 (> end-column cursor-column))))))
-                         first)]
-        (let [color (set-alpha (get-color :delimiter (:depth coll)) highlight-alpha)
-              rects (range->rects text-entity font-height coll)]
-          (update buffer :rects-entity assoc-rects base-rect-entity color rects))
-        buffer))))
+(defn update-highlight [{:keys [text-entity cursor-line cursor-column] :as buffer} {:keys [font-height base-rect-entity] :as state}]
+  (if-let [coll (->> (:collections text-entity)
+                     (filter (fn [{:keys [start-line start-column end-line end-column]}]
+                               (and (or (< start-line cursor-line)
+                                        (and (= start-line cursor-line)
+                                             (<= start-column cursor-column)))
+                                    (or (> end-line cursor-line)
+                                        (and (= end-line cursor-line)
+                                             (> end-column cursor-column))))))
+                     first)]
+    (let [color (set-alpha (get-color :delimiter (:depth coll)) highlight-alpha)
+          rects (range->rects text-entity font-height coll)]
+      (update buffer :rects-entity assoc-rects base-rect-entity color rects))
+    buffer))
 
-(defn update-selection [{:keys [font-height base-rect-entity] :as state} buffer-ptr visual-range]
-  (update-in state [:buffers buffer-ptr]
-    (fn [{:keys [text-entity] :as buffer}]
-      (let [rects (range->rects text-entity font-height visual-range)]
-        (update buffer :rects-entity assoc-rects base-rect-entity select-color rects)))))
+(defn update-selection [{:keys [text-entity] :as buffer} {:keys [font-height base-rect-entity] :as state} visual-range]
+  (let [rects (range->rects text-entity font-height visual-range)]
+    (update buffer :rects-entity assoc-rects base-rect-entity select-color rects)))
 
 (defn get-extension
   [path]
@@ -425,58 +418,50 @@
         lines)
       (update-uniforms font-height text-alpha)))
 
-(defn assoc-buffer [{:keys [base-font-entity base-text-entity font-height current-tab text-boxes] :as state} buffer-ptr path lines]
-  (assoc-in state [:buffers buffer-ptr]
-    {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
-     :camera (t/translate orig-camera 0 0)
-     :camera-x 0
-     :camera-y 0
-     :path path
-     :lines lines
-     :text-box (get text-boxes current-tab)
-     :clojure? (or (= current-tab :repl-in)
-                   (clojure-path? path))}))
+(defn ->buffer [{:keys [base-font-entity base-text-entity font-height current-tab text-boxes] :as state} path lines]
+  {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
+   :camera (t/translate orig-camera 0 0)
+   :camera-x 0
+   :camera-y 0
+   :path path
+   :lines lines
+   :text-box (get text-boxes current-tab)
+   :clojure? (or (= current-tab :repl-in)
+                 (clojure-path? path))})
 
-(defn assoc-ascii [{:keys [base-font-entity base-text-entity font-height current-tab text-boxes] :as state} ascii-key lines]
-  (assoc-in state [:buffers ascii-key]
-     {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
-      :camera (t/translate orig-camera 0 0)
-      :camera-x 0
-      :camera-y 0
-      :lines lines
-      :text-box (get text-boxes current-tab)}))
+(defn ->ascii [{:keys [base-font-entity base-text-entity font-height current-tab text-boxes] :as state} lines]
+  {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
+   :camera (t/translate orig-camera 0 0)
+   :camera-x 0
+   :camera-y 0
+   :lines lines
+   :text-box (get text-boxes current-tab)})
 
-(defn parse-clojure-buffer [{:keys [mode] :as state} buffer-ptr init?]
-  (update-in state [:buffers buffer-ptr]
-    (fn [{:keys [lines cursor-line cursor-column] :as buffer}]
-      (let [parse-opts (cond
-                         init? {:mode :paren} ;; see test: fix-bad-indentation
-                         (= 'INSERT mode) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}
-                         :else {:mode :indent})
-            parsed-code (ps/parse (str/join "\n" lines) parse-opts)]
-        (assoc buffer
-          :parsed-code parsed-code
-          :needs-parinfer? true)))))
+(defn parse-clojure-buffer [{:keys [lines cursor-line cursor-column] :as buffer} {:keys [mode] :as state} init?]
+  (let [parse-opts (cond
+                     init? {:mode :paren} ;; see test: fix-bad-indentation
+                     (= 'INSERT mode) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}
+                     :else {:mode :indent})
+        parsed-code (ps/parse (str/join "\n" lines) parse-opts)]
+    (assoc buffer
+      :parsed-code parsed-code
+      :needs-parinfer? true)))
 
-(defn update-clojure-buffer [{:keys [base-font-entity font-height] :as state} buffer-ptr]
-  (update-in state [:buffers buffer-ptr]
-    (fn [{:keys [text-entity parsed-code lines] :as buffer}]
-      (let [text-entity (clojurify-lines text-entity base-font-entity parsed-code false)
-            parinfer-text-entity (clojurify-lines text-entity base-font-entity parsed-code true)]
-        (assoc buffer
-          :text-entity (update-uniforms text-entity font-height text-alpha)
-          :parinfer-text-entity (update-uniforms parinfer-text-entity font-height parinfer-alpha))))))
+(defn update-clojure-buffer [{:keys [text-entity parsed-code lines] :as buffer} {:keys [base-font-entity font-height] :as state}]
+  (let [text-entity (clojurify-lines text-entity base-font-entity parsed-code false)
+        parinfer-text-entity (clojurify-lines text-entity base-font-entity parsed-code true)]
+    (assoc buffer
+      :text-entity (update-uniforms text-entity font-height text-alpha)
+      :parinfer-text-entity (update-uniforms parinfer-text-entity font-height parinfer-alpha))))
 
-(defn update-text [{:keys [base-font-entity font-height] :as state} buffer-ptr new-lines first-line line-count-change]
-  (update-in state [:buffers buffer-ptr]
-    (fn [{:keys [lines] :as buffer}]
-      (-> buffer
-          (assoc :lines (update-lines lines new-lines first-line line-count-change))
-          (update :text-entity
-                  (fn [text-entity]
-                    (-> text-entity
-                        (replace-lines base-font-entity new-lines first-line line-count-change)
-                        (update-uniforms font-height text-alpha))))))))
+(defn update-text-buffer [{:keys [lines] :as buffer} {:keys [base-font-entity font-height] :as state} new-lines first-line line-count-change]
+  (-> buffer
+      (assoc :lines (update-lines lines new-lines first-line line-count-change))
+      (update :text-entity
+              (fn [text-entity]
+                (-> text-entity
+                    (replace-lines base-font-entity new-lines first-line line-count-change)
+                    (update-uniforms font-height text-alpha))))))
 
 (defn update-buffers [state]
   (if-let [updates (not-empty (:buffer-updates state))]
@@ -484,15 +469,17 @@
       (as-> state state
             (reduce
               (fn [state {:keys [buffer-ptr lines first-line line-count-change]}]
-                (update-text state buffer-ptr lines first-line line-count-change))
+                (update-in state [:buffers buffer-ptr] update-text-buffer state lines first-line line-count-change))
               state
               updates)
             (assoc state :buffer-updates [])
             (reduce (fn [state buffer-ptr]
                       (if (:clojure? (get-buffer state buffer-ptr))
-                        (-> state
-                            (parse-clojure-buffer buffer-ptr false)
-                            (update-clojure-buffer buffer-ptr))
+                        (update-in state [:buffers buffer-ptr]
+                          (fn [buffer]
+                            (-> buffer
+                                (parse-clojure-buffer state false)
+                                (update-clojure-buffer state))))
                         state))
                     state buffer-ptrs)))
     state))
