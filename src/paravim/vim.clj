@@ -200,10 +200,10 @@
         char-count (count (v/get-line vim buffer line-count))]
     (v/set-current-buffer vim buffer)
     (v/set-cursor-position vim line-count (dec char-count))
-    (v/input vim "a")
+    (on-input game vim "a")
     (doseq [ch string]
       (on-input game vim (str ch)))
-    (v/input vim "<Esc>")
+    (on-input game vim "<Esc>")
     (v/set-current-buffer vim current-buffer)
     (v/set-cursor-position vim cursor-line cursor-column)))
 

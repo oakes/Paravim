@@ -208,11 +208,13 @@
                           new-chars)]
         text-entity))))
 
-(defn ->cursor-entity [{:keys [font-width font-height base-rect-entity font-size-multiplier] :as state} line-chars line column]
+(defn ->cursor-entity [{:keys [font-width font-height base-rect-entity font-size-multiplier mode] :as state} line-chars line column]
   (let [left-char (get line-chars (dec column))
         curr-char (get line-chars column)
         {:keys [left width height]} curr-char
-        width (or width font-width)
+        width (cond-> (or width font-width)
+                      (= 'INSERT mode)
+                      (/ 4))
         left (or left
                  (some-> (:left left-char)
                          (+ (:width left-char)))
