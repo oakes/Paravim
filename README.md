@@ -19,10 +19,10 @@ The easiest way to run it is with the [Clojure CLI tool](https://clojure.org/gui
 clj -Sdeps "{:deps {paravim {:mvn/version \""RELEASE\""}}}" -m paravim.start
 ```
 
-On Mac OS, you need to add a special flag at the end:
+On Mac OS, you need to add a special flag:
 
 ```
-clj -Sdeps "{:deps {paravim {:mvn/version \""RELEASE\""}}}" -m paravim.start -J-XstartOnFirstThread
+clj -Sdeps "{:deps {paravim {:mvn/version \""RELEASE\""}}}" -J-XstartOnFirstThread -m paravim.start
 ```
 
 ## Development
