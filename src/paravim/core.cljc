@@ -634,49 +634,50 @@
                 font-height mode font-size-multiplier ascii
                 tab-text-entities bounding-boxes current-tab tab->buffer]
          :as state} @*state]
-    (c/render game (update screen-entity :viewport
-                           assoc :width game-width :height game-height))
-    (if (and ascii (= current-tab :files))
-      (render-buffer game state game-width game-height current-tab ascii false)
-      (render-buffer game state game-width game-height current-tab current-buffer true))
-    (case current-tab
-      :repl-in (when-let [buffer-ptr (tab->buffer :repl-out)]
-                 (render-buffer game state game-width game-height :repl-out buffer-ptr false))
-      :repl-out (when-let [buffer-ptr (tab->buffer :repl-in)]
-                  (render-buffer game state game-width game-height :repl-in buffer-ptr false))
-      nil)
-    (when (and base-rects-entity base-rect-entity)
-      (c/render game (-> base-rects-entity
-                         (t/project game-width game-height)
-                         (i/assoc 0 (-> base-rect-entity
-                                        (t/color bg-color)
-                                        (t/translate 0 0)
-                                        (t/scale game-width (* font-size-multiplier font-height))))
-                         (i/assoc 1 (-> base-rect-entity
-                                        (t/color (if (= 'COMMAND_LINE mode) tan-color bg-color))
-                                        (t/translate 0 (- game-height (* font-size-multiplier font-height)))
-                                        (t/scale game-width (* font-size-multiplier font-height)))))))
-    (doseq [[k entity] tab-text-entities
-            :let [bounding-box (k bounding-boxes)]]
-      (c/render game (-> entity
-                         (assoc-in [:uniforms 'u_alpha] (if (= k current-tab) text-alpha unfocused-alpha))
-                         (t/project game-width game-height)
-                         (t/translate (-> bounding-box :x1 (* font-size-multiplier)
-                                          (cond->> (= :right (:align bounding-box))
-                                                   (- game-width)))
-                                      (:y1 bounding-box))
-                         (t/scale font-size-multiplier font-size-multiplier))))
-    (when (and (= mode 'COMMAND_LINE)
-               command-cursor-entity
-               command-text-entity)
-      (c/render game (-> command-cursor-entity
-                         (t/project game-width game-height)
-                         (t/translate 0 (- game-height (* font-size-multiplier font-height)))
-                         (t/scale font-size-multiplier font-size-multiplier)))
-      (c/render game (-> command-text-entity
-                         (t/project game-width game-height)
-                         (t/translate 0 (- game-height (* font-size-multiplier font-height)))
-                         (t/scale font-size-multiplier font-size-multiplier)))))
+    (when (and (pos? game-width) (pos? game-height))
+      (c/render game (update screen-entity :viewport
+                             assoc :width game-width :height game-height))
+      (if (and ascii (= current-tab :files))
+        (render-buffer game state game-width game-height current-tab ascii false)
+        (render-buffer game state game-width game-height current-tab current-buffer true))
+      (case current-tab
+        :repl-in (when-let [buffer-ptr (tab->buffer :repl-out)]
+                   (render-buffer game state game-width game-height :repl-out buffer-ptr false))
+        :repl-out (when-let [buffer-ptr (tab->buffer :repl-in)]
+                    (render-buffer game state game-width game-height :repl-in buffer-ptr false))
+        nil)
+      (when (and base-rects-entity base-rect-entity)
+        (c/render game (-> base-rects-entity
+                           (t/project game-width game-height)
+                           (i/assoc 0 (-> base-rect-entity
+                                          (t/color bg-color)
+                                          (t/translate 0 0)
+                                          (t/scale game-width (* font-size-multiplier font-height))))
+                           (i/assoc 1 (-> base-rect-entity
+                                          (t/color (if (= 'COMMAND_LINE mode) tan-color bg-color))
+                                          (t/translate 0 (- game-height (* font-size-multiplier font-height)))
+                                          (t/scale game-width (* font-size-multiplier font-height)))))))
+      (doseq [[k entity] tab-text-entities
+              :let [bounding-box (k bounding-boxes)]]
+        (c/render game (-> entity
+                           (assoc-in [:uniforms 'u_alpha] (if (= k current-tab) text-alpha unfocused-alpha))
+                           (t/project game-width game-height)
+                           (t/translate (-> bounding-box :x1 (* font-size-multiplier)
+                                            (cond->> (= :right (:align bounding-box))
+                                                     (- game-width)))
+                                        (:y1 bounding-box))
+                           (t/scale font-size-multiplier font-size-multiplier))))
+      (when (and (= mode 'COMMAND_LINE)
+                 command-cursor-entity
+                 command-text-entity)
+        (c/render game (-> command-cursor-entity
+                           (t/project game-width game-height)
+                           (t/translate 0 (- game-height (* font-size-multiplier font-height)))
+                           (t/scale font-size-multiplier font-size-multiplier)))
+        (c/render game (-> command-text-entity
+                           (t/project game-width game-height)
+                           (t/translate 0 (- game-height (* font-size-multiplier font-height)))
+                           (t/scale font-size-multiplier font-size-multiplier))))))
   ;; return the game map
   game)
 
