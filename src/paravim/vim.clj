@@ -208,9 +208,7 @@
     (v/set-cursor-position vim cursor-line cursor-column)))
 
 (defn on-buf-enter [game vim buffer-ptr]
-  (let [cursor-line (dec (v/get-cursor-line vim))
-        cursor-column (v/get-cursor-column vim)
-        path (v/get-file-name vim buffer-ptr)
+  (let [path (v/get-file-name vim buffer-ptr)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
                      (v/get-line vim buffer-ptr (inc i))))]
     (if path
@@ -226,10 +224,9 @@
                             :files)
             state @c/*state
             buffer (or (c/get-buffer state buffer-ptr)
-                       (c/->buffer state path file-name lines current-tab))
-            buffer (assoc buffer
-                     :cursor-line cursor-line
-                     :cursor-column cursor-column)
+                       (assoc (c/->buffer state path file-name lines current-tab)
+                         :cursor-line (dec (v/get-cursor-line vim))
+                         :cursor-column (v/get-cursor-column vim)))
             buffer (if (:clojure? buffer)
                       (-> buffer
                           (c/parse-clojure-buffer state true)
