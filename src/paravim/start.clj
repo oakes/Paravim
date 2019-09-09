@@ -40,11 +40,6 @@
    GLFW/GLFW_KEY_R \R
    GLFW/GLFW_KEY_U \U})
 
-(defn toggle? [keycode scancode action mods]
-  (and (= action GLFW/GLFW_PRESS)
-       (= keycode GLFW/GLFW_KEY_ESCAPE)
-       (= (:mode @c/*state) 'NORMAL)))
-
 (defn on-mouse-move! [{:keys [game]} window xpos ypos]
   (as-> (swap! c/*state
           (fn [state]

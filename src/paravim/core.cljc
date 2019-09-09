@@ -79,6 +79,9 @@
 (defn set-alpha [color alpha]
   (assoc color 3 alpha))
 
+(defn get-mode []
+  (:mode @*state))
+
 (defn clojurify-lines
   ([text-entity font-entity parsed-code parinfer?]
    (let [*line-num (volatile! 0)
