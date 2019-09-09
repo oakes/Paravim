@@ -13,7 +13,7 @@
             [javax.sound.sampled AudioSystem Clip])
   (:gen-class))
 
-(defn get-density-ratio [window]
+(defn- get-density-ratio [window]
   (let [*fb-width (MemoryUtil/memAllocInt 1)
         *window-width (MemoryUtil/memAllocInt 1)
         _ (GLFW/glfwGetFramebufferSize window *fb-width nil)
@@ -24,7 +24,7 @@
     (MemoryUtil/memFree *window-width)
     (float (/ fb-width window-width))))
 
-(def keycode->keyword
+(def ^:private keycode->keyword
   {GLFW/GLFW_KEY_BACKSPACE :backspace
    GLFW/GLFW_KEY_DELETE :delete
    GLFW/GLFW_KEY_TAB :tab
@@ -35,7 +35,7 @@
    GLFW/GLFW_KEY_LEFT :left
    GLFW/GLFW_KEY_RIGHT :right})
 
-(def keycode->char
+(def ^:private keycode->char
   {GLFW/GLFW_KEY_D \D
    GLFW/GLFW_KEY_R \R
    GLFW/GLFW_KEY_U \U})
@@ -118,7 +118,7 @@
 (defn on-char! [{:keys [send-input!]} window codepoint]
   (send-input! (str (char codepoint))))
 
-(defn listen-for-events [utils window]
+(defn- listen-for-events [utils window]
   (doto window
     (GLFW/glfwSetWindowSizeCallback
       (reify GLFWWindowSizeCallbackI
@@ -141,7 +141,7 @@
         (invoke [this window codepoint]
           (on-char! utils window codepoint))))))
 
-(defn poll-input [game vim c]
+(defn- poll-input [game vim c]
   (async/go-loop [delayed-inputs []]
     (if-let [[inputs-to-run inputs-to-delay] (vim/split-inputs vim delayed-inputs)]
       (do
@@ -156,7 +156,7 @@
             (recur delayed-inputs))
           (recur (conj delayed-inputs input)))))))
 
-(defn ->window []
+(defn- ->window []
   (when-not (GLFW/glfwInit)
     (throw (Exception. "Unable to initialize GLFW")))
   (GLFW/glfwWindowHint GLFW/GLFW_VISIBLE GLFW/GLFW_FALSE)
@@ -200,7 +200,7 @@
       :vim vim
       :game game})))
 
-(defn start [game window]
+(defn- start [game window]
   (let [game (assoc game :delta-time 0 :total-time 0)
         utils (init game)]
     (GLFW/glfwShowWindow window)
