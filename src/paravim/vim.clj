@@ -44,18 +44,10 @@
 (defn normal-mode? [vim]
   (= 'NORMAL (v/get-mode vim)))
 
-(defn split-inputs [vim inputs]
-  (when (and (seq inputs) (normal-mode? vim))
-    (let [current-buffer (v/get-current-buffer vim)
-          *inputs-to-run (volatile! [])
-          *inputs-to-delay (volatile! [])]
-      (doseq [input inputs]
-        (if (= (:buffer input) current-buffer)
-          (vswap! *inputs-to-delay conj input)
-          (vswap! *inputs-to-run conj input)))
-      (let [inputs-to-run @*inputs-to-run]
-        (when (seq inputs-to-run)
-          [inputs-to-run @*inputs-to-delay])))))
+(defn ready-to-append? [vim inputs]
+  (and (seq inputs)
+       (normal-mode? vim)
+       (not= :repl-out (:current-tab @c/*state))))
 
 (defn apply-parinfer! [{:keys [current-buffer] :as state} vim]
   (let [{:keys [parsed-code needs-parinfer?]} (get-in state [:buffers current-buffer])]
@@ -192,20 +184,22 @@
                (not= s "u"))
       (apply-parinfer! state vim))))
 
-(defn append-to-buffer! [game vim {:keys [buffer string]}]
-  (let [current-buffer (v/get-current-buffer vim)
-        cursor-line (v/get-cursor-line vim)
-        cursor-column (v/get-cursor-column vim)
-        line-count (v/get-line-count vim buffer)
-        char-count (count (v/get-line vim buffer line-count))]
-    (v/set-current-buffer vim buffer)
-    (v/set-cursor-position vim line-count (dec char-count))
-    (on-input game vim "a")
-    (doseq [ch string]
-      (on-input game vim (str ch)))
-    (on-input game vim "<Esc>")
-    (v/set-current-buffer vim current-buffer)
-    (v/set-cursor-position vim cursor-line cursor-column)))
+(defn append-to-buffer! [game vim inputs]
+  (when-let [buffer (-> @c/*state :tab->buffer :repl-out)]
+    (let [current-buffer (v/get-current-buffer vim)
+          cursor-line (v/get-cursor-line vim)
+          cursor-column (v/get-cursor-column vim)
+          _ (v/set-current-buffer vim buffer)
+          line-count (v/get-line-count vim buffer)
+          char-count (count (v/get-line vim buffer line-count))]
+      (v/set-cursor-position vim line-count (dec char-count))
+      (on-input game vim "a")
+      (doseq [input inputs
+              ch input]
+        (on-input game vim (str ch)))
+      (on-input game vim "<Esc>")
+      (v/set-current-buffer vim current-buffer)
+      (v/set-cursor-position vim cursor-line cursor-column))))
 
 (defn on-buf-enter [game vim buffer-ptr]
   (let [path (v/get-file-name vim buffer-ptr)

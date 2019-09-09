@@ -55,25 +55,26 @@
                                 :hand GLFW/GLFW_HAND_CURSOR
                                 GLFW/GLFW_ARROW_CURSOR)))))
 
-(defn on-mouse-click! [{:keys [vim pipes game]} window button action mods]
+(defn on-mouse-click! [{:keys [vim pipes game send-input!]} window button action mods]
   (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
              (= action GLFW/GLFW_PRESS))
-    (vim/open-buffer-for-tab! vim (swap! c/*state c/click-mouse game
-                                         (fn [state]
-                                           (let [{:keys [current-tab current-buffer buffers tab->buffer]} state
-                                                 {:keys [out-pipe]} pipes
-                                                 {:keys [lines file-name clojure?] :as buffer} (get buffers current-buffer)]
-                                             (if (and clojure? (= current-tab :files))
-                                               (do
-                                                 (doto out-pipe
-                                                   (.write (str "(do "
-                                                                (pr-str '(println))
-                                                                (pr-str (list 'println "Reloading" file-name))
-                                                                (str/join \newline lines)
-                                                                ")\n"))
-                                                   .flush)
-                                                 (assoc state :current-tab :repl-in))
-                                               state)))))))
+    (swap! c/*state c/click-mouse game
+           (fn [state]
+             (let [{:keys [current-tab current-buffer buffers tab->buffer]} state
+                   {:keys [out-pipe]} pipes
+                   {:keys [lines file-name clojure?] :as buffer} (get buffers current-buffer)]
+               (if (and clojure? (= current-tab :files))
+                 (do
+                   (doto out-pipe
+                     (.write (str "(do "
+                                  (pr-str '(println))
+                                  (pr-str (list 'println "Reloading" file-name))
+                                  (str/join \newline lines)
+                                  ")\n"))
+                     .flush)
+                   (assoc state :current-tab :repl-in))
+                 state))))
+    (send-input! [:new-tab])))
 
 (defn on-key! [{:keys [vim pipes send-input!]} window keycode scancode action mods]
   (when (= action GLFW/GLFW_PRESS)
@@ -83,7 +84,9 @@
       (if-let [k (keycode->keyword keycode)]
         (cond
           (and (or control? alt?) (= k :tab))
-          (vim/open-buffer-for-tab! vim (swap! c/*state c/change-tab (if shift? -1 1)))
+          (do
+            (swap! c/*state c/change-tab (if shift? -1 1))
+            (send-input! [:new-tab]))
           (and (= k :enter)
                (vim/normal-mode? vim)
                (= :repl-in (:current-tab @c/*state)))
@@ -138,18 +141,22 @@
 
 (defn- poll-input [game vim c]
   (async/go-loop [delayed-inputs []]
-    (if-let [[inputs-to-run inputs-to-delay] (vim/split-inputs vim delayed-inputs)]
+    (if (vim/ready-to-append? vim delayed-inputs)
       (do
         (binding [vim/*update-ui?* false]
-          (doseq [input inputs-to-run]
-            (vim/append-to-buffer! game vim input)))
-        (recur inputs-to-delay))
+          (vim/append-to-buffer! game vim delayed-inputs))
+        (recur []))
       (let [input (async/<! c)]
         (if (string? input)
           (do
             (vim/on-input game vim input)
             (recur delayed-inputs))
-          (recur (conj delayed-inputs input)))))))
+          (let [[type arg] input]
+            (case type
+              :append (recur (conj delayed-inputs arg))
+              :new-tab (do
+                         (vim/open-buffer-for-tab! vim @c/*state)
+                         (recur delayed-inputs)))))))))
 
 (defn ->window []
   (when-not (GLFW/glfwInit)
@@ -187,9 +194,7 @@
                          (vim/on-buf-enter game vim buffer-ptr))
                        nil)))
      (when vim-chan
-       (if-let [buffer (-> @c/*state :tab->buffer :repl-out)]
-         (repl/start-repl-thread! nil pipes #(async/put! vim-chan {:buffer buffer :string %}))
-         (throw (ex-info "REPL output buffer not found" {}))))
+       (repl/start-repl-thread! nil pipes #(async/put! vim-chan [:append %])))
      {:pipes pipes
       :send-input! send-input!
       :vim vim
