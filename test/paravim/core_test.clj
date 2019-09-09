@@ -3,11 +3,13 @@
             [paravim.start :as start]
             [paravim.vim :as vim]
             [libvim-clj.core :as v]
-            [paravim.core :as c]))
+            [paravim.core :as c]
+            [play-cljc.gl.core :as pc]))
 
 (def window (start/->window))
 (def vim (vim/->vim))
-(def game (start/->game window vim nil))
+(def game (pc/->game window))
+(start/init game vim nil)
 
 (defn get-characters [buffer-ptr entity-key]
   (get-in @c/*state [:buffers buffer-ptr entity-key :characters]))

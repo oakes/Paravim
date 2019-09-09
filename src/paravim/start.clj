@@ -156,7 +156,7 @@
             (recur delayed-inputs))
           (recur (conj delayed-inputs input)))))))
 
-(defn- ->window []
+(defn ->window []
   (when-not (GLFW/glfwInit)
     (throw (Exception. "Unable to initialize GLFW")))
   (GLFW/glfwWindowHint GLFW/GLFW_VISIBLE GLFW/GLFW_FALSE)
