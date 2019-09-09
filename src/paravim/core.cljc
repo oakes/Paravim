@@ -635,8 +635,14 @@
                 tab-text-entities bounding-boxes current-tab tab->buffer]
          :as state} @*state]
     (when (and (pos? game-width) (pos? game-height))
-      (c/render game (update screen-entity :viewport
-                             assoc :width game-width :height game-height))
+      (if (:clear? game)
+        (c/render game (update screen-entity :viewport assoc :width game-width :height game-height))
+        (c/render game (-> base-rects-entity
+                           (t/project game-width game-height)
+                           (i/assoc 0 (-> base-rect-entity
+                                          (t/color bg-color)
+                                          (t/translate 0 0)
+                                          (t/scale game-width game-height))))))
       (if (and ascii (= current-tab :files))
         (render-buffer game state game-width game-height current-tab ascii false)
         (render-buffer game state game-width game-height current-tab current-buffer true))
