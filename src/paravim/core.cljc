@@ -308,7 +308,9 @@
   (let [new-val (+ font-size-multiplier diff)]
     (if (<= min-font-size new-val max-font-size)
       (let [state (assoc state :font-size-multiplier new-val)]
-        (update-in state [:buffers current-buffer] update-cursor state game))
+        (if current-buffer
+          (update-in state [:buffers current-buffer] update-cursor state game)
+          state))
       state)))
 
 (defn click-mouse [{:keys [mouse-hover] :as state} game reload-file]
