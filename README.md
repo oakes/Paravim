@@ -16,13 +16,13 @@ See [the website](https://sekao.net/paravim/) for more info and join the discuss
 The easiest way to run it is with the [Clojure CLI tool](https://clojure.org/guides/getting_started#_clojure_installer_and_cli_tools). On Windows or Linux, run this in any directory you want:
 
 ```
-clj -Sdeps "{:deps {paravim {:mvn/version \""RELEASE\""}}}" -m paravim.start
+clojure -Sdeps "{:deps {paravim {:mvn/version \""RELEASE\""}}}" -m paravim.start
 ```
 
 On Mac OS, you need to add a special flag:
 
 ```
-clj -Sdeps "{:deps {paravim {:mvn/version \""RELEASE\""}}}" -J-XstartOnFirstThread -m paravim.start
+clojure -Sdeps "{:deps {paravim {:mvn/version \""RELEASE\""}}}" -J-XstartOnFirstThread -m paravim.start
 ```
 
 ## Development
