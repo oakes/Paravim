@@ -36,7 +36,7 @@
           font-width (* font-width font-size-multiplier)]
       (doto vim
         (v/set-window-width (/ width font-width))
-        (v/set-window-height (/ text-height font-height))))))
+        (v/set-window-height (/ (max 0 text-height) font-height))))))
 
 (defn repl-enter! [vim callback {:keys [out out-pipe]}]
   (let [buffer-ptr (v/get-current-buffer vim)
