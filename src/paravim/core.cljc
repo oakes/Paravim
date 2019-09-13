@@ -261,7 +261,7 @@
                     camera-y (cond
                                (< top camera-y)
                                top
-                               (> cursor-bottom camera-bottom)
+                               (> cursor-bottom camera-bottom 0)
                                (- cursor-bottom text-height)
                                :else
                                camera-y)]
@@ -589,9 +589,12 @@
 
 (defn crop-text-entity [{:keys [characters] :as text-entity} text-height camera-y font-height font-size-multiplier]
   (let [char-height (* font-height font-size-multiplier)
-        lines-to-skip-count (max 0 (int (/ camera-y char-height)))
-        lines-to-crop-count (max 0 (min (int (/ (+ text-height camera-y) char-height))
-                                        (count characters)))
+        line-count (count characters)
+        lines-to-skip-count (max 0 (min (int (/ camera-y char-height))
+                                        line-count))
+        lines-to-crop-count (max 0 (min (+ lines-to-skip-count
+                                           (int (/ text-height char-height)))
+                                        line-count))
         char-counts (get-in text-entity [:uniforms 'u_char_counts])
         chars-to-skip-count (reduce + 0 (subvec char-counts 0 lines-to-skip-count))
         char-counts (subvec char-counts lines-to-skip-count lines-to-crop-count)
