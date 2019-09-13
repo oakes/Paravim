@@ -188,7 +188,10 @@
   ([game vim vim-chan]
    (let [send-input! (if vim-chan
                        (partial async/put! vim-chan)
-                       #(vim/on-input game vim %))
+                       ;; only used in tests
+                       (fn [x]
+                         (when (string? x)
+                           (vim/on-input game vim x))))
          pipes (repl/create-pipes)]
      (c/init game)
      (vim/init vim (fn [buffer-ptr event]

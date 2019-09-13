@@ -4,12 +4,13 @@
             [paravim.vim :as vim]
             [libvim-clj.core :as v]
             [paravim.core :as c]
-            [play-cljc.gl.core :as pc]))
+            [play-cljc.gl.core :as pc])
+  (:import [org.lwjgl.glfw GLFW]))
 
 (def window (start/->window))
 (def vim (vim/->vim))
 (def game (pc/->game window))
-(start/init game vim nil)
+(def paravim-utils (start/init game vim nil))
 
 (defn get-characters [buffer-ptr entity-key]
   (get-in @c/*state [:buffers buffer-ptr entity-key :characters]))
@@ -63,4 +64,15 @@
   (vim/on-input game vim "<Down>") ;; any keystroke will trigger parinfer
   (is (= " 2 3)" (get-line bad-indent-buffer 3)))
   (is (= "   (println a b))" (get-line bad-indent-buffer 7))))
+
+(deftest dont-break-play-cljc-template
+  (v/set-current-buffer vim core-buffer)
+  (is (= (c/get-mode) 'NORMAL))
+  (is (map? paravim-utils))
+  (let [handle (:context game)]
+    (start/on-mouse-move! paravim-utils handle 0 0)
+    (start/on-mouse-click! paravim-utils handle GLFW/GLFW_MOUSE_BUTTON_LEFT GLFW/GLFW_PRESS 0)
+    (start/on-key! paravim-utils handle GLFW/GLFW_KEY_DOWN 0 GLFW/GLFW_PRESS 0)
+    (start/on-char! paravim-utils handle (int \j))
+    (start/on-resize! paravim-utils handle 800 600)))
 
