@@ -6,8 +6,8 @@
             [play-cljc.gl.core :as pc]
             [clojure.core.async :as async])
   (:import  [org.lwjgl.glfw GLFW Callbacks
-             GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWCharCallbackI
-             GLFWMouseButtonCallbackI GLFWWindowSizeCallbackI]
+             GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWMouseButtonCallbackI
+             GLFWCharCallbackI GLFWWindowSizeCallbackI]
             [org.lwjgl.opengl GL GL41]
             [org.lwjgl.system MemoryUtil]
             [javax.sound.sampled AudioSystem Clip])
@@ -98,6 +98,9 @@
           (when-let [ch (keycode->char keycode)]
             (send-input! (str "<C-" (when shift? "S-") ch ">"))))))))
 
+(defn on-char! [{:keys [send-input!]} window codepoint]
+  (send-input! (str (char codepoint))))
+
 (defn on-resize! [{:keys [game]} window width height]
   (swap! c/*state
          (fn [{:keys [current-buffer current-tab tab->buffer] :as state}]
@@ -113,15 +116,8 @@
                    (update-in state [:buffers (tab->buffer other-tab)] c/update-cursor state game)
                    state)))))
 
-(defn on-char! [{:keys [send-input!]} window codepoint]
-  (send-input! (str (char codepoint))))
-
 (defn- listen-for-events [utils window]
   (doto window
-    (GLFW/glfwSetWindowSizeCallback
-      (reify GLFWWindowSizeCallbackI
-        (invoke [this window width height]
-          (on-resize! utils window width height))))
     (GLFW/glfwSetCursorPosCallback
       (reify GLFWCursorPosCallbackI
         (invoke [this window xpos ypos]
@@ -137,7 +133,11 @@
     (GLFW/glfwSetCharCallback
       (reify GLFWCharCallbackI
         (invoke [this window codepoint]
-          (on-char! utils window codepoint))))))
+          (on-char! utils window codepoint))))
+    (GLFW/glfwSetWindowSizeCallback
+      (reify GLFWWindowSizeCallbackI
+        (invoke [this window width height]
+          (on-resize! utils window width height))))))
 
 (defn- poll-input [game vim c]
   (async/go-loop [delayed-inputs []]
