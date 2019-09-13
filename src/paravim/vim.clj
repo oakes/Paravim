@@ -28,6 +28,16 @@
     (when-let [path (c/tab->path current-tab)]
       (v/open-buffer vim path))))
 
+(defn set-window-size! [vim {:keys [font-height font-width font-size-multiplier text-boxes current-tab] :as state} width height]
+  (when-let [{:keys [top bottom]} (get text-boxes current-tab)]
+    (let [text-height (- (bottom height font-size-multiplier)
+                         (top height font-size-multiplier))
+          font-height (* font-height font-size-multiplier)
+          font-width (* font-width font-size-multiplier)]
+      (doto vim
+        (v/set-window-width (/ width font-width))
+        (v/set-window-height (/ text-height font-height))))))
+
 (defn repl-enter! [vim callback {:keys [out out-pipe]}]
   (let [buffer-ptr (v/get-current-buffer vim)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]

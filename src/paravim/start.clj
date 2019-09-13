@@ -2,6 +2,7 @@
   (:require [paravim.core :as c]
             [paravim.repl :as repl]
             [paravim.vim :as vim]
+            [paravim.utils :as utils]
             [clojure.string :as str]
             [play-cljc.gl.core :as pc]
             [clojure.core.async :as async])
@@ -101,7 +102,7 @@
 (defn on-char! [{:keys [send-input!]} window codepoint]
   (send-input! (str (char codepoint))))
 
-(defn on-resize! [{:keys [game]} window width height]
+(defn on-resize! [{:keys [game send-input!]} window width height]
   (swap! c/*state
          (fn [{:keys [current-buffer current-tab tab->buffer] :as state}]
            (as-> state state
@@ -114,7 +115,8 @@
                                       :repl-out :repl-in
                                       nil)]
                    (update-in state [:buffers (tab->buffer other-tab)] c/update-cursor state game)
-                   state)))))
+                   state))))
+  (send-input! [:resize]))
 
 (defn- listen-for-events [utils window]
   (doto window
@@ -151,12 +153,16 @@
           (do
             (vim/on-input game vim input)
             (recur delayed-inputs))
-          (let [[type arg] input]
-            (case type
-              :append (recur (conj delayed-inputs arg))
-              :new-tab (do
-                         (vim/open-buffer-for-tab! vim @c/*state)
-                         (recur delayed-inputs)))))))))
+          (case (first input)
+            :append (recur (conj delayed-inputs (second input)))
+            :new-tab (do
+                       (vim/open-buffer-for-tab! vim @c/*state)
+                       (async/put! c [:resize])
+                       (recur delayed-inputs))
+            :resize (let [width (utils/get-width game)
+                          height (utils/get-height game)]
+                      (vim/set-window-size! vim @c/*state width height)
+                      (recur delayed-inputs))))))))
 
 (defn ->window []
   (when-not (GLFW/glfwInit)
@@ -185,8 +191,6 @@
                        #(vim/on-input game vim %))
          pipes (repl/create-pipes)]
      (c/init game)
-     (when vim-chan
-       (poll-input game vim vim-chan))
      (vim/init vim (fn [buffer-ptr event]
                      (case event
                        EVENT_BUFENTER
@@ -194,6 +198,8 @@
                          (vim/on-buf-enter game vim buffer-ptr))
                        nil)))
      (when vim-chan
+       (poll-input game vim vim-chan)
+       (async/put! vim-chan [:resize])
        (repl/start-repl-thread! nil pipes #(async/put! vim-chan [:append %])))
      {:pipes pipes
       :send-input! send-input!
