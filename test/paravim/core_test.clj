@@ -76,3 +76,14 @@
     (start/on-char! paravim-utils handle (int \j))
     (start/on-resize! paravim-utils handle 800 600)))
 
+;; this test reproduces a crash in the libvim
+;; when search highlighting is enabled
+(deftest search-highlights-crash
+  (v/set-current-buffer vim core-buffer)
+  (dotimes [_ 50]
+    (run! (partial vim/on-input game vim)
+      ["/" "h" "e" "l" "l" "o"
+       "<Esc>"
+       ":" "%" "s" "/" "h" "e" "l" "l" "o" "/" "w" "o" "r" "l" "d"
+       "<Esc>"])))
+
