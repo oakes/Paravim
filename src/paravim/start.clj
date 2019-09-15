@@ -211,7 +211,9 @@
 
 (defn- start [game window]
   (let [game (assoc game :delta-time 0 :total-time 0 :clear? true)
-        utils (init game)]
+        utils (init game)
+        density-ratio (get-density-ratio window)]
+    (swap! c/*state update :font-size-multiplier * density-ratio)
     (GLFW/glfwShowWindow window)
     (listen-for-events utils window)
     (loop [game game]
