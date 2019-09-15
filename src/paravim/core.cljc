@@ -352,26 +352,19 @@
       :command-text-entity command-text-entity
       :command-cursor-entity command-cursor-entity)))
 
-(defn range->rects [text-entity font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
-  (let [{:keys [start-line start-column end-line end-column]}
-        (if (or (> start-line end-line)
-                (and (= start-line end-line)
-                     (> start-column end-column)))
-          {:start-line end-line
-           :start-column end-column
-           :end-line start-line
-           :end-column start-column}
-          rect-range)]
-    (vec (for [line-num (range start-line (inc end-line))]
-           (let [line-chars (-> text-entity :characters (nth line-num))
-                 start-column (if (= line-num start-line) start-column 0)
-                 end-column (if (= line-num end-line) end-column (count line-chars))
-                 empty-columns (subvec line-chars 0 start-column)
-                 filled-columns (subvec line-chars start-column end-column)]
-             {:left (->> empty-columns (map :width) (reduce +))
-              :top (* line-num font-height)
-              :width (->> filled-columns (map :width) (reduce +))
-              :height font-height})))))
+(defn range->rects [text-entity font-width font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
+  (vec (for [line-num (range start-line (inc end-line))]
+         (let [line-chars (-> text-entity :characters (nth line-num))
+               start-column (if (= line-num start-line) start-column 0)
+               end-column (if (= line-num end-line) end-column (count line-chars))]
+           {:left (* font-width start-column)
+            ;; to support variable width fonts, we would need...
+            ;; :left (->> (subvec line-chars 0 start-column) (map :width) (reduce +))
+            :top (* line-num font-height)
+            :width (* font-width (- end-column start-column))
+            ;; to support variable width fonts, we would need...
+            ;; :width (->> (subvec line-chars start-column end-column) (map :width) (reduce +))
+            :height font-height}))))
 
 (defn assoc-rects [{:keys [rect-count] :as rects-entity} rect-entity color rects]
   (reduce-kv
@@ -384,7 +377,7 @@
     (update rects-entity :rect-count + (count rects))
     rects))
 
-(defn update-highlight [{:keys [text-entity cursor-line cursor-column] :as buffer} {:keys [font-height base-rect-entity] :as state}]
+(defn update-highlight [{:keys [text-entity cursor-line cursor-column] :as buffer} {:keys [font-width font-height base-rect-entity] :as state}]
   (if-let [coll (->> (:collections text-entity)
                      (filter (fn [{:keys [start-line start-column end-line end-column]}]
                                (and (or (< start-line cursor-line)
@@ -395,12 +388,25 @@
                                              (> end-column cursor-column))))))
                      first)]
     (let [color (set-alpha (get-color :delimiter (:depth coll)) highlight-alpha)
-          rects (range->rects text-entity font-height coll)]
+          rects (range->rects text-entity font-width font-height coll)]
       (update buffer :rects-entity assoc-rects base-rect-entity color rects))
     buffer))
 
-(defn update-selection [{:keys [text-entity] :as buffer} {:keys [font-height base-rect-entity] :as state} visual-range]
-  (let [rects (range->rects text-entity font-height visual-range)]
+(defn update-selection [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as state} visual-range]
+  (let [{:keys [start-line start-column end-line end-column]} visual-range
+        ;; make sure the range is always going the same direction
+        visual-range (if (or (> start-line end-line)
+                             (and (= start-line end-line)
+                                  (> start-column end-column)))
+                       {:start-line end-line
+                        :start-column end-column
+                        :end-line start-line
+                        :end-column start-column}
+                       visual-range)
+        ;; the column the cursor is in doesn't seem to be included in the range
+        ;; add it manually so it is included in the selection
+        visual-range (update visual-range :end-column inc)
+        rects (range->rects text-entity font-width font-height visual-range)]
     (update buffer :rects-entity assoc-rects base-rect-entity select-color rects)))
 
 (defn get-extension
@@ -524,7 +530,7 @@
                                     :characters [])
                              assoc-attr-lengths)
              text-entity (c/compile game text-entity)
-             font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :w)
+             font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :xadv)
              font-height (:font-height baked-font)
              snap-to-top (fn [game-height multiplier] (* font-height multiplier))
              snap-to-bottom (fn [game-height multiplier] (- game-height (* font-height multiplier)))
