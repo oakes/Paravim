@@ -23,7 +23,7 @@
         window-width (.get *window-width)]
     (MemoryUtil/memFree *fb-width)
     (MemoryUtil/memFree *window-width)
-    (float (/ fb-width window-width))))
+    (/ fb-width window-width)))
 
 (def ^:private keycode->keyword
   {GLFW/GLFW_KEY_BACKSPACE :backspace
@@ -44,7 +44,7 @@
 (defn on-mouse-move! [{:keys [game]} window xpos ypos]
   (as-> (swap! c/*state
           (fn [state]
-            (let [density-ratio (get-density-ratio window)
+            (let [density-ratio (float (get-density-ratio window))
                   x (* xpos density-ratio)
                   y (* ypos density-ratio)]
               (c/update-mouse state game x y))))
@@ -213,7 +213,8 @@
   (let [game (assoc game :delta-time 0 :total-time 0 :clear? true)
         utils (init game)
         density-ratio (get-density-ratio window)]
-    (swap! c/*state update :font-size-multiplier * density-ratio)
+    (when (pos-int? density-ratio)
+      (swap! c/*state update :font-size-multiplier * density-ratio))
     (GLFW/glfwShowWindow window)
     (listen-for-events utils window)
     (loop [game game]
