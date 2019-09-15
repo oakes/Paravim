@@ -26,7 +26,7 @@
 
 (def font-size-step (float (/ 1 8)))
 (def min-font-size (float (/ 1 4)))
-(def max-font-size (float 1))
+(def max-font-size (float 2))
 
 (defonce *state (atom {:mouse-x 0
                        :mouse-y 0
