@@ -593,18 +593,32 @@
   {:viewport {:x 0 :y 0 :width 0 :height 0}
    :clear {:color bg-color :depth 1}})
 
-(defn crop-text-entity [{:keys [characters] :as text-entity} text-height camera-y font-height font-size-multiplier]
-  (let [char-height (* font-height font-size-multiplier)
+(defn get-visible-lines [{:keys [characters] :as text-entity}
+                         {:keys [font-height font-size-multiplier] :as state}
+                         {:keys [top bottom] :as text-box}
+                         game-height
+                         camera-y]
+  (let [text-height (- (bottom game-height font-size-multiplier)
+                       (top game-height font-size-multiplier))
+        char-height (* font-height font-size-multiplier)
         line-count (count characters)
         lines-to-skip-count (max 0 (min (int (/ camera-y char-height))
                                         line-count))
         lines-to-crop-count (max 0 (min (+ lines-to-skip-count
-                                           (int (/ text-height char-height)))
-                                        line-count))
-        char-counts (get-in text-entity [:uniforms 'u_char_counts])
+                                           (int (/ text-height char-height))
+                                           1)
+                                        line-count))]
+    [lines-to-skip-count lines-to-crop-count]))
+
+(defn get-visible-chars [{:keys [characters] :as text-entity} lines-to-skip-count lines-to-crop-count]
+  (let [char-counts (get-in text-entity [:uniforms 'u_char_counts])
         chars-to-skip-count (reduce + 0 (subvec char-counts 0 lines-to-skip-count))
         char-counts (subvec char-counts lines-to-skip-count lines-to-crop-count)
         chars-to-crop-count (+ chars-to-skip-count (reduce + 0 char-counts))]
+    [chars-to-skip-count chars-to-crop-count char-counts]))
+
+(defn crop-text-entity [text-entity lines-to-skip-count lines-to-crop-count]
+  (let [[chars-to-skip-count chars-to-crop-count char-counts] (get-visible-chars text-entity lines-to-skip-count lines-to-crop-count)]
     (reduce-kv
       (fn [text-entity attr-name length]
         (update-in text-entity [:attributes attr-name :data] subvec
@@ -615,24 +629,23 @@
               'u_start_line lines-to-skip-count)
       (:attribute-lengths text-entity))))
 
-(defn render-buffer [game {:keys [buffers text-boxes font-height font-size-multiplier] :as state} game-width game-height current-tab buffer-ptr show-cursor?]
+(defn render-buffer [game {:keys [buffers text-boxes font-size-multiplier] :as state} game-width game-height current-tab buffer-ptr show-cursor?]
   (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera camera-y]} (get buffers buffer-ptr)]
-    (when-let [{:keys [top bottom]} (get text-boxes current-tab)]
+    (when-let [text-box (get text-boxes current-tab)]
       (when (and rects-entity show-cursor?)
         (c/render game (-> rects-entity
                            (t/project game-width game-height)
                            (t/camera camera)
                            (t/scale font-size-multiplier font-size-multiplier))))
-      (let [text-height (- (bottom game-height font-size-multiplier)
-                           (top game-height font-size-multiplier))]
+      (let [[lines-to-skip-count lines-to-crop-count] (get-visible-lines text-entity state text-box game-height camera-y)]
         (when parinfer-text-entity
           (c/render game (-> parinfer-text-entity
-                             (crop-text-entity text-height camera-y font-height font-size-multiplier)
+                             (crop-text-entity lines-to-skip-count lines-to-crop-count)
                              (t/project game-width game-height)
                              (t/camera camera)
                              (t/scale font-size-multiplier font-size-multiplier))))
         (c/render game (-> text-entity
-                           (crop-text-entity text-height camera-y font-height font-size-multiplier)
+                           (crop-text-entity lines-to-skip-count lines-to-crop-count)
                            (cond-> (not show-cursor?)
                                    (assoc-in [:uniforms 'u_alpha] unfocused-alpha))
                            (t/project game-width game-height)
