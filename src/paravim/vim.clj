@@ -172,19 +172,28 @@
         (c/update-command (v/get-command-text vim) (v/get-command-position vim))
         (as-> state
               (if (c/get-buffer state current-buffer)
-                (-> state
-                    (update-in [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)
-                    c/update-buffers
-                    (update-in [:buffers current-buffer]
-                      (fn [buffer]
-                        (-> buffer
-                            (c/update-cursor state game)
-                            (c/update-highlight state))))
-                    (cond-> (v/visual-active? vim)
-                            (update-in [:buffers current-buffer]
-                              c/update-selection state (-> (v/get-visual-range vim)
-                                                           (update :start-line dec)
-                                                           (update :end-line dec)))))
+                (let [state (-> state
+                                (update-in [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)
+                                c/update-buffers
+                                (update-in [:buffers current-buffer]
+                                  (fn [buffer]
+                                    (-> buffer
+                                        (c/update-cursor state game)
+                                        (c/update-highlight state)))))
+                      {:keys [visible-start-line visible-end-line]} (get-in state [:buffers current-buffer])]
+                  (cond-> state
+                          (v/visual-active? vim)
+                          (update-in [:buffers current-buffer]
+                            c/update-selection state (-> (v/get-visual-range vim)
+                                                         (update :start-line dec)
+                                                         (update :end-line dec)))
+                          (and visible-start-line visible-end-line)
+                          (update-in [:buffers current-buffer]
+                            c/update-search-highlights state (->> (v/get-search-highlights vim (inc visible-start-line) (inc visible-end-line))
+                                                                  (mapv (fn [highlight]
+                                                                          (-> highlight
+                                                                              (update :start-line dec)
+                                                                              (update :end-line dec))))))))
                 state)))))
 
 (defn on-input [game vim s]
@@ -277,6 +286,8 @@
                        (System/exit 0)))
   (v/set-on-auto-command vim on-auto-command)
   (v/set-on-buffer-update vim (partial on-buf-update vim))
+  (v/set-on-stop-search-highlight vim (fn []
+                                        (swap! c/*state assoc :show-search? false)))
   (run! #(v/open-buffer vim (c/tab->path %)) [:repl-in :repl-out :files])
   (init-ascii))
 

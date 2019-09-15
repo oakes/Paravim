@@ -37,7 +37,8 @@
                        :tab->buffer {}
                        :font-size-multiplier (float (/ 1 2))
                        :text-boxes {}
-                       :bounding-boxes {}}))
+                       :bounding-boxes {}
+                       :show-search? false}))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
 
@@ -211,6 +212,30 @@
                           new-chars)]
         text-entity))))
 
+(defn get-visible-lines [{:keys [characters] :as text-entity}
+                         {:keys [font-height font-size-multiplier] :as state}
+                         {:keys [top bottom] :as text-box}
+                         game-height
+                         camera-y]
+  (let [text-height (- (bottom game-height font-size-multiplier)
+                       (top game-height font-size-multiplier))
+        char-height (* font-height font-size-multiplier)
+        line-count (count characters)
+        lines-to-skip-count (max 0 (min (int (/ camera-y char-height))
+                                        line-count))
+        lines-to-crop-count (max 0 (min (+ lines-to-skip-count
+                                           (int (/ text-height char-height))
+                                           1)
+                                        line-count))]
+    [lines-to-skip-count lines-to-crop-count]))
+
+(defn get-visible-chars [{:keys [characters] :as text-entity} lines-to-skip-count lines-to-crop-count]
+  (let [char-counts (get-in text-entity [:uniforms 'u_char_counts])
+        chars-to-skip-count (reduce + 0 (subvec char-counts 0 lines-to-skip-count))
+        char-counts (subvec char-counts lines-to-skip-count lines-to-crop-count)
+        chars-to-crop-count (+ chars-to-skip-count (reduce + 0 char-counts))]
+    [chars-to-skip-count chars-to-crop-count char-counts]))
+
 (defn ->cursor-entity [{:keys [font-width font-height base-rect-entity font-size-multiplier mode] :as state} line-chars line column]
   (let [left-char (get line-chars (dec column))
         curr-char (get line-chars column)
@@ -233,7 +258,7 @@
                :width (* width font-size-multiplier)
                :height (* height font-size-multiplier)))))
 
-(defn update-cursor [{:keys [cursor-line cursor-column text-box] :as buffer} {:keys [base-rects-entity font-size-multiplier] :as state} game]
+(defn update-cursor [{:keys [text-entity cursor-line cursor-column text-box] :as buffer} {:keys [base-rects-entity font-size-multiplier] :as state} game]
   (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
         {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars cursor-line cursor-column)]
     (-> buffer
@@ -264,11 +289,14 @@
                                (> cursor-bottom camera-bottom 0)
                                (- cursor-bottom text-height)
                                :else
-                               camera-y)]
+                               camera-y)
+                    [lines-to-skip-count lines-to-crop-count] (get-visible-lines text-entity state text-box game-height camera-y)]
                 (assoc buffer
                   :camera (t/translate orig-camera camera-x (- camera-y text-top))
                   :camera-x camera-x
-                  :camera-y camera-y))))))
+                  :camera-y camera-y
+                  :visible-start-line lines-to-skip-count
+                  :visible-end-line lines-to-crop-count))))))
 
 (defn update-mouse [{:keys [text-boxes current-tab bounding-boxes tab-text-entities font-size-multiplier] :as state} game x y]
   (let [game-width (utils/get-width game)
@@ -338,7 +366,7 @@
       'u_alpha alpha
       'u_start_line 0))
 
-(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start] :as state} text position]
+(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start show-search?] :as state} text position]
   (let [command-text-entity (when text
                               (-> (chars/assoc-line base-text-entity 0 (mapv #(-> base-font-entity (chars/crop-char %) (t/color bg-color))
                                                                          (str command-start text)))
@@ -350,7 +378,8 @@
     (assoc state
       :command-text text
       :command-text-entity command-text-entity
-      :command-cursor-entity command-cursor-entity)))
+      :command-cursor-entity command-cursor-entity
+      :show-search? (if (= command-start "/") true show-search?))))
 
 (defn range->rects [text-entity font-width font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
   (vec (for [line-num (range start-line (inc end-line))]
@@ -408,6 +437,12 @@
         visual-range (update visual-range :end-column inc)
         rects (range->rects text-entity font-width font-height visual-range)]
     (update buffer :rects-entity assoc-rects base-rect-entity select-color rects)))
+
+(defn update-search-highlights [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity show-search?] :as state} highlights]
+  (if show-search?
+    (let [rects (vec (mapcat (partial range->rects text-entity font-width font-height) highlights))]
+      (update buffer :rects-entity assoc-rects base-rect-entity select-color rects))
+    buffer))
 
 (defn get-extension
   [path]
@@ -592,30 +627,6 @@
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
    :clear {:color bg-color :depth 1}})
-
-(defn get-visible-lines [{:keys [characters] :as text-entity}
-                         {:keys [font-height font-size-multiplier] :as state}
-                         {:keys [top bottom] :as text-box}
-                         game-height
-                         camera-y]
-  (let [text-height (- (bottom game-height font-size-multiplier)
-                       (top game-height font-size-multiplier))
-        char-height (* font-height font-size-multiplier)
-        line-count (count characters)
-        lines-to-skip-count (max 0 (min (int (/ camera-y char-height))
-                                        line-count))
-        lines-to-crop-count (max 0 (min (+ lines-to-skip-count
-                                           (int (/ text-height char-height))
-                                           1)
-                                        line-count))]
-    [lines-to-skip-count lines-to-crop-count]))
-
-(defn get-visible-chars [{:keys [characters] :as text-entity} lines-to-skip-count lines-to-crop-count]
-  (let [char-counts (get-in text-entity [:uniforms 'u_char_counts])
-        chars-to-skip-count (reduce + 0 (subvec char-counts 0 lines-to-skip-count))
-        char-counts (subvec char-counts lines-to-skip-count lines-to-crop-count)
-        chars-to-crop-count (+ chars-to-skip-count (reduce + 0 char-counts))]
-    [chars-to-skip-count chars-to-crop-count char-counts]))
 
 (defn crop-text-entity [text-entity lines-to-skip-count lines-to-crop-count]
   (let [[chars-to-skip-count chars-to-crop-count char-counts] (get-visible-chars text-entity lines-to-skip-count lines-to-crop-count)]
