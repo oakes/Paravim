@@ -192,7 +192,10 @@
                        (fn [x]
                          (when (string? x)
                            (vim/on-input game vim x))))
-         pipes (repl/create-pipes)]
+         pipes (repl/create-pipes)
+         density-ratio (get-density-ratio (:context game))]
+     (when (pos-int? density-ratio)
+       (swap! c/*state update :font-size-multiplier * density-ratio))
      (c/init game)
      (vim/init vim (fn [buffer-ptr event]
                      (case event
@@ -211,10 +214,7 @@
 
 (defn- start [game window]
   (let [game (assoc game :delta-time 0 :total-time 0 :clear? true)
-        utils (init game)
-        density-ratio (get-density-ratio window)]
-    (when (pos-int? density-ratio)
-      (swap! c/*state update :font-size-multiplier * density-ratio))
+        utils (init game)]
     (GLFW/glfwShowWindow window)
     (listen-for-events utils window)
     (loop [game game]
