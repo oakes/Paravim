@@ -76,8 +76,9 @@
     (start/on-char! paravim-utils handle (int \j))
     (start/on-resize! paravim-utils handle 800 600)))
 
-;; this test reproduces a crash in the libvim
+;; this test reproduces a crash in libvim
 ;; when search highlighting is enabled
+;; without hlsearch set
 (deftest search-highlights-crash
   (v/set-current-buffer vim core-buffer)
   (dotimes [_ 50]

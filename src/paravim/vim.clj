@@ -187,7 +187,6 @@
                             c/update-selection state (-> (v/get-visual-range vim)
                                                          (update :start-line dec)
                                                          (update :end-line dec)))
-                          #_#_ ;; search highlights are disabled for now
                           (and (:show-search? state) visible-start-line visible-end-line)
                           (update-in [:buffers current-buffer]
                             c/update-search-highlights state (->> (v/get-search-highlights vim (inc visible-start-line) (inc visible-end-line))
@@ -280,6 +279,7 @@
     (v/execute "set softtabstop=2")
     (v/execute "set shiftwidth=2")
     (v/execute "set expandtab")
+    (v/execute "set hlsearch")
     (v/execute "filetype plugin indent on")))
 
 (defn init [vim on-auto-command]
