@@ -567,15 +567,16 @@
              font-height (:font-height baked-font)
              snap-to-top (fn [game-height multiplier] (* font-height multiplier))
              snap-to-bottom (fn [game-height multiplier] (- game-height (* font-height multiplier)))
-             repl-edge (fn [game-height multiplier] (- game-height (* 5 font-height multiplier)))]
+             repl-in-top (fn [game-height multiplier] (- game-height (* 5 font-height multiplier)))
+             repl-out-bottom (fn [game-height multiplier] (- game-height (* 6 font-height multiplier)))]
          (swap! *state assoc
            :font-width font-width
            :font-height font-height
            :base-font-entity font-entity
            :base-text-entity text-entity
            :text-boxes {:files {:left 0 :right 0 :top snap-to-top :bottom snap-to-bottom}
-                        :repl-in {:left 0 :right 0 :top repl-edge :bottom snap-to-bottom}
-                        :repl-out {:left 0 :right 0 :top snap-to-top :bottom repl-edge}})
+                        :repl-in {:left 0 :right 0 :top repl-in-top :bottom snap-to-bottom}
+                        :repl-out {:left 0 :right 0 :top snap-to-top :bottom repl-out-bottom}})
          (#?(:clj load-font-clj :cljs load-font-cljs) :roboto
           (fn [{:keys [data]} baked-font]
             (let [font-entity (-> (text/->font-entity game data baked-font)
