@@ -35,7 +35,7 @@
                        :buffer-updates []
                        :current-tab :files
                        :tab->buffer {}
-                       :font-size-multiplier (float (/ 1 2))
+                       :font-size-multiplier (float (/ 1 4))
                        :text-boxes {}
                        :bounding-boxes {}
                        :show-search? false}))

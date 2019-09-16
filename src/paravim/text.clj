@@ -1,10 +1,10 @@
 (ns paravim.text
   (:require [play-cljc.text :as text]))
 
-(def bitmap-size 512)
+(def bitmap-size 1024)
 (def bitmaps {:firacode (text/->bitmap bitmap-size bitmap-size)
               :roboto (text/->bitmap bitmap-size bitmap-size)})
-(def font-height 64)
+(def font-height 96)
 (def baked-fonts {:firacode (text/->baked-font "ttf/FiraCode-Regular.ttf" font-height (:firacode bitmaps))
                   :roboto (text/->baked-font "ttf/Roboto-Regular.ttf" font-height (:roboto bitmaps))})
 
