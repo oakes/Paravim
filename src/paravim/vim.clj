@@ -201,10 +201,10 @@
             state)
           (c/update-command state (v/get-command-text vim) (v/get-command-position vim))
           (if (c/get-buffer state current-buffer)
-            (-> state
-                (update-in [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)
-                c/update-buffers
-                (update-in [:buffers current-buffer] update-buffer state game vim))
+            (as-> state state
+                  (update-in state [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)
+                  (c/update-buffers state)
+                  (update-in state [:buffers current-buffer] update-buffer state game vim))
             state))))
 
 (defn on-input [game vim s]
