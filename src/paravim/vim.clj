@@ -165,8 +165,8 @@
       (c/update-selection buffer state visual-range))
     buffer))
 
-(defn update-search-highlights [{:keys [visible-start-line visible-end-line] :as buffer} {:keys [search-pattern] :as state} vim]
-  (if (and search-pattern visible-start-line visible-end-line)
+(defn update-search-highlights [{:keys [visible-start-line visible-end-line] :as buffer} {:keys [show-search?] :as state} vim]
+  (if (and show-search? visible-start-line visible-end-line)
     (let [highlights (mapv (fn [highlight]
                              (-> highlight
                                  (update :start-line dec)
@@ -197,7 +197,7 @@
             state)
           (if (and (= (:command-start state) "/")
                    (= mode 'COMMAND_LINE))
-            (assoc state :search-pattern (v/get-search-pattern vim))
+            (assoc state :show-search? true)
             state)
           (c/update-command state (v/get-command-text vim) (v/get-command-position vim))
           (if (c/get-buffer state current-buffer)
@@ -304,11 +304,11 @@
                                  nil)))
   (v/set-on-buffer-update vim (partial on-buf-update vim))
   (v/set-on-stop-search-highlight vim (fn []
-                                        (swap! c/*state assoc :search-pattern nil)))
+                                        (swap! c/*state assoc :show-search? false)))
   (v/set-on-unhandled-escape vim (fn []
                                    (swap! c/*state
                                      (fn [{:keys [current-buffer] :as state}]
-                                       (let [state (assoc state :search-pattern nil)]
+                                       (let [state (assoc state :show-search? false)]
                                          (if (c/get-buffer state current-buffer)
                                            (update-in state [:buffers current-buffer] update-buffer state game vim)
                                            state))))))
