@@ -24,8 +24,8 @@
                 :repl-in "repl.in"
                 :repl-out "repl.out"})
 
-(def font-size-step (/ 1 6))
-(def min-font-size (/ 1 6))
+(def font-size-step (/ 1 8))
+(def min-font-size (/ 1 8))
 (def max-font-size 1)
 
 (defonce *state (atom {:mouse-x 0
@@ -35,7 +35,7 @@
                        :buffer-updates []
                        :current-tab :files
                        :tab->buffer {}
-                       :font-size-multiplier (/ 1 3)
+                       :font-size-multiplier (/ 1 4)
                        :text-boxes {}
                        :bounding-boxes {}
                        :show-search? false}))
