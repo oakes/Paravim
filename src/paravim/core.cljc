@@ -38,7 +38,7 @@
                        :font-size-multiplier (/ 1 3)
                        :text-boxes {}
                        :bounding-boxes {}
-                       :show-search? false}))
+                       :search-pattern nil}))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
 
@@ -366,7 +366,7 @@
       'u_alpha alpha
       'u_start_line 0))
 
-(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start show-search?] :as state} text position]
+(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start] :as state} text position]
   (let [command-text-entity (when text
                               (-> (chars/assoc-line base-text-entity 0 (mapv #(-> base-font-entity (chars/crop-char %) (t/color bg-color))
                                                                          (str command-start text)))
@@ -378,8 +378,7 @@
     (assoc state
       :command-text text
       :command-text-entity command-text-entity
-      :command-cursor-entity command-cursor-entity
-      :show-search? (if (= command-start "/") true show-search?))))
+      :command-cursor-entity command-cursor-entity)))
 
 (defn range->rects [text-entity font-width font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
   (vec (for [line-num (range start-line (inc end-line))]

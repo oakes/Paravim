@@ -197,12 +197,7 @@
      (when (pos-int? density-ratio)
        (swap! c/*state update :font-size-multiplier * density-ratio))
      (c/init game)
-     (vim/init vim (fn [buffer-ptr event]
-                     (case event
-                       EVENT_BUFENTER
-                       (when vim/*update-ui?*
-                         (vim/on-buf-enter game vim buffer-ptr))
-                       nil)))
+     (vim/init vim game)
      (when vim-chan
        (poll-input game vim vim-chan)
        (async/put! vim-chan [:resize])
