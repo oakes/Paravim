@@ -298,12 +298,13 @@
   (let [{:keys [current-buffer] :as state} @c/*state]
     (when-let [{:keys [lines]} (c/get-buffer state current-buffer)]
       (let [yanked-lines (subvec lines (dec start-line) end-line)
+            end-line (dec (count yanked-lines))
             end-column (cond-> end-column
                                (and (pos? end-column)
-                                    (not= end-line (count lines)))
+                                    (< end-column (count (nth yanked-lines end-line))))
                                inc)]
         (-> yanked-lines
-            (update (dec (count yanked-lines)) subs 0 end-column)
+            (update end-line subs 0 end-column)
             (update 0 subs start-column))))))
 
 (defn init [vim game]
