@@ -45,6 +45,7 @@
 (def text-color [1 1 1 1])
 (def cursor-color [(/ 112 255) (/ 128 255) (/ 144 255) 0.9])
 (def select-color [(/ 148 255) (/ 69 255) (/ 5 255) 0.8])
+(def search-color [(/ 127 255) (/ 52 255) (/ 83 255) 0.8])
 
 (def text-alpha 1.0)
 (def parinfer-alpha 0.15)
@@ -63,7 +64,6 @@
 
 (def orange-color [(/ 220 255) (/ 103 255) (/ 44 255) 1])
 (def red-color [(/ 210 255) (/ 45 255) (/ 58 255) 1])
-(def purple-color [(/ 127 255) (/ 52 255) (/ 83 255) 1])
 (def green-color [(/ 65 255) (/ 174 255) (/ 122 255) 1])
 
 (def rainbow-colors [orange-color
@@ -438,7 +438,7 @@
 
 (defn update-search-highlights [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as state} highlights]
   (let [rects (vec (mapcat (partial range->rects text-entity font-width font-height) highlights))]
-    (update buffer :rects-entity assoc-rects base-rect-entity purple-color rects)))
+    (update buffer :rects-entity assoc-rects base-rect-entity search-color rects)))
 
 (defn get-extension
   [path]
