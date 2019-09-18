@@ -300,11 +300,11 @@
     (when-let [{:keys [lines]} (c/get-buffer state current-buffer)]
       (let [lines (subvec lines (dec start-line) end-line)
             end-column (cond-> end-column
-                               (= start-line end-line)
-                               (- start-column))]
+                               (pos? end-column)
+                               inc)]
         (-> lines
-            (update 0 subs start-column)
-            (update (dec (count lines)) subs 0 end-column))))))
+            (update (dec (count lines)) subs 0 end-column)
+            (update 0 subs start-column))))))
 
 (defn init [vim game]
   (v/set-on-quit vim (fn [buffer-ptr force?]
