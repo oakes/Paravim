@@ -24,7 +24,7 @@
                 :repl-in "repl.in"
                 :repl-out "repl.out"})
 
-(def font-size-step (/ 1 8))
+(def font-size-step (/ 1 16))
 (def min-font-size (/ 1 8))
 (def max-font-size 1)
 
