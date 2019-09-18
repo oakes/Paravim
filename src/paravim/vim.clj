@@ -4,7 +4,9 @@
             [clojure.string :as str]
             [clojure.java.io :as io]
             [parinferish.core :as par])
-  (:import [java.time LocalDate]))
+  (:import [java.time LocalDate]
+           [java.awt Toolkit]
+           [java.awt.datatransfer StringSelection]))
 
 ;; https://vim.fandom.com/wiki/Mapping_keys_in_Vim_-_Tutorial_%28Part_2%29
 
@@ -293,6 +295,17 @@
     (v/execute "set hlsearch")
     (v/execute "filetype plugin indent on")))
 
+(defn yank-lines [{:keys [start-line start-column end-line end-column]}]
+  (let [{:keys [current-buffer] :as state} @c/*state]
+    (when-let [{:keys [lines]} (c/get-buffer state current-buffer)]
+      (let [lines (subvec lines (dec start-line) end-line)
+            end-column (cond-> end-column
+                               (= start-line end-line)
+                               (- start-column))]
+        (-> lines
+            (update 0 subs start-column)
+            (update (dec (count lines)) subs 0 end-column))))))
+
 (defn init [vim game]
   (v/set-on-quit vim (fn [buffer-ptr force?]
                        (System/exit 0)))
@@ -312,6 +325,13 @@
                                          (if (c/get-buffer state current-buffer)
                                            (update-in state [:buffers current-buffer] update-buffer state game vim)
                                            state))))))
+  (v/set-on-yank vim (fn [yank-info]
+                       (try
+                         (when-let [lines (yank-lines yank-info)]
+                           (-> (Toolkit/getDefaultToolkit)
+                               .getSystemClipboard
+                               (.setContents (StringSelection. (str/join \newline lines)) nil)))
+                         (catch Exception e (.printStackTrace e)))))
   (run! #(v/open-buffer vim (c/tab->path %)) [:repl-in :repl-out :files])
   (init-ascii))
 
