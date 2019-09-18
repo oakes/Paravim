@@ -5,8 +5,7 @@
             [clojure.java.io :as io]
             [parinferish.core :as par])
   (:import [java.time LocalDate]
-           [java.awt Toolkit]
-           [java.awt.datatransfer StringSelection]))
+           [org.lwjgl.glfw GLFW]))
 
 ;; https://vim.fandom.com/wiki/Mapping_keys_in_Vim_-_Tutorial_%28Part_2%29
 
@@ -329,9 +328,8 @@
   (v/set-on-yank vim (fn [yank-info]
                        (try
                          (when-let [lines (yank-lines yank-info)]
-                           (-> (Toolkit/getDefaultToolkit)
-                               .getSystemClipboard
-                               (.setContents (StringSelection. (str/join \newline lines)) nil)))
+                           (GLFW/glfwSetClipboardString (:context game)
+                             (str/join \newline lines)))
                          (catch Exception e (.printStackTrace e)))))
   (run! #(v/open-buffer vim (c/tab->path %)) [:repl-in :repl-out :files])
   (init-ascii))
