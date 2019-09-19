@@ -51,6 +51,7 @@
 (def parinfer-alpha 0.15)
 (def highlight-alpha 0.05)
 (def unfocused-alpha 0.5)
+(def completion-alpha 0.35)
 
 (def yellow-color [(/ 255 255) (/ 193 255) (/ 94 255) 1])
 (def tan-color [(/ 209 255) (/ 153 255) (/ 101 255) 1])
@@ -365,11 +366,21 @@
       'u_alpha alpha
       'u_start_line 0))
 
-(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start] :as state} text position]
+(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start command-completion] :as state} text position]
   (let [command-text-entity (when text
-                              (-> (chars/assoc-line base-text-entity 0 (mapv #(-> base-font-entity (chars/crop-char %) (t/color bg-color))
+                              (-> (chars/assoc-line base-text-entity 0 (mapv #(-> base-font-entity
+                                                                                  (chars/crop-char %)
+                                                                                  (t/color bg-color))
                                                                          (str command-start text)))
                                   (update-uniforms font-height text-alpha)))
+        command-completion-text-entity (when (and text command-completion)
+                                         (-> (chars/assoc-line base-text-entity 0 (mapv #(-> base-font-entity
+                                                                                             (chars/crop-char %)
+                                                                                             (t/color (set-alpha bg-color completion-alpha)))
+                                                                                    (str command-start
+                                                                                         (some->> (str/last-index-of text " ") inc (subs text 0))
+                                                                                         command-completion)))
+                                             (update-uniforms font-height text-alpha)))
         command-cursor-entity (when text
                                 (let [line-chars (get-in command-text-entity [:characters 0])]
                                   (-> base-rects-entity
@@ -377,6 +388,7 @@
     (assoc state
       :command-text text
       :command-text-entity command-text-entity
+      :command-completion-text-entity command-completion-text-entity
       :command-cursor-entity command-cursor-entity)))
 
 (defn range->rects [text-entity font-width font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
@@ -665,7 +677,7 @@
         game-height (utils/get-height game)
         {:keys [current-buffer
                 base-rect-entity base-rects-entity
-                command-text-entity command-cursor-entity
+                command-text-entity command-completion-text-entity command-cursor-entity
                 font-height mode font-size-multiplier ascii
                 tab-text-entities bounding-boxes current-tab tab->buffer]
          :as state} @*state]
@@ -709,12 +721,17 @@
                                         (:y1 bounding-box))
                            (t/scale font-size-multiplier font-size-multiplier))))
       (when (and (= mode 'COMMAND_LINE)
-                 command-cursor-entity
-                 command-text-entity)
+                 command-text-entity
+                 command-cursor-entity)
         (c/render game (-> command-cursor-entity
                            (t/project game-width game-height)
                            (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                            (t/scale font-size-multiplier font-size-multiplier)))
+        (when command-completion-text-entity
+          (c/render game (-> command-completion-text-entity
+                             (t/project game-width game-height)
+                             (t/translate 0 (- game-height (* font-size-multiplier font-height)))
+                             (t/scale font-size-multiplier font-size-multiplier))))
         (c/render game (-> command-text-entity
                            (t/project game-width game-height)
                            (t/translate 0 (- game-height (* font-size-multiplier font-height)))

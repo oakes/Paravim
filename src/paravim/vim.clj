@@ -141,18 +141,17 @@
                  "intro")
              (swap! c/*state assoc-ascii))))
 
-(defn input [{:keys [mode command-text command-start] :as state} vim s]
+(defn input [{:keys [mode command-text command-start command-completion] :as state} vim s]
   (if (and (= 'COMMAND_LINE mode) command-text)
     (let [pos (v/get-command-position vim)]
       (case s
         "<Tab>"
-        (when (= (count command-text) pos)
-          (when-let [completion-text (v/get-command-completion vim)]
-            (when-let [first-part (str/last-index-of command-text " ")]
-              (dotimes [_ (- (count command-text) (inc first-part))]
-                (v/input vim "<BS>"))
-              (doseq [ch completion-text]
-                (v/input vim (str ch))))))
+        (when (and (= (count command-text) pos) command-completion)
+          (when-let [first-part (str/last-index-of command-text " ")]
+            (dotimes [_ (- (count command-text) (inc first-part))]
+              (v/input vim "<BS>"))
+            (doseq [ch command-completion]
+              (v/input vim (str ch)))))
         ("<Right>" "<Left>" "<Up>" "<Down>")
         nil
         (v/input vim s)))
@@ -188,17 +187,20 @@
         old-mode (:mode state)
         mode (v/get-mode vim)
         cursor-line (dec (v/get-cursor-line vim))
-        cursor-column (v/get-cursor-column vim)]
+        cursor-column (v/get-cursor-column vim)
+        command-line? (= mode 'COMMAND_LINE)]
     (as-> state state
           (change-ascii state s)
-          (assoc state :mode mode)
-          (if (and (not= 'COMMAND_LINE old-mode)
-                   (= mode 'COMMAND_LINE))
-            (assoc state :command-start s)
-            state)
-          (if (and (= (:command-start state) "/")
-                   (= mode 'COMMAND_LINE))
-            (assoc state :show-search? true)
+          (assoc state
+                 :mode mode
+                 :command-completion (when command-line?
+                                       (v/get-command-completion vim)))
+          (if command-line?
+            (cond-> state
+                    (not= old-mode 'COMMAND_LINE)
+                    (assoc :command-start s)
+                    (= (:command-start state) "/")
+                    (assoc :show-search? true))
             state)
           (c/update-command state (v/get-command-text vim) (v/get-command-position vim))
           (if (c/get-buffer state current-buffer)
