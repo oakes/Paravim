@@ -188,22 +188,23 @@
         old-mode (:mode state)
         mode (v/get-mode vim)
         cursor-line (dec (v/get-cursor-line vim))
-        cursor-column (v/get-cursor-column vim)
-        command-line? (= mode 'COMMAND_LINE)]
+        cursor-column (v/get-cursor-column vim)]
     (as-> state state
           (change-ascii state s)
-          (assoc state
-                 :mode mode
-                 :command-completion (when command-line?
-                                       (v/get-command-completion vim)))
-          (if command-line?
-            (cond-> state
-                    (not= old-mode 'COMMAND_LINE)
-                    (assoc :command-start s)
-                    (= (:command-start state) "/")
-                    (assoc :show-search? true))
-            state)
-          (c/update-command state (v/get-command-text vim) (v/get-command-position vim))
+          (assoc state :mode mode)
+          (if (= mode 'COMMAND_LINE)
+            (-> state
+                (assoc
+                  :command-text (v/get-command-text vim)
+                  :command-completion (v/get-command-completion vim))
+                (c/update-command (v/get-command-position vim))
+                (cond-> (not= old-mode 'COMMAND_LINE)
+                        (assoc :command-start s)
+                        (= (:command-start state) "/")
+                        (assoc :show-search? true)))
+            (assoc state
+              :command-text nil
+              :command-completion nil))
           (if (c/get-buffer state current-buffer)
             (as-> state state
                   (update-in state [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)

@@ -366,31 +366,32 @@
       'u_alpha alpha
       'u_start_line 0))
 
-(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start command-completion] :as state} text position]
-  (let [state (assoc state :command-text text)]
-    (if (nil? text)
-      state
-      (let [char-entities (mapv #(-> base-font-entity
-                                     (chars/crop-char %)
-                                     (t/color bg-color))
-                            (str command-start text))
-            completion-entities (when command-completion
-                                  (mapv #(-> base-font-entity
-                                             (chars/crop-char %)
-                                             (t/color (set-alpha bg-color completion-alpha)))
-                                    (subs
-                                      (str command-start
-                                           (some->> (str/last-index-of text " ") inc (subs text 0))
-                                           command-completion)
-                                      (count char-entities))))
-            char-entities (into char-entities completion-entities)
-            command-text-entity (-> (chars/assoc-line base-text-entity 0 char-entities)
-                                    (update-uniforms font-height text-alpha))
-            line-chars (get-in command-text-entity [:characters 0])
-            command-cursor-entity (i/assoc base-rects-entity 0 (->cursor-entity state line-chars 0 (inc position)))]
-        (assoc state
-          :command-text-entity command-text-entity
-          :command-cursor-entity command-cursor-entity)))))
+(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start command-text command-completion] :as state} position]
+  (if command-text
+    (let [char-entities (mapv #(-> base-font-entity
+                                   (chars/crop-char %)
+                                   (t/color bg-color))
+                          (str command-start command-text))
+          completion-entities (when command-completion
+                                (mapv #(-> base-font-entity
+                                           (chars/crop-char %)
+                                           (t/color (set-alpha bg-color completion-alpha)))
+                                  (subs
+                                    (str command-start
+                                         (some->> (str/last-index-of command-text " ") inc (subs command-text 0))
+                                         command-completion)
+                                    (count char-entities))))
+          char-entities (into char-entities completion-entities)
+          command-text-entity (-> (chars/assoc-line base-text-entity 0 char-entities)
+                                  (update-uniforms font-height text-alpha))
+          line-chars (get-in command-text-entity [:characters 0])
+          command-cursor-entity (i/assoc base-rects-entity 0 (->cursor-entity state line-chars 0 (inc position)))]
+      (assoc state
+        :command-text-entity command-text-entity
+        :command-cursor-entity command-cursor-entity))
+    (assoc state
+      :command-text-entity nil
+      :command-cursor-entity nil)))
 
 (defn range->rects [text-entity font-width font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
   (vec (for [line-num (range start-line (inc end-line))]
