@@ -143,15 +143,16 @@
 
 (defn input [{:keys [mode command-text command-start command-completion] :as state} vim s]
   (if (and (= 'COMMAND_LINE mode) command-text)
-    (let [pos (v/get-command-position vim)]
+    (let [pos (v/get-command-position vim)
+          first-part (or (some-> (str/last-index-of command-text " ") inc)
+                         0)]
       (case s
         "<Tab>"
         (when (and (= (count command-text) pos) command-completion)
-          (when-let [first-part (str/last-index-of command-text " ")]
-            (dotimes [_ (- (count command-text) (inc first-part))]
-              (v/input vim "<BS>"))
-            (doseq [ch command-completion]
-              (v/input vim (str ch)))))
+          (dotimes [_ (- (count command-text) first-part)]
+            (v/input vim "<BS>"))
+          (doseq [ch command-completion]
+            (v/input vim (str ch))))
         ("<Right>" "<Left>" "<Up>" "<Down>")
         nil
         (v/input vim s)))
