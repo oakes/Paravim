@@ -51,7 +51,7 @@
 (def parinfer-alpha 0.15)
 (def highlight-alpha 0.05)
 (def unfocused-alpha 0.5)
-(def completion-alpha 0.35)
+(def completion-alpha 0.65)
 
 (def yellow-color [(/ 255 255) (/ 193 255) (/ 94 255) 1])
 (def tan-color [(/ 209 255) (/ 153 255) (/ 101 255) 1])
