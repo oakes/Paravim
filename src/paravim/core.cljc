@@ -367,29 +367,30 @@
       'u_start_line 0))
 
 (defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start command-completion] :as state} text position]
-  (let [command-text-entity (when text
-                              (-> (chars/assoc-line base-text-entity 0 (mapv #(-> base-font-entity
-                                                                                  (chars/crop-char %)
-                                                                                  (t/color bg-color))
-                                                                         (str command-start text)))
-                                  (update-uniforms font-height text-alpha)))
-        command-completion-text-entity (when (and text command-completion)
-                                         (-> (chars/assoc-line base-text-entity 0 (mapv #(-> base-font-entity
-                                                                                             (chars/crop-char %)
-                                                                                             (t/color (set-alpha bg-color completion-alpha)))
-                                                                                    (str command-start
-                                                                                         (some->> (str/last-index-of text " ") inc (subs text 0))
-                                                                                         command-completion)))
-                                             (update-uniforms font-height text-alpha)))
-        command-cursor-entity (when text
-                                (let [line-chars (get-in command-text-entity [:characters 0])]
-                                  (-> base-rects-entity
-                                      (i/assoc 0 (->cursor-entity state line-chars 0 (inc position))))))]
-    (assoc state
-      :command-text text
-      :command-text-entity command-text-entity
-      :command-completion-text-entity command-completion-text-entity
-      :command-cursor-entity command-cursor-entity)))
+  (let [state (assoc state :command-text text)]
+    (if (nil? text)
+      state
+      (let [char-entities (mapv #(-> base-font-entity
+                                     (chars/crop-char %)
+                                     (t/color bg-color))
+                            (str command-start text))
+            completion-entities (when command-completion
+                                  (mapv #(-> base-font-entity
+                                             (chars/crop-char %)
+                                             (t/color (set-alpha bg-color completion-alpha)))
+                                    (subs
+                                      (str command-start
+                                           (some->> (str/last-index-of text " ") inc (subs text 0))
+                                           command-completion)
+                                      (count char-entities))))
+            char-entities (into char-entities completion-entities)
+            command-text-entity (-> (chars/assoc-line base-text-entity 0 char-entities)
+                                    (update-uniforms font-height text-alpha))
+            line-chars (get-in command-text-entity [:characters 0])
+            command-cursor-entity (i/assoc base-rects-entity 0 (->cursor-entity state line-chars 0 (inc position)))]
+        (assoc state
+          :command-text-entity command-text-entity
+          :command-cursor-entity command-cursor-entity)))))
 
 (defn range->rects [text-entity font-width font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
   (vec (for [line-num (range start-line (inc end-line))]
@@ -727,11 +728,6 @@
                            (t/project game-width game-height)
                            (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                            (t/scale font-size-multiplier font-size-multiplier)))
-        (when command-completion-text-entity
-          (c/render game (-> command-completion-text-entity
-                             (t/project game-width game-height)
-                             (t/translate 0 (- game-height (* font-size-multiplier font-height)))
-                             (t/scale font-size-multiplier font-size-multiplier))))
         (c/render game (-> command-text-entity
                            (t/project game-width game-height)
                            (t/translate 0 (- game-height (* font-size-multiplier font-height)))
