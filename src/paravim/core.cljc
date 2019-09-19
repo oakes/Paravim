@@ -366,6 +366,12 @@
       'u_alpha alpha
       'u_start_line 0))
 
+(defn assoc-command-text [state text completion]
+  (assoc state :command-text text :command-completion (when (seq text) completion)))
+
+(defn assoc-command-entity [state text-entity cursor-entity]
+  (assoc state :command-text-entity text-entity :command-cursor-entity cursor-entity))
+
 (defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start command-text command-completion] :as state} position]
   (if command-text
     (let [char-entities (mapv #(-> base-font-entity
@@ -386,12 +392,8 @@
                                   (update-uniforms font-height text-alpha))
           line-chars (get-in command-text-entity [:characters 0])
           command-cursor-entity (i/assoc base-rects-entity 0 (->cursor-entity state line-chars 0 (inc position)))]
-      (assoc state
-        :command-text-entity command-text-entity
-        :command-cursor-entity command-cursor-entity))
-    (assoc state
-      :command-text-entity nil
-      :command-cursor-entity nil)))
+      (assoc-command-entity state command-text-entity command-cursor-entity))
+    (assoc-command-entity state nil nil)))
 
 (defn range->rects [text-entity font-width font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
   (vec (for [line-num (range start-line (inc end-line))]

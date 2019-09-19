@@ -142,20 +142,23 @@
              (swap! c/*state assoc-ascii))))
 
 (defn input [{:keys [mode command-text command-start command-completion] :as state} vim s]
-  (if (and (= 'COMMAND_LINE mode) command-text)
-    (let [pos (v/get-command-position vim)
-          first-part (or (some-> (str/last-index-of command-text " ") inc)
-                         0)]
+  (if (= 'COMMAND_LINE mode)
+    (let [pos (v/get-command-position vim)]
       (case s
         "<Tab>"
         (when (and (= (count command-text) pos) command-completion)
-          (dotimes [_ (- (count command-text) first-part)]
-            (v/input vim "<BS>"))
-          (doseq [ch command-completion]
-            (v/input vim (str ch))))
+          (let [first-part (or (some-> command-text (str/last-index-of " ") inc)
+                               0)]
+            (dotimes [_ (- (count command-text) first-part)]
+              (v/input vim "<BS>"))
+            (doseq [ch command-completion]
+              (v/input vim (str ch)))))
         ("<Right>" "<Left>" "<Up>" "<Down>")
         nil
-        (v/input vim s)))
+        (if (and (= s "!")
+                 (not (seq (some-> command-text str/trim))))
+          nil ;; disable shell commands for now
+          (v/input vim s))))
     (v/input vim s)))
 
 (defn update-selection [buffer state vim]
@@ -194,17 +197,13 @@
           (assoc state :mode mode)
           (if (= mode 'COMMAND_LINE)
             (-> state
-                (assoc
-                  :command-text (v/get-command-text vim)
-                  :command-completion (v/get-command-completion vim))
-                (c/update-command (v/get-command-position vim))
+                (c/assoc-command-text (v/get-command-text vim) (v/get-command-completion vim))
                 (cond-> (not= old-mode 'COMMAND_LINE)
                         (assoc :command-start s)
                         (= (:command-start state) "/")
-                        (assoc :show-search? true)))
-            (assoc state
-              :command-text nil
-              :command-completion nil))
+                        (assoc :show-search? true))
+                (c/update-command (v/get-command-position vim)))
+            (c/assoc-command-text state nil nil))
           (if (c/get-buffer state current-buffer)
             (as-> state state
                   (update-in state [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)
