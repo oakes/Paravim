@@ -241,7 +241,7 @@
         curr-char (get line-chars column)
         {:keys [left width height]} curr-char
         width (cond-> (or width font-width)
-                      (= 'INSERT mode)
+                      ('#{INSERT COMMAND_LINE} mode)
                       (/ 4))
         left (or left
                  (some-> (:left left-char)
