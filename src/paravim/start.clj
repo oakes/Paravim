@@ -84,7 +84,7 @@
           shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))]
       (if-let [k (keycode->keyword keycode)]
         (cond
-          (and (or control? alt?) (= k :tab))
+          (and control? (= k :tab))
           (do
             (swap! c/*state c/change-tab (if shift? -1 1))
             (send-input! [:new-tab]))
