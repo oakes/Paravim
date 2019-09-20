@@ -27,14 +27,10 @@ clojure -Sdeps "{:deps {paravim {:mvn/version \""RELEASE\""}}}" -J-XstartOnFirst
 
 ## Development
 
-* To develop on each OS:
-  * `clj -A:dev:linux native`
-  * `clj -A:dev:macos native`
-  * `clj -A:dev:windows native`
-* To run the tests on each OS:
-  * `clj -A:test:linux`
-  * `clj -A:test:macos`
-  * `clj -A:test:windows`
+* To develop: `clj -A:dev native`
+  * On Mac OS, you'll need to run `clj -A:dev:macos native`
+* To run the tests: `clj -A:test`
+  * On Mac OS, you'll need to run `clj -A:test:macos`
 * To install the release version: `clj -A:prod install`
 
 ## Licensing

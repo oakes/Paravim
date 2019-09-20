@@ -9,7 +9,19 @@
         parinferish {:mvn/version "0.6.3"}
         com.rpl/specter {:mvn/version "1.1.2"}
         org.clojars.oakes/core.rrb-vector {:mvn/version "0.0.15-2019.09.02"}
-        org.clojure/core.async {:mvn/version "0.4.500"}}
+        org.clojure/core.async {:mvn/version "0.4.500"}
+        org.lwjgl/lwjgl$natives-linux {:mvn/version "3.2.3"}
+        org.lwjgl/lwjgl-glfw$natives-linux {:mvn/version "3.2.3"}
+        org.lwjgl/lwjgl-opengl$natives-linux {:mvn/version "3.2.3"}
+        org.lwjgl/lwjgl-stb$natives-linux {:mvn/version "3.2.3"}
+        org.lwjgl/lwjgl$natives-macos {:mvn/version "3.2.3"}
+        org.lwjgl/lwjgl-glfw$natives-macos {:mvn/version "3.2.3"}
+        org.lwjgl/lwjgl-opengl$natives-macos {:mvn/version "3.2.3"}
+        org.lwjgl/lwjgl-stb$natives-macos {:mvn/version "3.2.3"}
+        org.lwjgl/lwjgl$natives-windows {:mvn/version "3.2.3"}
+        org.lwjgl/lwjgl-glfw$natives-windows {:mvn/version "3.2.3"}
+        org.lwjgl/lwjgl-opengl$natives-windows {:mvn/version "3.2.3"}
+        org.lwjgl/lwjgl-stb$natives-windows {:mvn/version "3.2.3"}}
  :aliases {:dev {:extra-deps {orchestra {:mvn/version "2018.12.06-2"}
                               expound {:mvn/version "0.7.2"}}
                  :main-opts ["dev.clj"]}
@@ -17,19 +29,7 @@
                   :main-opts ["prod.clj"]}
            :test {:extra-paths ["test"]
                   :main-opts ["test.clj"]}
-           :linux {:extra-deps {org.lwjgl/lwjgl$natives-linux {:mvn/version "3.2.3"}
-                                org.lwjgl/lwjgl-glfw$natives-linux {:mvn/version "3.2.3"}
-                                org.lwjgl/lwjgl-opengl$natives-linux {:mvn/version "3.2.3"}
-                                org.lwjgl/lwjgl-stb$natives-linux {:mvn/version "3.2.3"}}}
-           :macos {:extra-deps {org.lwjgl/lwjgl$natives-macos {:mvn/version "3.2.3"}
-                                org.lwjgl/lwjgl-glfw$natives-macos {:mvn/version "3.2.3"}
-                                org.lwjgl/lwjgl-opengl$natives-macos {:mvn/version "3.2.3"}
-                                org.lwjgl/lwjgl-stb$natives-macos {:mvn/version "3.2.3"}}
-                   :jvm-opts ["-XstartOnFirstThread"]}
-           :windows {:extra-deps {org.lwjgl/lwjgl$natives-windows {:mvn/version "3.2.3"}
-                                  org.lwjgl/lwjgl-glfw$natives-windows {:mvn/version "3.2.3"}
-                                  org.lwjgl/lwjgl-opengl$natives-windows {:mvn/version "3.2.3"}
-                                  org.lwjgl/lwjgl-stb$natives-windows {:mvn/version "3.2.3"}}}
+           :macos {:jvm-opts ["-XstartOnFirstThread"]}
            :profiler {:extra-deps {com.clojure-goes-fast/clj-async-profiler {:mvn/version "0.4.0"}}
                       :jvm-opts ["-Djdk.attach.allowAttachSelf"
                                  "-XX:+UnlockDiagnosticVMOptions"
