@@ -34,7 +34,9 @@
    GLFW/GLFW_KEY_UP :up
    GLFW/GLFW_KEY_DOWN :down
    GLFW/GLFW_KEY_LEFT :left
-   GLFW/GLFW_KEY_RIGHT :right})
+   GLFW/GLFW_KEY_RIGHT :right
+   GLFW/GLFW_KEY_HOME :home
+   GLFW/GLFW_KEY_END :end})
 
 (def ^:private keycode->char
   {GLFW/GLFW_KEY_D \D
