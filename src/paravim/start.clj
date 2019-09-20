@@ -119,9 +119,11 @@
         ;alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
         shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))
         press? (= action GLFW/GLFW_PRESS)
+        release? (= action GLFW/GLFW_RELEASE)
         control-key? (control-keycode? keycode)]
-    (swap! c/*state assoc :control? (or (and control? (not control-key?))
-                                        (and press? control-key?)))
+    (when (or press? release?)
+      (swap! c/*state assoc :control? (or (and control? (not control-key?))
+                                          (and press? control-key?))))
     (when press?
       (let [{:keys [mode current-tab] :as state} @c/*state
             k (keycode->keyword keycode)]
