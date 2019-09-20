@@ -37,6 +37,8 @@
    GLFW/GLFW_KEY_RIGHT :right
    GLFW/GLFW_KEY_HOME :home
    GLFW/GLFW_KEY_END :end
+   GLFW/GLFW_KEY_PAGE_UP :page-up
+   GLFW/GLFW_KEY_PAGE_DOWN :page-down
    GLFW/GLFW_KEY_GRAVE_ACCENT :backtick
    GLFW/GLFW_KEY_F :f
    GLFW/GLFW_KEY_MINUS :-
@@ -61,6 +63,8 @@
    :escape "Esc"
    :up "Up"
    :down "Down"
+   :page-up "PageUp"
+   :page-down "PageDown"
    :left "Left"
    :right "Right"
    :home "Home"
