@@ -207,6 +207,12 @@
                                            :height (:font-height baked-font))))]
      (assoc text-entity :characters (assoc characters line-num line)))))
 
+(defn translate [matrix x y]
+  (m/multiply-matrices 3 (m/translation-matrix x y) matrix))
+
+(defn update-translation-matrix [entity x y]
+  (update-in entity [:uniforms 'u_translate_matrix] translate x y))
+
 (defn assoc-line [text-entity line-num char-entities]
   (let [new-text-entity (specter/setval [:characters line-num] [] text-entity)
         new-text-entity (if (seq char-entities)
@@ -220,7 +226,7 @@
         adjusted-new-line (specter/transform
                             [specter/ALL (specter/collect-one :left) :uniforms 'u_translate_matrix]
                             (fn [left matrix]
-                              (m/multiply-matrices 3 (m/translation-matrix left 0) matrix))
+                              (translate matrix left 0))
                             new-line)]
     (-> text-entity
         (assoc-line* line-num adjusted-new-line)

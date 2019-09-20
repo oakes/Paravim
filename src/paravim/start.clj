@@ -112,37 +112,38 @@
         (send-input! [:new-tab])))))
 
 (defn on-key! [{:keys [vim pipes game send-input!]} window keycode scancode action mods]
-  (when (= action GLFW/GLFW_PRESS)
-    (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
-          ;alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
-          shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))
-          {:keys [mode current-tab] :as state} @c/*state
-          k (keycode->keyword keycode)]
-      (cond
-        ;; pressing enter in the repl
-        (and (= current-tab :repl-in)
-             (= k :enter)
-             (= mode 'NORMAL))
-        (vim/repl-enter! vim send-input! pipes)
-        ;; all ctrl shortcuts
-        control?
-        (case k
-          (:tab :backtick)
-          (do
-            (swap! c/*state c/change-tab (if shift? -1 1))
-            (send-input! [:new-tab]))
-          :f (reload-file! state pipes)
-          :- (swap! c/*state c/font-dec game)
-          := (swap! c/*state c/font-inc game)
-          ; else
-          (when-let [key-name (if k
-                                (keyword->name k)
-                                (keycode->char keycode))]
-            (send-input! (str "<C-" (when shift? "S-") key-name ">"))))
-        ;; all other input
-        :else
-        (when-let [key-name (keyword->name k)]
-          (send-input! (str "<" key-name ">")))))))
+  (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
+        ;alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
+        shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))]
+    (swap! c/*state assoc :control? control?)
+    (when (= action GLFW/GLFW_PRESS)
+      (let [{:keys [mode current-tab] :as state} @c/*state
+            k (keycode->keyword keycode)]
+        (cond
+          ;; pressing enter in the repl
+          (and (= current-tab :repl-in)
+               (= k :enter)
+               (= mode 'NORMAL))
+          (vim/repl-enter! vim send-input! pipes)
+          ;; all ctrl shortcuts
+          control?
+          (case k
+            (:tab :backtick)
+            (do
+              (swap! c/*state c/change-tab (if shift? -1 1))
+              (send-input! [:new-tab]))
+            :f (reload-file! state pipes)
+            :- (swap! c/*state c/font-dec game)
+            := (swap! c/*state c/font-inc game)
+            ; else
+            (when-let [key-name (if k
+                                  (keyword->name k)
+                                  (keycode->char keycode))]
+              (send-input! (str "<C-" (when shift? "S-") key-name ">"))))
+          ;; all other input
+          :else
+          (when-let [key-name (keyword->name k)]
+            (send-input! (str "<" key-name ">"))))))))
 
 (defn on-char! [{:keys [send-input!]} window codepoint]
   (send-input! (str (char codepoint))))

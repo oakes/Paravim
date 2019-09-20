@@ -17,9 +17,23 @@
   #?(:cljs (:require-macros [paravim.text :refer [load-font-cljs]])))
 
 (def orig-camera (e/->camera true))
-(def tabs [:files :repl-in :repl-out])
-(def buttons [:font-inc :font-dec :reload-file])
-(def tab? (set tabs))
+(def tabs [{:id :files
+            :text "Files"}
+           {:id :repl-in
+            :text "REPL In"}
+           {:id :repl-out
+            :text "REPL Out"}])
+(def buttons [{:id :font-inc
+               :text "Font +"
+               :shortcut-char 5}
+              {:id :font-dec
+               :text "Font -"
+               :shortcut-char 5}
+              {:id :reload-file
+               :text "Reload File"
+               :shortcut-char 7}])
+(def tab-ids (mapv :id tabs))
+(def tab? (set tab-ids))
 (def tab->path {:files "scratch.clj"
                 :repl-in "repl.in"
                 :repl-out "repl.out"})
@@ -298,7 +312,7 @@
                   :visible-start-line lines-to-skip-count
                   :visible-end-line lines-to-crop-count))))))
 
-(defn update-mouse [{:keys [text-boxes current-tab bounding-boxes tab-text-entities font-size-multiplier] :as state} game x y]
+(defn update-mouse [{:keys [text-boxes current-tab bounding-boxes toolbar-text-entities font-size-multiplier] :as state} game x y]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
         {:keys [left right top bottom] :as text-box} (get text-boxes current-tab)
@@ -329,7 +343,7 @@
       :mouse-type (cond
                     (= hover :text)
                     :ibeam
-                    (contains? tab-text-entities hover)
+                    (contains? toolbar-text-entities hover)
                     :hand))))
 
 (defn change-font-size [{:keys [font-size-multiplier current-buffer] :as state} game diff]
@@ -357,13 +371,13 @@
       state)))
 
 (defn change-tab [{:keys [current-tab] :as state} direction]
-  (let [index (+ (.indexOf tabs current-tab)
+  (let [index (+ (.indexOf tab-ids current-tab)
                  direction)
         index (cond
-                (neg? index) (dec (count tabs))
-                (= index (count tabs)) 0
+                (neg? index) (dec (count tab-ids))
+                (= index (count tab-ids)) 0
                 :else index)]
-    (assoc state :current-tab (nth tabs index))))
+    (assoc state :current-tab (nth tab-ids index))))
 
 (defn update-uniforms [{:keys [characters] :as text-entity} font-height alpha]
   (update text-entity :uniforms assoc
@@ -607,40 +621,49 @@
                                          :characters [])
                                   assoc-attr-lengths)
                   text-entity (c/compile game text-entity)
-                  files-text-entity (assoc-lines text-entity font-entity font-height ["Files"])
-                  repl-in-text-entity (assoc-lines text-entity font-entity font-height ["REPL In"])
-                  repl-out-text-entity (assoc-lines text-entity font-entity font-height ["REPL Out"])
                   tab-spacing (* font-width 2)
-                  tab-entities {:files files-text-entity
-                                :repl-in repl-in-text-entity
-                                :repl-out repl-out-text-entity}
+                  tab-entities (reduce
+                                 (fn [m {:keys [id text]}]
+                                   (assoc m id (assoc-lines text-entity font-entity font-height [text])))
+                                 {}
+                                 tabs)
                   bounding-boxes (reduce-kv
-                                   (fn [m i tab]
-                                     (let [last-tab (some->> (get tabs (dec i)) (get m))
+                                   (fn [m i {:keys [id]}]
+                                     (let [last-tab (some->> (get tabs (dec i)) :id (get m))
                                            left (if last-tab (+ (:x2 last-tab) tab-spacing) 0)
-                                           right (-> tab-entities (get tab) :characters first last :x-total (+ left))]
-                                       (assoc m tab {:x1 left :y1 0 :x2 right :y2 font-height})))
+                                           right (-> tab-entities (get id) :characters first last :x-total (+ left))]
+                                       (assoc m id {:x1 left :y1 0 :x2 right :y2 font-height})))
                                    {}
                                    tabs)
-                  reload-file-entity (assoc-lines text-entity font-entity font-height ["Reload File"])
-                  font-inc-entity (assoc-lines text-entity font-entity font-height ["Font +"])
-                  font-dec-entity (assoc-lines text-entity font-entity font-height ["Font -"])
-                  tab-entities (assoc tab-entities
-                                 :reload-file reload-file-entity
-                                 :font-inc font-inc-entity
-                                 :font-dec font-dec-entity)
+                  button-entities (reduce
+                                    (fn [m {:keys [id text]}]
+                                      (assoc m id (assoc-lines text-entity font-entity font-height [text])))
+                                    {}
+                                    buttons)
                   bounding-boxes (reduce-kv
-                                   (fn [m i button]
-                                     (let [last-button (some->> (get buttons (dec i)) (get m))
+                                   (fn [m i {:keys [id]}]
+                                     (let [last-button (some->> (get buttons (dec i)) :id (get m))
                                            right (if last-button (+ (:x1 last-button) tab-spacing) 0)
-                                           left (-> tab-entities (get button) :characters first last :x-total (+ right))]
-                                      (assoc m button {:x1 left :y1 0 :x2 right :y2 font-height :align :right})))
+                                           left (-> button-entities (get id) :characters first last :x-total (+ right))]
+                                      (assoc m id {:x1 left :y1 0 :x2 right :y2 font-height :align :right})))
                                    bounding-boxes
-                                   buttons)]
+                                   buttons)
+                  ;; when the user holds down control, we want to show the shortcut character
+                  ;; for each button in a different color so they can learn the shortcut
+                  highlight-button-entities (reduce
+                                              (fn [m {:keys [id text shortcut-char]}]
+                                                (let [character (get-in m [id :characters 0 shortcut-char])]
+                                                  (update m id i/assoc shortcut-char
+                                                          (-> character
+                                                              (chars/update-translation-matrix (:left character) 0)
+                                                              (t/color yellow-color)))))
+                                              button-entities
+                                              buttons)]
               (swap! *state assoc
                 :roboto-font-entity font-entity
                 :roboto-text-entity text-entity
-                :tab-text-entities tab-entities
+                :toolbar-text-entities (merge tab-entities button-entities)
+                :highlight-text-entities highlight-button-entities
                 :bounding-boxes bounding-boxes))))))))
 
 (def screen-entity
@@ -685,11 +708,11 @@
 (defn tick [game]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
-        {:keys [current-buffer
+        {:keys [current-buffer control?
                 base-rect-entity base-rects-entity
                 command-text-entity command-completion-text-entity command-cursor-entity
                 font-height mode font-size-multiplier ascii
-                tab-text-entities bounding-boxes current-tab tab->buffer]
+                toolbar-text-entities bounding-boxes current-tab tab->buffer highlight-text-entities]
          :as state} @*state]
     (when (and (pos? game-width) (pos? game-height))
       (if (:clear? game)
@@ -720,10 +743,15 @@
                                           (t/color (if (= 'COMMAND_LINE mode) tan-color bg-color))
                                           (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                                           (t/scale game-width (* font-size-multiplier font-height)))))))
-      (doseq [[k entity] tab-text-entities
-              :let [bounding-box (k bounding-boxes)]]
-        (c/render game (-> entity
-                           (assoc-in [:uniforms 'u_alpha] (if (= k current-tab) text-alpha unfocused-alpha))
+      (doseq [[k entity] toolbar-text-entities
+              :let [bounding-box (k bounding-boxes)
+                    highlight-entity (when control?
+                                       (get highlight-text-entities k))]]
+        (c/render game (-> (or highlight-entity entity)
+                           (assoc-in [:uniforms 'u_alpha] (if (or (= k current-tab)
+                                                                  highlight-entity)
+                                                            text-alpha
+                                                            unfocused-alpha))
                            (t/project game-width game-height)
                            (t/translate (-> bounding-box :x1 (* font-size-multiplier)
                                             (cond->> (= :right (:align bounding-box))
