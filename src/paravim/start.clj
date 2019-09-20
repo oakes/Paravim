@@ -53,6 +53,9 @@
    GLFW/GLFW_KEY_R \R
    GLFW/GLFW_KEY_U \U})
 
+(def ^:private control-keycode?
+  #{GLFW/GLFW_KEY_LEFT_CONTROL GLFW/GLFW_KEY_RIGHT_CONTROL})
+
 ;; https://vim.fandom.com/wiki/Mapping_keys_in_Vim_-_Tutorial_%28Part_2%29
 
 (def ^:private keyword->name
@@ -114,9 +117,12 @@
 (defn on-key! [{:keys [vim pipes game send-input!]} window keycode scancode action mods]
   (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
         ;alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
-        shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))]
-    (swap! c/*state assoc :control? control?)
-    (when (= action GLFW/GLFW_PRESS)
+        shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))
+        press? (= action GLFW/GLFW_PRESS)
+        control-key? (control-keycode? keycode)]
+    (swap! c/*state assoc :control? (or (and control? (not control-key?))
+                                        (and press? control-key?)))
+    (when press?
       (let [{:keys [mode current-tab] :as state} @c/*state
             k (keycode->keyword keycode)]
         (cond
