@@ -36,12 +36,29 @@
    GLFW/GLFW_KEY_LEFT :left
    GLFW/GLFW_KEY_RIGHT :right})
 
-(def ^:private keycode->name
-  {GLFW/GLFW_KEY_D "D"
-   GLFW/GLFW_KEY_R "R"
-   GLFW/GLFW_KEY_U "U"
-   GLFW/GLFW_KEY_LEFT "Left"
-   GLFW/GLFW_KEY_RIGHT "Right"})
+(def ^:private keycode->char
+  {GLFW/GLFW_KEY_D \D
+   GLFW/GLFW_KEY_H \H
+   GLFW/GLFW_KEY_J \J
+   GLFW/GLFW_KEY_M \M
+   GLFW/GLFW_KEY_P \P
+   GLFW/GLFW_KEY_R \R
+   GLFW/GLFW_KEY_U \U})
+
+;; https://vim.fandom.com/wiki/Mapping_keys_in_Vim_-_Tutorial_%28Part_2%29
+
+(def ^:private keyword->name
+  {:backspace "BS"
+   :delete "Del"
+   :tab "Tab"
+   :enter "Enter"
+   :escape "Esc"
+   :up "Up"
+   :down "Down"
+   :left "Left"
+   :right "Right"
+   :home "Home"
+   :end "End"})
 
 (defn on-mouse-move! [{:keys [game]} window xpos ypos]
   (as-> (swap! c/*state
@@ -83,23 +100,29 @@
   (when (= action GLFW/GLFW_PRESS)
     (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
           alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
-          shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))]
-      (if control?
-        (when-let [s (keycode->name keycode)]
-          (send-input! (str "<C-" (when shift? "S-") s ">")))
-        (if-let [k (keycode->keyword keycode)]
-          (cond
-            (and control? (= k :tab))
-            (do
-              (swap! c/*state c/change-tab (if shift? -1 1))
-              (send-input! [:new-tab]))
-            (and (= k :enter)
-                 (vim/normal-mode? vim)
-                 (= :repl-in (:current-tab @c/*state)))
-            (vim/repl-enter! vim send-input! pipes)
-            :else
-            (when-let [key-name (vim/keyword->name k)]
-              (send-input! key-name))))))))
+          shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))
+          {:keys [mode current-tab]} @c/*state
+          k (keycode->keyword keycode)]
+      (cond
+        ;; pressing enter in the repl
+        (and (= current-tab :repl-in)
+             (= k :enter)
+             (= mode 'NORMAL))
+        (vim/repl-enter! vim send-input! pipes)
+        ;; all ctrl shortcuts
+        control?
+        (if (= k :tab)
+          (do
+            (swap! c/*state c/change-tab (if shift? -1 1))
+            (send-input! [:new-tab]))
+          (when-let [key-name (if k
+                                (keyword->name k)
+                                (keycode->char keycode))]
+            (send-input! (str "<C-" (when shift? "S-") key-name ">"))))
+        ;; all other input
+        :else
+        (when-let [key-name (keyword->name k)]
+          (send-input! (str "<" key-name ">")))))))
 
 (defn on-char! [{:keys [send-input!]} window codepoint]
   (send-input! (str (char codepoint))))

@@ -7,19 +7,6 @@
   (:import [java.time LocalDate]
            [org.lwjgl.glfw GLFW]))
 
-;; https://vim.fandom.com/wiki/Mapping_keys_in_Vim_-_Tutorial_%28Part_2%29
-
-(def keyword->name
-  {:backspace "<BS>"
-   :delete "<Del>"
-   :tab "<Tab>"
-   :enter "<Enter>"
-   :escape "<Esc>"
-   :up "<Up>"
-   :down "<Down>"
-   :left "<Left>"
-   :right "<Right>"})
-
 (def ^:dynamic *update-ui?* true)
 
 (defn open-buffer-for-tab! [vim {:keys [current-buffer current-tab tab->buffer] :as state}]
@@ -52,12 +39,9 @@
       (.write text)
       .flush)))
 
-(defn normal-mode? [vim]
-  (= 'NORMAL (v/get-mode vim)))
-
 (defn ready-to-append? [vim inputs]
   (and (seq inputs)
-       (normal-mode? vim)
+       (= 'NORMAL (v/get-mode vim))
        (not= :repl-out (:current-tab @c/*state))))
 
 (defn apply-parinfer! [{:keys [current-buffer] :as state} vim]
