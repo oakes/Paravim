@@ -36,7 +36,8 @@
    GLFW/GLFW_KEY_LEFT :left
    GLFW/GLFW_KEY_RIGHT :right
    GLFW/GLFW_KEY_HOME :home
-   GLFW/GLFW_KEY_END :end})
+   GLFW/GLFW_KEY_END :end
+   GLFW/GLFW_KEY_GRAVE_ACCENT :backtick})
 
 (def ^:private keycode->char
   {GLFW/GLFW_KEY_D \D
@@ -113,7 +114,7 @@
         (vim/repl-enter! vim send-input! pipes)
         ;; all ctrl shortcuts
         control?
-        (if (= k :tab)
+        (if (#{:tab :backtick} k)
           (do
             (swap! c/*state c/change-tab (if shift? -1 1))
             (send-input! [:new-tab]))
