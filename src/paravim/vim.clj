@@ -200,7 +200,7 @@
                 (c/assoc-command-text (v/get-command-text vim) (v/get-command-completion vim))
                 (cond-> (not= old-mode 'COMMAND_LINE)
                         (assoc :command-start s)
-                        (= (:command-start state) "/")
+                        (#{"/" "?"} (:command-start state))
                         (assoc :show-search? true))
                 (c/update-command (v/get-command-position vim)))
             (c/assoc-command-text state nil nil))
