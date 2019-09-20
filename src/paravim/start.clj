@@ -36,10 +36,12 @@
    GLFW/GLFW_KEY_LEFT :left
    GLFW/GLFW_KEY_RIGHT :right})
 
-(def ^:private keycode->char
-  {GLFW/GLFW_KEY_D \D
-   GLFW/GLFW_KEY_R \R
-   GLFW/GLFW_KEY_U \U})
+(def ^:private keycode->name
+  {GLFW/GLFW_KEY_D "D"
+   GLFW/GLFW_KEY_R "R"
+   GLFW/GLFW_KEY_U "U"
+   GLFW/GLFW_KEY_LEFT "Left"
+   GLFW/GLFW_KEY_RIGHT "Right"})
 
 (defn on-mouse-move! [{:keys [game]} window xpos ypos]
   (as-> (swap! c/*state
@@ -82,22 +84,22 @@
     (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
           alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
           shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))]
-      (if-let [k (keycode->keyword keycode)]
-        (cond
-          (and control? (= k :tab))
-          (do
-            (swap! c/*state c/change-tab (if shift? -1 1))
-            (send-input! [:new-tab]))
-          (and (= k :enter)
-               (vim/normal-mode? vim)
-               (= :repl-in (:current-tab @c/*state)))
-          (vim/repl-enter! vim send-input! pipes)
-          :else
-          (when-let [key-name (vim/keyword->name k)]
-            (send-input! key-name)))
-        (when control?
-          (when-let [ch (keycode->char keycode)]
-            (send-input! (str "<C-" (when shift? "S-") ch ">"))))))))
+      (if control?
+        (when-let [s (keycode->name keycode)]
+          (send-input! (str "<C-" (when shift? "S-") s ">")))
+        (if-let [k (keycode->keyword keycode)]
+          (cond
+            (and control? (= k :tab))
+            (do
+              (swap! c/*state c/change-tab (if shift? -1 1))
+              (send-input! [:new-tab]))
+            (and (= k :enter)
+                 (vim/normal-mode? vim)
+                 (= :repl-in (:current-tab @c/*state)))
+            (vim/repl-enter! vim send-input! pipes)
+            :else
+            (when-let [key-name (vim/keyword->name k)]
+              (send-input! key-name))))))))
 
 (defn on-char! [{:keys [send-input!]} window codepoint]
   (send-input! (str (char codepoint))))
