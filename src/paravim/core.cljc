@@ -341,12 +341,18 @@
           state))
       state)))
 
+(defn font-dec [state game]
+  (change-font-size state game (- font-size-step)))
+
+(defn font-inc [state game]
+  (change-font-size state game font-size-step))
+
 (defn click-mouse [{:keys [mouse-hover] :as state} game reload-file]
   (if (tab? mouse-hover)
     (assoc state :current-tab mouse-hover)
     (case mouse-hover
-      :font-dec (change-font-size state game (- font-size-step))
-      :font-inc (change-font-size state game font-size-step)
+      :font-dec (font-dec state game)
+      :font-inc (font-inc state game)
       :reload-file (reload-file state)
       state)))
 

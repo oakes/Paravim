@@ -37,7 +37,10 @@
    GLFW/GLFW_KEY_RIGHT :right
    GLFW/GLFW_KEY_HOME :home
    GLFW/GLFW_KEY_END :end
-   GLFW/GLFW_KEY_GRAVE_ACCENT :backtick})
+   GLFW/GLFW_KEY_GRAVE_ACCENT :backtick
+   GLFW/GLFW_KEY_F :f
+   GLFW/GLFW_KEY_MINUS :-
+   GLFW/GLFW_KEY_EQUAL :=})
 
 (def ^:private keycode->char
   {GLFW/GLFW_KEY_D \D
@@ -78,33 +81,36 @@
                                 :hand GLFW/GLFW_HAND_CURSOR
                                 GLFW/GLFW_ARROW_CURSOR)))))
 
+(defn- reload-file! [state pipes]
+  (let [{:keys [current-tab current-buffer buffers tab->buffer]} state
+        {:keys [out-pipe]} pipes
+        {:keys [lines file-name clojure?] :as buffer} (get buffers current-buffer)]
+    (when (and clojure? (= current-tab :files))
+      (doto out-pipe
+        (.write (str "(do "
+                     (pr-str '(println))
+                     (pr-str (list 'println "Reloading" file-name))
+                     (str/join \newline lines)
+                     ")\n"))
+        .flush)
+      true)))
+
 (defn on-mouse-click! [{:keys [vim pipes game send-input!]} window button action mods]
   (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
              (= action GLFW/GLFW_PRESS))
     (swap! c/*state c/click-mouse game
            (fn [state]
-             (let [{:keys [current-tab current-buffer buffers tab->buffer]} state
-                   {:keys [out-pipe]} pipes
-                   {:keys [lines file-name clojure?] :as buffer} (get buffers current-buffer)]
-               (if (and clojure? (= current-tab :files))
-                 (do
-                   (doto out-pipe
-                     (.write (str "(do "
-                                  (pr-str '(println))
-                                  (pr-str (list 'println "Reloading" file-name))
-                                  (str/join \newline lines)
-                                  ")\n"))
-                     .flush)
-                   (assoc state :current-tab :repl-in))
-                 state))))
+             (cond-> state
+                     (reload-file! state pipes)
+                     (assoc :current-tab :repl-in))))
     (send-input! [:new-tab])))
 
-(defn on-key! [{:keys [vim pipes send-input!]} window keycode scancode action mods]
+(defn on-key! [{:keys [vim pipes game send-input!]} window keycode scancode action mods]
   (when (= action GLFW/GLFW_PRESS)
     (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
-          alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
+          ;alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
           shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))
-          {:keys [mode current-tab]} @c/*state
+          {:keys [mode current-tab] :as state} @c/*state
           k (keycode->keyword keycode)]
       (cond
         ;; pressing enter in the repl
@@ -114,10 +120,15 @@
         (vim/repl-enter! vim send-input! pipes)
         ;; all ctrl shortcuts
         control?
-        (if (#{:tab :backtick} k)
+        (case k
+          (:tab :backtick)
           (do
             (swap! c/*state c/change-tab (if shift? -1 1))
             (send-input! [:new-tab]))
+          :f (reload-file! state pipes)
+          :- (swap! c/*state c/font-dec game)
+          := (swap! c/*state c/font-inc game)
+          ; else
           (when-let [key-name (if k
                                 (keyword->name k)
                                 (keycode->char keycode))]
