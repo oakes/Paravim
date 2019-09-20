@@ -373,7 +373,7 @@
       'u_start_line 0))
 
 (defn assoc-command-text [state text completion]
-  (assoc state :command-text text :command-completion (when (seq text) completion)))
+  (assoc state :command-text text :command-completion (when (some-> text str/trim seq) completion)))
 
 (defn assoc-command-entity [state text-entity cursor-entity]
   (assoc state :command-text-entity text-entity :command-cursor-entity cursor-entity))
