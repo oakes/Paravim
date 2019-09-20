@@ -708,7 +708,7 @@
 (defn tick [game]
   (let [game-width (utils/get-width game)
         game-height (utils/get-height game)
-        {:keys [current-buffer control?
+        {:keys [current-buffer buffers control?
                 base-rect-entity base-rects-entity
                 command-text-entity command-completion-text-entity command-cursor-entity
                 font-height mode font-size-multiplier ascii
@@ -746,7 +746,11 @@
       (doseq [[k entity] toolbar-text-entities
               :let [bounding-box (k bounding-boxes)
                     highlight-entity (when control?
-                                       (get highlight-text-entities k))]]
+                                       (get highlight-text-entities k))]
+              ;; hide the reload file button when necessary
+              :when (or (not= k :reload-file)
+                        (and (= current-tab :files)
+                             (->> current-buffer (get buffers) :clojure?)))]
         (c/render game (-> (or highlight-entity entity)
                            (assoc-in [:uniforms 'u_alpha] (if (or (= k current-tab)
                                                                   highlight-entity)
