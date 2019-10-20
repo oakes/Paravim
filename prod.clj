@@ -10,7 +10,9 @@
   '[clojure.string :as str]
   '[leiningen.core.project :as p :refer [defproject]]
   '[leiningen.install :refer [install]]
-  '[leiningen.deploy :refer [deploy]])
+  '[leiningen.deploy :refer [deploy]]
+  '[leiningen.clean :refer [clean]]
+  '[leiningen.uberjar :refer [uberjar]])
 
 (defn read-project-clj []
   (p/ensure-dynamic-classloader)
@@ -44,6 +46,15 @@
     {:dependencies deps
      :source-paths []
      :resource-paths paths}))
+
+(defmethod task "uberjar"
+  [_]
+  (let [project (-> (read-project-clj)
+                    (merge (read-deps-edn []))
+                    p/init-project)]
+    (clean project)
+    (uberjar project))
+  (System/exit 0))
 
 (defmethod task "install"
   [_]

@@ -5,4 +5,6 @@
             :url "http://unlicense.org/UNLICENSE"}
   :repositories [["clojars" {:url "https://clojars.org/repo"
                              :sign-releases false}]]
-  :clean-targets ^{:protect false} ["target"])
+  :clean-targets ^{:protect false} ["target"]
+  :aot [paravim.start]
+  :main paravim.start)
