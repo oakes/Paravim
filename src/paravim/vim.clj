@@ -202,7 +202,7 @@
                (not= s "u"))
       (apply-parinfer! state vim))))
 
-(defn append-to-buffer! [game vim inputs]
+(defn append-to-buffer! [game vim input]
   (when-let [buffer (-> @c/*state :tab->buffer :repl-out)]
     (let [current-buffer (v/get-current-buffer vim)
           cursor-line (v/get-cursor-line vim)
@@ -212,8 +212,7 @@
           char-count (count (v/get-line vim buffer line-count))]
       (v/set-cursor-position vim line-count (dec char-count))
       (on-input game vim "a")
-      (doseq [input inputs
-              ch input]
+      (doseq [ch input]
         (on-input game vim (str ch)))
       (on-input game vim "<Esc>")
       (v/set-current-buffer vim current-buffer)

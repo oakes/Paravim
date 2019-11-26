@@ -196,27 +196,37 @@
           (on-resize! utils window width height))))))
 
 (defn- poll-input [game vim vim-chan append-repl-chan]
-  (async/go-loop [delayed-inputs []]
-    (if (vim/ready-to-append? vim delayed-inputs)
+  (async/go-loop [vim-input nil
+                  append-inputs []]
+    (cond
+      ;; process input from either chan
+      vim-input
+      (if (string? vim-input)
+        (do
+          (vim/on-input game vim vim-input)
+          (recur nil append-inputs))
+        (case (first vim-input)
+          :append (recur nil (conj append-inputs (second vim-input)))
+          :new-tab (do
+                     (vim/open-buffer-for-tab! vim @c/*state)
+                     (async/put! vim-chan [:resize])
+                     (recur nil append-inputs))
+          :resize (let [width (utils/get-width game)
+                        height (utils/get-height game)]
+                    (vim/set-window-size! vim @c/*state width height)
+                    (recur nil append-inputs))))
+      ;; append to the repl
+      (vim/ready-to-append? vim append-inputs)
       (do
         (binding [vim/*update-ui?* false]
-          (vim/append-to-buffer! game vim delayed-inputs))
-        (recur []))
+          (vim/append-to-buffer! game vim (first append-inputs)))
+        ;; check if anything came on vim-chan, so we don't lock up everything
+        (let [[input] (async/alts! [vim-chan] :default nil)]
+          (recur input (-> append-inputs rest vec))))
+      ;; park and listen for something on either chan
+      :else
       (let [[input] (async/alts! [vim-chan append-repl-chan] :priority true)]
-        (if (string? input)
-          (do
-            (vim/on-input game vim input)
-            (recur delayed-inputs))
-          (case (first input)
-            :append (recur (conj delayed-inputs (second input)))
-            :new-tab (do
-                       (vim/open-buffer-for-tab! vim @c/*state)
-                       (async/put! vim-chan [:resize])
-                       (recur delayed-inputs))
-            :resize (let [width (utils/get-width game)
-                          height (utils/get-height game)]
-                      (vim/set-window-size! vim @c/*state width height)
-                      (recur delayed-inputs))))))))
+        (recur input append-inputs)))))
 
 (defn ->window []
   (when-not (GLFW/glfwInit)
