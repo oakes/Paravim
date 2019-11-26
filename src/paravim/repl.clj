@@ -8,7 +8,7 @@
   (str/escape s {\return ""}))
 
 (defn pipe-into-console! [in-pipe callback]
-  (let [ca (char-array 256)]
+  (let [ca (char-array 8)]
     (.start
       (Thread.
         (fn []

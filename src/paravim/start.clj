@@ -195,14 +195,14 @@
         (invoke [this window width height]
           (on-resize! utils window width height))))))
 
-(defn- poll-input [game vim c]
+(defn- poll-input [game vim vim-chan append-repl-chan]
   (async/go-loop [delayed-inputs []]
     (if (vim/ready-to-append? vim delayed-inputs)
       (do
         (binding [vim/*update-ui?* false]
           (vim/append-to-buffer! game vim delayed-inputs))
         (recur []))
-      (let [input (async/<! c)]
+      (let [[input] (async/alts! [vim-chan append-repl-chan] :priority true)]
         (if (string? input)
           (do
             (vim/on-input game vim input)
@@ -211,7 +211,7 @@
             :append (recur (conj delayed-inputs (second input)))
             :new-tab (do
                        (vim/open-buffer-for-tab! vim @c/*state)
-                       (async/put! c [:resize])
+                       (async/put! vim-chan [:resize])
                        (recur delayed-inputs))
             :resize (let [width (utils/get-width game)
                           height (utils/get-height game)]
@@ -253,9 +253,10 @@
      (c/init game)
      (vim/init vim game)
      (when vim-chan
-       (poll-input game vim vim-chan)
-       (async/put! vim-chan [:resize])
-       (repl/start-repl-thread! nil pipes #(async/put! vim-chan [:append %])))
+       (let [append-repl-chan (async/chan)]
+         (poll-input game vim vim-chan append-repl-chan)
+         (async/put! vim-chan [:resize])
+         (repl/start-repl-thread! nil pipes #(async/put! append-repl-chan [:append %]))))
      {:pipes pipes
       :send-input! send-input!
       :vim vim
