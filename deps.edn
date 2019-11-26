@@ -1,15 +1,15 @@
 {:paths ["src" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.10.1"}
         play-cljc {:mvn/version "0.8.4"}
+        libvim-clj {:mvn/version "0.7.3"}
+        parinferish {:mvn/version "0.6.3"}
+        com.rpl/specter {:mvn/version "1.1.3"}
+        org.clojure/core.rrb-vector {:mvn/version "0.1.1"}
+        org.clojure/core.async {:mvn/version "0.4.500"}
         org.lwjgl/lwjgl {:mvn/version "3.2.3"}
         org.lwjgl/lwjgl-glfw {:mvn/version "3.2.3"}
         org.lwjgl/lwjgl-opengl {:mvn/version "3.2.3"}
         org.lwjgl/lwjgl-stb {:mvn/version "3.2.3"}
-        libvim-clj {:mvn/version "0.7.3"}
-        parinferish {:mvn/version "0.6.3"}
-        com.rpl/specter {:mvn/version "1.1.3"}
-        org.clojure/core.rrb-vector {:mvn/version "0.1.0"}
-        org.clojure/core.async {:mvn/version "0.4.500"}
         org.lwjgl/lwjgl$natives-linux {:mvn/version "3.2.3"}
         org.lwjgl/lwjgl-glfw$natives-linux {:mvn/version "3.2.3"}
         org.lwjgl/lwjgl-opengl$natives-linux {:mvn/version "3.2.3"}
