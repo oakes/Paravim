@@ -674,7 +674,7 @@
   (let [[chars-to-skip-count chars-to-crop-count char-counts] (get-visible-chars text-entity lines-to-skip-count lines-to-crop-count)]
     (reduce-kv
       (fn [text-entity attr-name length]
-        (update-in text-entity [:attributes attr-name :data] subvec
+        (update-in text-entity [:attributes attr-name :data] rrb/subvec
                    (* length chars-to-skip-count)
                    (* length chars-to-crop-count)))
       (update text-entity :uniforms assoc
