@@ -25,7 +25,7 @@ On Mac OS, you need to add a special flag:
 clojure -Sdeps "{:deps {paravim {:mvn/version \""RELEASE\""}}}" -J-XstartOnFirstThread -m paravim.start
 ```
 
-NOTE: On Linux, there have been some `UnsatisfiedLinkError`s due to `libtinfo.5` not being present. If you have apt, try `apt install libtinfo5`. If you're on Arch, see [this issue](https://github.com/oakes/Paravim/issues/5) for a solution.
+NOTE: On Linux, there have been some `UnsatisfiedLinkError`s due to `libtinfo.so.5` not being present. If you have apt, try `apt install libtinfo5`. If you use Arch btw, see [this issue](https://github.com/oakes/Paravim/issues/5) for a solution.
 
 ## Development
 
