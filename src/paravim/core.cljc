@@ -715,7 +715,7 @@
                 toolbar-text-entities bounding-boxes current-tab tab->buffer highlight-text-entities]
          :as state} @*state]
     (when (and (pos? game-width) (pos? game-height))
-      (if (:clear? game)
+      (if (::clear? game)
         (c/render game (update screen-entity :viewport assoc :width game-width :height game-height))
         (c/render game (-> base-rects-entity
                            (t/project game-width game-height)
