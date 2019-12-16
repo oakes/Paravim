@@ -157,6 +157,7 @@
   (send-input! (str (char codepoint))))
 
 (defn on-resize! [{:keys [game send-input!]} window width height]
+  (c/update-window-size! width height)
   (swap! c/*state
          (fn [{:keys [current-buffer current-tab tab->buffer] :as state}]
            (as-> state state

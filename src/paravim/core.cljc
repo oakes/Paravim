@@ -1,6 +1,9 @@
 (ns paravim.core
   (:require [paravim.utils :as utils]
             [paravim.chars :as chars]
+            [paravim.session :as session]
+            [clara.rules :as clara]
+            [clarax.rules :as clarax]
             [parinferish.core :as ps]
             [clojure.string :as str]
             [play-cljc.gl.utils :as u]
@@ -53,6 +56,28 @@
                        :text-boxes {}
                        :bounding-boxes {}
                        :show-search? false}))
+
+(let [query-fns (clarax/query-fns @session/*session)]
+  (def get-game (:get-game query-fns))
+  (def get-window (:get-window query-fns))
+  (def get-keys (:get-keys query-fns))
+  (def get-mouse (:get-mouse query-fns)))
+
+(defn update-mouse-coords! [x y]
+  (swap! session/*session
+    (fn [session]
+      (as-> session $
+            (get-mouse $)
+            (clarax/merge session $ {:x x :y y})
+            (clara/fire-rules $)))))
+
+(defn update-window-size! [width height]
+  (swap! session/*session
+    (fn [session]
+      (as-> session $
+            (get-window $)
+            (clarax/merge session $ {:width width :height height})
+            (clara/fire-rules $)))))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
 
@@ -580,6 +605,14 @@
   ;; allow transparency in images
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
+  ;; insert game record
+  (swap! session/*session
+    (fn [session]
+      (-> session
+          (clara/insert
+            (session/map->Game game)
+            (session/->Window (utils/get-width game) (utils/get-height game)))
+          clara/fire-rules)))
   ;; create rect entities
   (let [rect-entity (e/->entity game primitives/rect)
         rects-entity (c/compile game (i/->instanced-entity rect-entity))]
@@ -706,8 +739,8 @@
                            (t/scale font-size-multiplier font-size-multiplier)))))))
 
 (defn tick [game]
-  (let [game-width (utils/get-width game)
-        game-height (utils/get-height game)
+  (let [session @session/*session
+        {game-width :width game-height :height :as window} (get-window session)
         {:keys [current-buffer buffers control?
                 base-rect-entity base-rects-entity
                 command-text-entity command-completion-text-entity command-cursor-entity
@@ -772,7 +805,15 @@
         (c/render game (-> command-text-entity
                            (t/project game-width game-height)
                            (t/translate 0 (- game-height (* font-size-multiplier font-height)))
-                           (t/scale font-size-multiplier font-size-multiplier))))))
+                           (t/scale font-size-multiplier font-size-multiplier)))))
+    ;; insert/update the game record
+    (if-let [game' (get-game session)]
+      (swap! session/*session
+        (fn [session]
+          (-> session
+              (clarax/merge game' game)
+              clara/fire-rules)))
+      (init game)))
   ;; return the game map
   game)
 
