@@ -74,19 +74,18 @@
    :end "End"})
 
 (defn on-mouse-move! [{:keys [game]} window xpos ypos]
-  (as-> (swap! c/*state
-          (fn [state]
-            (let [density-ratio (float (get-density-ratio window))
-                  x (* xpos density-ratio)
-                  y (* ypos density-ratio)]
-              (c/update-mouse state game x y))))
-        state
-        (GLFW/glfwSetCursor window
-                            (GLFW/glfwCreateStandardCursor
-                              (case (:mouse-type state)
-                                ;:ibeam GLFW/GLFW_IBEAM_CURSOR
-                                :hand GLFW/GLFW_HAND_CURSOR
-                                GLFW/GLFW_ARROW_CURSOR)))))
+  (let [density-ratio (float (get-density-ratio window))
+        x (* xpos density-ratio)
+        y (* ypos density-ratio)]
+    (c/update-mouse-coords! x y)
+    (as-> (swap! c/*state c/update-mouse game x y)
+          state
+          (GLFW/glfwSetCursor window
+                              (GLFW/glfwCreateStandardCursor
+                                (case (:mouse-type state)
+                                  ;:ibeam GLFW/GLFW_IBEAM_CURSOR
+                                  :hand GLFW/GLFW_HAND_CURSOR
+                                  GLFW/GLFW_ARROW_CURSOR))))))
 
 (defn- reload-file! [state pipes]
   (let [{:keys [current-tab current-buffer buffers tab->buffer]} state

@@ -60,7 +60,6 @@
 (let [query-fns (clarax/query-fns @session/*session)]
   (def get-game (:get-game query-fns))
   (def get-window (:get-window query-fns))
-  (def get-keys (:get-keys query-fns))
   (def get-mouse (:get-mouse query-fns)))
 
 (defn update-mouse-coords! [x y]
@@ -635,15 +634,24 @@
              snap-to-top (fn [game-height multiplier] (* font-height multiplier))
              snap-to-bottom (fn [game-height multiplier] (- game-height (* font-height multiplier)))
              repl-in-top (fn [game-height multiplier] (- game-height (* 5 font-height multiplier)))
-             repl-out-bottom (fn [game-height multiplier] (- game-height (* 6 font-height multiplier)))]
+             repl-out-bottom (fn [game-height multiplier] (- game-height (* 6 font-height multiplier)))
+             text-boxes {:files {:left 0 :right 0 :top snap-to-top :bottom snap-to-bottom}
+                         :repl-in {:left 0 :right 0 :top repl-in-top :bottom snap-to-bottom}
+                         :repl-out {:left 0 :right 0 :top snap-to-top :bottom repl-out-bottom}}]
          (swap! *state assoc
            :font-width font-width
            :font-height font-height
            :base-font-entity font-entity
            :base-text-entity text-entity
-           :text-boxes {:files {:left 0 :right 0 :top snap-to-top :bottom snap-to-bottom}
-                        :repl-in {:left 0 :right 0 :top repl-in-top :bottom snap-to-bottom}
-                        :repl-out {:left 0 :right 0 :top snap-to-top :bottom repl-out-bottom}})
+           :text-boxes text-boxes)
+         (swap! session/*session
+           (fn [session]
+             (->> text-boxes
+                  (reduce-kv
+                    (fn [session id text-box]
+                      (clara/insert session (session/map->TextBox (assoc text-box :id id))))
+                    session)
+                  clara/fire-rules)))
          (#?(:clj load-font-clj :cljs load-font-cljs) :roboto
           (fn [{:keys [data]} baked-font]
             (let [font-entity (-> (text/->font-entity game data baked-font)
@@ -697,7 +705,15 @@
                 :roboto-text-entity text-entity
                 :toolbar-text-entities (merge tab-entities button-entities)
                 :highlight-text-entities highlight-button-entities
-                :bounding-boxes bounding-boxes))))))))
+                :bounding-boxes bounding-boxes)
+              (swap! session/*session
+                (fn [session]
+                  (->> bounding-boxes
+                       (reduce-kv
+                         (fn [session id bounding-box]
+                           (clara/insert session (session/map->BoundingBox (assoc bounding-box :id id))))
+                         session)
+                       clara/fire-rules))))))))))
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}

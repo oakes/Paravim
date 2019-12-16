@@ -8,7 +8,9 @@
 (defrecord Game [total-time delta-time context])
 (defrecord Window [width height])
 (defrecord Mouse [x y])
-(defrecord Keys [pressed])
+(defrecord MouseHover [target cursor])
+(defrecord TextBox [id left right top bottom])
+(defrecord BoundingBox [id x1 y1 x2 y2 align])
 
 (def queries
   '{:get-game
@@ -22,11 +24,7 @@
     :get-mouse
     (fn []
       (let [mouse Mouse]
-        mouse))
-    :get-keys
-    (fn []
-      (let [keys Keys]
-        keys))})
+        mouse))})
 
 (def rules
   '{})
@@ -40,8 +38,7 @@
   (reset! *session
     (-> (->session-wrapper)
         (clara/insert
-          (->Mouse 0 0)
-          (->Keys #{}))
+          (->Mouse 0 0))
         clara/fire-rules)))
 
 (restart!)
