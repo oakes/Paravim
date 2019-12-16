@@ -76,16 +76,18 @@
 (defn on-mouse-move! [{:keys [game]} window xpos ypos]
   (let [density-ratio (float (get-density-ratio window))
         x (* xpos density-ratio)
-        y (* ypos density-ratio)]
-    (c/update-mouse-coords! x y)
-    (as-> (swap! c/*state c/update-mouse game x y)
-          state
-          (GLFW/glfwSetCursor window
-                              (GLFW/glfwCreateStandardCursor
-                                (case (:mouse-type state)
-                                  ;:ibeam GLFW/GLFW_IBEAM_CURSOR
-                                  :hand GLFW/GLFW_HAND_CURSOR
-                                  GLFW/GLFW_ARROW_CURSOR))))))
+        y (* ypos density-ratio)
+        session (c/update-mouse! x y)
+        mouse-hover (c/get-mouse-hover session)]
+    (swap! c/*state assoc
+           :mouse-hover (:target mouse-hover)
+           :mouse-type (:cursor mouse-hover))
+    (GLFW/glfwSetCursor window
+                        (GLFW/glfwCreateStandardCursor
+                          (case (:cursor mouse-hover)
+                            :ibeam GLFW/GLFW_IBEAM_CURSOR
+                            :hand GLFW/GLFW_HAND_CURSOR
+                            GLFW/GLFW_ARROW_CURSOR)))))
 
 (defn- reload-file! [state pipes]
   (let [{:keys [current-tab current-buffer buffers tab->buffer]} state
@@ -111,6 +113,7 @@
                                 (reload-file! state pipes)
                                 (assoc :current-tab :repl-in))))]
       (when (not= (:current-tab old-state) (:current-tab new-state))
+        (c/update-prefs! {:tab (:current-tab new-state)})
         (send-input! [:new-tab])))))
 
 (defn on-key! [{:keys [vim pipes game send-input!]} window keycode scancode action mods]
@@ -138,6 +141,7 @@
             (:tab :backtick)
             (do
               (swap! c/*state c/change-tab (if shift? -1 1))
+              (c/update-prefs! {:tab (:current-tab @c/*state)})
               (send-input! [:new-tab]))
             :f (reload-file! state pipes)
             :- (swap! c/*state c/font-dec game)

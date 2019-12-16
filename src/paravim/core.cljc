@@ -45,9 +45,7 @@
 (def min-font-size (/ 1 8))
 (def max-font-size 1)
 
-(defonce *state (atom {:mouse-x 0
-                       :mouse-y 0
-                       :current-buffer nil
+(defonce *state (atom {:current-buffer nil
                        :buffers {}
                        :buffer-updates []
                        :current-tab :files
@@ -60,23 +58,31 @@
 (let [query-fns (clarax/query-fns @session/*session)]
   (def get-game (:get-game query-fns))
   (def get-window (:get-window query-fns))
-  (def get-mouse (:get-mouse query-fns)))
+  (def get-mouse (:get-mouse query-fns))
+  (def get-mouse-hover (:get-mouse-hover query-fns))
+  (def get-prefs (:get-prefs query-fns)))
 
-(defn update-mouse-coords! [x y]
+(defn update-mouse! [x y]
   (swap! session/*session
     (fn [session]
-      (as-> session $
-            (get-mouse $)
-            (clarax/merge session $ {:x x :y y})
-            (clara/fire-rules $)))))
+      (-> session
+          (clarax/merge (get-mouse-hover session) {:target nil :cursor nil})
+          (clarax/merge (get-mouse session) {:x x :y y})
+          clara/fire-rules))))
 
 (defn update-window-size! [width height]
   (swap! session/*session
     (fn [session]
-      (as-> session $
-            (get-window $)
-            (clarax/merge session $ {:width width :height height})
-            (clara/fire-rules $)))))
+      (-> session
+          (clarax/merge (get-window session) {:width width :height height})
+          clara/fire-rules))))
+
+(defn update-prefs! [prefs]
+  (swap! session/*session
+    (fn [session]
+      (-> session
+          (clarax/merge (get-prefs session) prefs)
+          clara/fire-rules))))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
 
@@ -335,40 +341,6 @@
                   :camera-y camera-y
                   :visible-start-line lines-to-skip-count
                   :visible-end-line lines-to-crop-count))))))
-
-(defn update-mouse [{:keys [text-boxes current-tab bounding-boxes toolbar-text-entities font-size-multiplier] :as state} game x y]
-  (let [game-width (utils/get-width game)
-        game-height (utils/get-height game)
-        {:keys [left right top bottom] :as text-box} (get text-boxes current-tab)
-        hover (if (and text-box
-                       (<= left x (- game-width right))
-                       (<= (top game-height font-size-multiplier)
-                           y
-                           (bottom game-height font-size-multiplier)))
-                :text
-                (some
-                  (fn [[k box]]
-                    (let [{:keys [x1 y1 x2 y2 align]} box
-                          x1 (cond->> (* x1 font-size-multiplier)
-                                      (= :right align)
-                                      (- game-width))
-                          y1 (* y1 font-size-multiplier)
-                          x2 (cond->> (* x2 font-size-multiplier)
-                                      (= :right align)
-                                      (- game-width))
-                          y2 (* y2 font-size-multiplier)]
-                      (when (and (<= x1 x x2) (<= y1 y y2))
-                        k)))
-                  bounding-boxes))]
-    (assoc state
-      :mouse-x x
-      :mouse-y y
-      :mouse-hover hover
-      :mouse-type (cond
-                    (= hover :text)
-                    :ibeam
-                    (contains? toolbar-text-entities hover)
-                    :hand))))
 
 (defn change-font-size [{:keys [font-size-multiplier current-buffer] :as state} game diff]
   (let [new-val (+ font-size-multiplier diff)]
