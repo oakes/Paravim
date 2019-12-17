@@ -125,8 +125,9 @@
                              (clarax/merge! current-tab {:id :repl-in}))
               nil)))))
     :tab-changed
-    (let [current-tab CurrentTab]
-      (println current-tab))
+    (let [game Game
+          current-tab CurrentTab]
+      ((:send-input! game) [:new-tab]))
     :font-changed
     (let [font Font]
       (println font))})

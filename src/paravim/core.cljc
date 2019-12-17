@@ -593,7 +593,7 @@
             ;; the keys must have namespaces removed
             ;; because predefined fields in records can't have namespaces
             (session/map->Game (set/rename-keys game {::pipes :pipes
-                                                      ::send-input! :send-input
+                                                      ::send-input! :send-input!
                                                       ::vim :vim}))
             (session/->Window (utils/get-width game) (utils/get-height game)))
           clara/fire-rules)))
