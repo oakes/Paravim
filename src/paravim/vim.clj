@@ -1,5 +1,6 @@
 (ns paravim.vim
   (:require [paravim.core :as c]
+            [paravim.session :as session]
             [libvim-clj.core :as v]
             [clojure.string :as str]
             [clojure.java.io :as io]
@@ -9,23 +10,26 @@
 
 (def ^:dynamic *update-ui?* true)
 
-(defn open-buffer-for-tab! [vim {:keys [current-buffer current-tab tab->buffer] :as state}]
-  (if-let [buffer-for-tab (tab->buffer current-tab)]
-    (when (not= current-buffer buffer-for-tab)
-      (v/set-current-buffer vim buffer-for-tab))
-    (when-let [path (c/tab->path current-tab)]
-      (v/open-buffer vim path))))
+(defn open-buffer-for-tab! [vim {:keys [tab->buffer] :as state} session]
+  (let [current-buffer (:id (c/get-current-buffer session))
+        current-tab (:id (c/get-current-tab session))]
+    (if-let [buffer-for-tab (tab->buffer current-tab)]
+      (when (not= current-buffer buffer-for-tab)
+        (v/set-current-buffer vim buffer-for-tab))
+      (when-let [path (c/tab->path current-tab)]
+        (v/open-buffer vim path)))))
 
-(defn set-window-size! [vim {:keys [font-height font-width text-boxes current-tab] :as state} session width height]
-  (when-let [{:keys [top bottom]} (get text-boxes current-tab)]
-    (let [font-size-multiplier (:size (c/get-font session))
-          text-height (- (bottom height font-size-multiplier)
-                         (top height font-size-multiplier))
-          font-height (* font-height font-size-multiplier)
-          font-width (* font-width font-size-multiplier)]
-      (doto vim
-        (v/set-window-width (/ width font-width))
-        (v/set-window-height (/ (max 0 text-height) font-height))))))
+(defn set-window-size! [vim {:keys [font-height font-width text-boxes] :as state} session width height]
+  (let [current-tab (:id (c/get-current-tab session))]
+    (when-let [{:keys [top bottom]} (get text-boxes current-tab)]
+      (let [font-size-multiplier (:size (c/get-font session))
+            text-height (- (bottom height font-size-multiplier)
+                           (top height font-size-multiplier))
+            font-height (* font-height font-size-multiplier)
+            font-width (* font-width font-size-multiplier)]
+        (doto vim
+          (v/set-window-width (/ width font-width))
+          (v/set-window-height (/ (max 0 text-height) font-height)))))))
 
 (defn repl-enter! [vim callback {:keys [out out-pipe]}]
   (let [buffer-ptr (v/get-current-buffer vim)
@@ -43,10 +47,11 @@
 (defn ready-to-append? [vim inputs]
   (and (seq inputs)
        (= 'NORMAL (v/get-mode vim))
-       (not= :repl-out (:current-tab @c/*state))))
+       (not= :repl-out (:id (c/get-current-tab @session/*session)))))
 
-(defn apply-parinfer! [{:keys [current-buffer] :as state} vim]
-  (let [{:keys [parsed-code needs-parinfer?]} (get-in state [:buffers current-buffer])]
+(defn apply-parinfer! [state vim]
+  (let [current-buffer (:id (c/get-current-buffer @session/*session))
+        {:keys [parsed-code needs-parinfer?]} (get-in state [:buffers current-buffer])]
     (when needs-parinfer?
       (let [cursor-line (v/get-cursor-line vim)
             cursor-column (v/get-cursor-column vim)
@@ -244,18 +249,20 @@
                           (c/parse-clojure-buffer state true)
                           (c/update-clojure-buffer state))
                       buffer)]
+        (c/update-current-buffer! buffer-ptr)
+        (c/update-current-tab! current-tab)
         (swap! c/*state
           (fn [state]
             (-> state
-                (assoc :current-buffer buffer-ptr :current-tab current-tab)
                 (update :tab->buffer assoc current-tab buffer-ptr)
                 (assoc-in [:buffers buffer-ptr] (c/update-cursor buffer state game))))))
       ;; clear the files tab
-      (swap! c/*state
-        (fn [state]
-          (-> state
-              (assoc :current-buffer nil)
-              (update :tab->buffer assoc :files nil)))))))
+      (do
+        (c/update-current-buffer! nil)
+        (swap! c/*state
+          (fn [state]
+            (-> state
+                (update :tab->buffer assoc :files nil))))))))
 
 (defn on-buf-update [vim buffer-ptr start-line end-line line-count-change]
   (let [first-line (dec start-line)
@@ -282,7 +289,8 @@
     (v/execute "filetype plugin indent on")))
 
 (defn yank-lines [{:keys [start-line start-column end-line end-column]}]
-  (let [{:keys [current-buffer] :as state} @c/*state]
+  (let [current-buffer (:id (c/get-current-buffer @session/*session))
+        state @c/*state]
     (when-let [{:keys [lines]} (c/get-buffer state current-buffer)]
       (let [yanked-lines (subvec lines (dec start-line) end-line)
             end-line (dec (count yanked-lines))
@@ -308,8 +316,9 @@
                                         (swap! c/*state assoc :show-search? false)))
   (v/set-on-unhandled-escape vim (fn []
                                    (swap! c/*state
-                                     (fn [{:keys [current-buffer] :as state}]
-                                       (let [state (assoc state :show-search? false)]
+                                     (fn [state]
+                                       (let [current-buffer (:id (c/get-current-buffer @session/*session))
+                                             state (assoc state :show-search? false)]
                                          (if (c/get-buffer state current-buffer)
                                            (update-in state [:buffers current-buffer] update-buffer state game vim)
                                            state))))))

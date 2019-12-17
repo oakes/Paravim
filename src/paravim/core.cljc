@@ -33,10 +33,8 @@
                 :repl-in "repl.in"
                 :repl-out "repl.out"})
 
-(defonce *state (atom {:current-buffer nil
-                       :buffers {}
+(defonce *state (atom {:buffers {}
                        :buffer-updates []
-                       :current-tab :files
                        :tab->buffer {}
                        :text-boxes {}
                        :bounding-boxes {}
@@ -48,7 +46,8 @@
   (def get-mouse (:get-mouse query-fns))
   (def get-mouse-hover (:get-mouse-hover query-fns))
   (def get-font (:get-font query-fns))
-  (def get-current-tab (:get-current-tab query-fns)))
+  (def get-current-tab (:get-current-tab query-fns))
+  (def get-current-buffer (:get-current-buffer query-fns)))
 
 (defn update-mouse! [x y]
   (swap! session/*session
@@ -70,6 +69,28 @@
     (fn [session]
       (-> session
           (clarax/merge (get-current-tab session) {:id id})
+          clara/fire-rules))))
+
+(defn shift-current-tab! [direction]
+  (swap! session/*session
+    (fn [session]
+      (let [current-tab (get-current-tab session)
+            id (:id current-tab)
+            index (+ (.indexOf session/tab-ids id)
+                     direction)
+            index (cond
+                    (neg? index) (dec (count session/tab-ids))
+                    (= index (count session/tab-ids)) 0
+                    :else index)]
+        (-> session
+            (clarax/merge current-tab {:id (nth session/tab-ids index)})
+            clara/fire-rules)))))
+
+(defn update-current-buffer! [id]
+  (swap! session/*session
+    (fn [session]
+      (-> session
+          (clarax/merge (get-current-buffer session) {:id id})
           clara/fire-rules))))
 
 (defn click-mouse! [button reload-file!]
@@ -362,27 +383,10 @@
                   :visible-start-line lines-to-skip-count
                   :visible-end-line lines-to-crop-count))))))
 
-(defn update-cursor-if-necessary [{:keys [current-buffer] :as state} game]
-  (if current-buffer
+(defn update-cursor-if-necessary [state game]
+  (if-let [current-buffer (:id (get-current-buffer @session/*session))]
     (update-in state [:buffers current-buffer] update-cursor state game)
     state))
-
-(defn click-mouse [{:keys [mouse-hover] :as state} game]
-  (if (session/tab? mouse-hover)
-    (assoc state :current-tab mouse-hover)
-    (case mouse-hover
-      (:font-dec :font-inc) (update-cursor-if-necessary state game)
-      :reload-file (assoc state :current-tab (:id (get-current-tab @session/*session)))
-      state)))
-
-(defn change-tab [{:keys [current-tab] :as state} direction]
-  (let [index (+ (.indexOf session/tab-ids current-tab)
-                 direction)
-        index (cond
-                (neg? index) (dec (count session/tab-ids))
-                (= index (count session/tab-ids)) 0
-                :else index)]
-    (assoc state :current-tab (nth session/tab-ids index))))
 
 (defn update-uniforms [{:keys [characters] :as text-entity} font-height alpha]
   (update text-entity :uniforms assoc
@@ -516,13 +520,13 @@
    :clojure? (or (= current-tab :repl-in)
                  (clojure-path? path))})
 
-(defn ->ascii [{:keys [base-font-entity base-text-entity font-height current-tab text-boxes] :as state} lines]
+(defn ->ascii [{:keys [base-font-entity base-text-entity font-height text-boxes] :as state} lines]
   {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
    :camera (t/translate session/orig-camera 0 0)
    :camera-x 0
    :camera-y 0
    :lines lines
-   :text-box (get text-boxes current-tab)})
+   :text-box (get text-boxes (:id (get-current-tab @session/*session)))})
 
 (defn parse-clojure-buffer [{:keys [lines cursor-line cursor-column] :as buffer} {:keys [mode] :as state} init?]
   (let [parse-opts (cond
@@ -742,14 +746,19 @@
 (defn tick [game]
   (let [session @session/*session
         font-size-multiplier (:size (get-font session))
+        current-tab (:id (get-current-tab session))
+        current-buffer (:id (get-current-buffer session))
         {game-width :width game-height :height :as window} (get-window session)
-        {:keys [current-buffer buffers control?
+        {:keys [buffers control?
                 base-rect-entity base-rects-entity
                 command-text-entity command-completion-text-entity command-cursor-entity
                 font-height mode ascii
-                toolbar-text-entities bounding-boxes current-tab tab->buffer highlight-text-entities]
+                toolbar-text-entities bounding-boxes tab->buffer highlight-text-entities]
          :as state} @*state
-        state (assoc state :font-size-multiplier font-size-multiplier)]
+        state (assoc state
+                :font-size-multiplier font-size-multiplier
+                :current-tab current-tab
+                :current-buffer current-buffer)]
     (when (and (pos? game-width) (pos? game-height))
       (if (::clear? game)
         (c/render game (update screen-entity :viewport assoc :width game-width :height game-height))

@@ -90,8 +90,8 @@
                             :hand GLFW/GLFW_HAND_CURSOR
                             GLFW/GLFW_ARROW_CURSOR)))))
 
-(defn- reload-file! [state pipes]
-  (let [{:keys [current-tab current-buffer buffers tab->buffer]} state
+(defn- reload-file! [state pipes current-tab current-buffer]
+  (let [{:keys [buffers tab->buffer]} state
         {:keys [out-pipe]} pipes
         {:keys [lines file-name clojure?] :as buffer} (get buffers current-buffer)]
     (when (and clojure? (= current-tab :files))
@@ -107,8 +107,8 @@
 (defn on-mouse-click! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window button action mods]
   (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
              (= action GLFW/GLFW_PRESS))
-    (c/click-mouse! :left #(reload-file! @c/*state pipes))
-    (swap! c/*state c/click-mouse game)))
+    (c/click-mouse! :left (partial reload-file! @c/*state))
+    (swap! c/*state c/update-cursor-if-necessary game)))
 
 (defn on-key! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window keycode scancode action mods]
   (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
@@ -121,8 +121,11 @@
       (swap! c/*state assoc :control? (or (and control? (not control-key?))
                                           (and press? control-key?))))
     (when press?
-      (let [{:keys [mode current-tab] :as state} @c/*state
-            k (keycode->keyword keycode)]
+      (let [{:keys [mode] :as state} @c/*state
+            k (keycode->keyword keycode)
+            session @session/*session
+            current-tab (:id (c/get-current-tab session))
+            current-buffer (:id (c/get-current-buffer session))]
         (cond
           ;; pressing enter in the repl
           (and (= current-tab :repl-in)
@@ -133,10 +136,8 @@
           control?
           (case k
             (:tab :backtick)
-            (do
-              (swap! c/*state c/change-tab (if shift? -1 1))
-              (c/update-current-tab! (:current-tab @c/*state)))
-            :f (reload-file! state pipes)
+            (c/shift-current-tab! (if shift? -1 1))
+            :f (reload-file! state pipes current-tab current-buffer)
             :- (do
                  (c/font-dec!)
                  (swap! c/*state c/update-cursor-if-necessary game))
@@ -159,18 +160,21 @@
 (defn on-resize! [{:keys [::c/send-input!] :as game} window width height]
   (c/update-window-size! width height)
   (swap! c/*state
-         (fn [{:keys [current-buffer current-tab tab->buffer] :as state}]
-           (as-> state state
-                 (if current-buffer
-                   (update-in state [:buffers current-buffer] c/update-cursor state game)
-                   state)
-                 ;; if we're in the repl, make sure both the input and output are refreshed
-                 (if-let [other-tab (case current-tab
-                                      :repl-in :repl-out
-                                      :repl-out :repl-in
-                                      nil)]
-                   (update-in state [:buffers (tab->buffer other-tab)] c/update-cursor state game)
-                   state))))
+         (fn [{:keys [tab->buffer] :as state}]
+           (let [session @session/*session
+                 current-tab (:id (c/get-current-tab session))
+                 current-buffer (:id (c/get-current-buffer session))]
+             (as-> state state
+                   (if current-buffer
+                     (update-in state [:buffers current-buffer] c/update-cursor state game)
+                     state)
+                   ;; if we're in the repl, make sure both the input and output are refreshed
+                   (if-let [other-tab (case current-tab
+                                        :repl-in :repl-out
+                                        :repl-out :repl-in
+                                        nil)]
+                     (update-in state [:buffers (tab->buffer other-tab)] c/update-cursor state game)
+                     state)))))
   (send-input! [:resize]))
 
 (defn- listen-for-events [game window]
@@ -209,7 +213,7 @@
         (case (first vim-input)
           :append (recur nil (conj append-inputs (second vim-input)))
           :new-tab (do
-                     (vim/open-buffer-for-tab! vim @c/*state)
+                     (vim/open-buffer-for-tab! vim @c/*state @session/*session)
                      (async/put! vim-chan [:resize])
                      (recur nil append-inputs))
           :resize (let [width (utils/get-width game)

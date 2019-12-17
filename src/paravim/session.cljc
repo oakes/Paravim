@@ -30,6 +30,10 @@
 (defrecord Font [size])
 (defrecord CurrentTab [id])
 (defrecord CurrentBuffer [id])
+(defrecord Buffer [id text-entity
+                   camera camera-x camera-y
+                   path file-name
+                   lines text-box clojure?])
 
 (defn change-font-size! [{:keys [size] :as font} diff]
   (let [new-val (+ size diff)]
@@ -59,6 +63,10 @@
     (fn []
       (let [current-tab CurrentTab]
         current-tab))
+    :get-current-buffer
+    (fn []
+      (let [current-buffer CurrentBuffer]
+        current-buffer))
     :get-mouse-hover
     (fn []
       (let [mouse-hover MouseHover]
@@ -109,9 +117,11 @@
                                   :cursor :hand
                                   :mouse mouse}))
     :mouse-clicked
-    (let [mouse-click MouseClick
+    (let [game Game
+          mouse-click MouseClick
           mouse-hover MouseHover
           current-tab CurrentTab
+          current-buffer CurrentBuffer
           font Font]
       (clara/retract! mouse-click)
       (when (= :left (:button mouse-click))
@@ -121,7 +131,7 @@
             (case target
               :font-dec (font-dec! font)
               :font-inc (font-inc! font)
-              :reload-file (when (:reload-file! mouse-click)
+              :reload-file (when ((:reload-file! mouse-click) (:pipes game) (:id current-tab) (:id current-buffer))
                              (clarax/merge! current-tab {:id :repl-in}))
               nil)))))
     :tab-changed
