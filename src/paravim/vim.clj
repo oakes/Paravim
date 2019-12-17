@@ -16,9 +16,10 @@
     (when-let [path (c/tab->path current-tab)]
       (v/open-buffer vim path))))
 
-(defn set-window-size! [vim {:keys [font-height font-width font-size-multiplier text-boxes current-tab] :as state} width height]
+(defn set-window-size! [vim {:keys [font-height font-width text-boxes current-tab] :as state} session width height]
   (when-let [{:keys [top bottom]} (get text-boxes current-tab)]
-    (let [text-height (- (bottom height font-size-multiplier)
+    (let [font-size-multiplier (:size (c/get-font session))
+          text-height (- (bottom height font-size-multiplier)
                          (top height font-size-multiplier))
           font-height (* font-height font-size-multiplier)
           font-width (* font-width font-size-multiplier)]

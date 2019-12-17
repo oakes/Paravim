@@ -27,20 +27,20 @@
 (defrecord MouseClick [button reload-file!])
 (defrecord TextBox [id left right top bottom])
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
-(defrecord Prefs [font-size])
+(defrecord Font [size])
 (defrecord CurrentTab [id])
 (defrecord CurrentBuffer [id])
 
-(defn change-font-size! [{:keys [font-size] :as prefs} diff]
-  (let [new-val (+ font-size diff)]
+(defn change-font-size! [{:keys [size] :as font} diff]
+  (let [new-val (+ size diff)]
     (when (<= min-font-size new-val max-font-size)
-      (clarax/merge! prefs {:font-size new-val}))))
+      (clarax/merge! font {:size new-val}))))
 
-(defn font-dec! [prefs]
-  (change-font-size! prefs (- font-size-step)))
+(defn font-dec! [font]
+  (change-font-size! font (- font-size-step)))
 
-(defn font-inc! [prefs]
-  (change-font-size! prefs font-size-step))
+(defn font-inc! [font]
+  (change-font-size! font font-size-step))
 
 (def queries
   '{:get-game
@@ -62,7 +62,11 @@
     :get-mouse-hover
     (fn []
       (let [mouse-hover MouseHover]
-        mouse-hover))})
+        mouse-hover))
+    :get-font
+    (fn []
+      (let [font Font]
+        font))})
 
 (def rules
   '{:mouse-hovers-over-text
@@ -72,13 +76,13 @@
           :when (not= mouse (:mouse mouse-hover))
           current-tab CurrentTab
           :when (not= nil (:id current-tab))
-          prefs Prefs
+          font Font
           {:keys [id left right top bottom] :as text-box} TextBox
           :when (and (= id (:id current-tab))
                      (<= left (:x mouse) (- (:width window) right))
-                     (<= (top (:height window) (:font-size prefs))
+                     (<= (top (:height window) (:size font))
                          (:y mouse)
-                         (bottom (:height window) (:font-size prefs))))]
+                         (bottom (:height window) (:size font))))]
       (clarax/merge! mouse-hover {:target :text
                                   :cursor :ibeam
                                   :mouse mouse}))
@@ -87,9 +91,9 @@
           mouse Mouse
           mouse-hover MouseHover
           :when (not= mouse (:mouse mouse-hover))
-          prefs Prefs
+          font Font
           {:keys [x1 y1 x2 y2 align] :as bounding-box} BoundingBox
-          :when (let [font-size (:font-size prefs)
+          :when (let [font-size (:size font)
                       game-width (:width window)
                       x1 (cond->> (* x1 font-size)
                                   (= :right align)
@@ -108,24 +112,24 @@
     (let [mouse-click MouseClick
           mouse-hover MouseHover
           current-tab CurrentTab
-          prefs Prefs]
+          font Font]
       (clara/retract! mouse-click)
       (when (= :left (:button mouse-click))
         (let [{:keys [target]} mouse-hover]
           (if (tab? target)
             (clarax/merge! current-tab {:id target})
             (case target
-              :font-dec (font-dec! prefs)
-              :font-inc (font-inc! prefs)
+              :font-dec (font-dec! font)
+              :font-inc (font-inc! font)
               :reload-file (when (:reload-file! mouse-click)
                              (clarax/merge! current-tab {:id :repl-in}))
               nil)))))
     :tab-changed
     (let [current-tab CurrentTab]
       (println current-tab))
-    :prefs-changed
-    (let [prefs Prefs]
-      (println prefs))})
+    :font-changed
+    (let [font Font]
+      (println font))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))
@@ -140,7 +144,7 @@
           (->MouseHover nil nil nil)
           (->CurrentTab :files)
           (->CurrentBuffer nil)
-          (->Prefs (/ 1 4)))
+          (->Font (/ 1 4)))
         clara/fire-rules)))
 
 (restart!)

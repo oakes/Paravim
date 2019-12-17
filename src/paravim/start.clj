@@ -3,6 +3,7 @@
             [paravim.repl :as repl]
             [paravim.vim :as vim]
             [paravim.utils :as utils]
+            [paravim.session :as session]
             [clojure.string :as str]
             [play-cljc.gl.core :as pc]
             [clojure.core.async :as async])
@@ -140,8 +141,12 @@
               (c/update-current-tab! (:current-tab @c/*state))
               (send-input! [:new-tab]))
             :f (reload-file! state pipes)
-            :- (swap! c/*state c/font-dec game)
-            := (swap! c/*state c/font-inc game)
+            :- (do
+                 (c/font-dec!)
+                 (swap! c/*state c/update-cursor-if-necessary game))
+            := (do
+                 (c/font-inc!)
+                 (swap! c/*state c/update-cursor-if-necessary game))
             ; else
             (when-let [key-name (if k
                                   (keyword->name k)
@@ -213,7 +218,7 @@
                      (recur nil append-inputs))
           :resize (let [width (utils/get-width game)
                         height (utils/get-height game)]
-                    (vim/set-window-size! vim @c/*state width height)
+                    (vim/set-window-size! vim @c/*state @session/*session width height)
                     (recur nil append-inputs))))
       ;; append to the repl
       (vim/ready-to-append? vim append-inputs)
@@ -263,7 +268,7 @@
                 ::c/send-input! send-input!
                 ::c/vim vim)]
      (when (pos-int? density-ratio)
-       (swap! c/*state update :font-size-multiplier * density-ratio))
+       (c/font-multiply! density-ratio))
      (c/init game)
      (vim/init vim game)
      (when vim-chan

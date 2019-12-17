@@ -38,7 +38,6 @@
                        :buffer-updates []
                        :current-tab :files
                        :tab->buffer {}
-                       :font-size-multiplier (/ 1 4)
                        :text-boxes {}
                        :bounding-boxes {}
                        :show-search? false}))
@@ -48,7 +47,7 @@
   (def get-window (:get-window query-fns))
   (def get-mouse (:get-mouse query-fns))
   (def get-mouse-hover (:get-mouse-hover query-fns))
-  (def get-prefs (:get-prefs query-fns))
+  (def get-font (:get-font query-fns))
   (def get-current-tab (:get-current-tab query-fns)))
 
 (defn update-mouse! [x y]
@@ -79,6 +78,28 @@
       (-> session
           (clara/insert (session/->MouseClick button reload-file!))
           clara/fire-rules))))
+
+(defn change-font-size! [diff]
+  (swap! session/*session
+    (fn [session]
+      (let [font (get-font session)
+            curr-val (:size font)
+            new-val (+ curr-val diff)]
+        (if (<= session/min-font-size new-val session/max-font-size)
+          (-> session
+              (clarax/merge font {:size new-val})
+              clara/fire-rules)
+          session)))))
+
+(defn font-dec! []
+  (change-font-size! (- session/font-size-step)))
+
+(defn font-inc! []
+  (change-font-size! session/font-size-step))
+
+(defn font-multiply! [n]
+  (let [font-size (:size (get-font @session/*session))]
+    (change-font-size! (- (* font-size n) font-size))))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
 
@@ -253,11 +274,12 @@
         text-entity))))
 
 (defn get-visible-lines [{:keys [characters] :as text-entity}
-                         {:keys [font-height font-size-multiplier] :as state}
+                         {:keys [font-height] :as state}
                          {:keys [top bottom] :as text-box}
                          game-height
                          camera-y]
-  (let [text-height (- (bottom game-height font-size-multiplier)
+  (let [font-size-multiplier (:size (get-font @session/*session))
+        text-height (- (bottom game-height font-size-multiplier)
                        (top game-height font-size-multiplier))
         char-height (* font-height font-size-multiplier)
         line-count (count characters)
@@ -276,8 +298,9 @@
         chars-to-crop-count (+ chars-to-skip-count (reduce + 0 char-counts))]
     [chars-to-skip-count chars-to-crop-count char-counts]))
 
-(defn ->cursor-entity [{:keys [font-width font-height base-rect-entity font-size-multiplier mode] :as state} line-chars line column]
-  (let [left-char (get line-chars (dec column))
+(defn ->cursor-entity [{:keys [font-width font-height base-rect-entity mode] :as state} line-chars line column]
+  (let [font-size-multiplier (:size (get-font @session/*session))
+        left-char (get line-chars (dec column))
         curr-char (get line-chars column)
         {:keys [left width height]} curr-char
         width (cond-> (or width font-width)
@@ -298,8 +321,9 @@
                :width (* width font-size-multiplier)
                :height (* height font-size-multiplier)))))
 
-(defn update-cursor [{:keys [text-entity cursor-line cursor-column text-box] :as buffer} {:keys [base-rects-entity font-size-multiplier] :as state} game]
-  (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
+(defn update-cursor [{:keys [text-entity cursor-line cursor-column text-box] :as buffer} {:keys [base-rects-entity] :as state} game]
+  (let [font-size-multiplier (:size (get-font @session/*session))
+        line-chars (get-in buffer [:text-entity :characters cursor-line])
         {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars cursor-line cursor-column)]
     (-> buffer
         (assoc :rects-entity (-> base-rects-entity
@@ -338,27 +362,16 @@
                   :visible-start-line lines-to-skip-count
                   :visible-end-line lines-to-crop-count))))))
 
-(defn change-font-size [{:keys [font-size-multiplier current-buffer] :as state} game diff]
-  (let [new-val (+ font-size-multiplier diff)]
-    (if (<= session/min-font-size new-val session/max-font-size)
-      (let [state (assoc state :font-size-multiplier new-val)]
-        (if current-buffer
-          (update-in state [:buffers current-buffer] update-cursor state game)
-          state))
-      state)))
-
-(defn font-dec [state game]
-  (change-font-size state game (- session/font-size-step)))
-
-(defn font-inc [state game]
-  (change-font-size state game session/font-size-step))
+(defn update-cursor-if-necessary [{:keys [current-buffer] :as state} game]
+  (if current-buffer
+    (update-in state [:buffers current-buffer] update-cursor state game)
+    state))
 
 (defn click-mouse [{:keys [mouse-hover] :as state} game]
   (if (session/tab? mouse-hover)
     (assoc state :current-tab mouse-hover)
     (case mouse-hover
-      :font-dec (font-dec state game)
-      :font-inc (font-inc state game)
+      (:font-dec :font-inc) (update-cursor-if-necessary state game)
       :reload-file (assoc state :current-tab (:id (get-current-tab @session/*session)))
       state)))
 
@@ -728,13 +741,15 @@
 
 (defn tick [game]
   (let [session @session/*session
+        font-size-multiplier (:size (get-font session))
         {game-width :width game-height :height :as window} (get-window session)
         {:keys [current-buffer buffers control?
                 base-rect-entity base-rects-entity
                 command-text-entity command-completion-text-entity command-cursor-entity
-                font-height mode font-size-multiplier ascii
+                font-height mode ascii
                 toolbar-text-entities bounding-boxes current-tab tab->buffer highlight-text-entities]
-         :as state} @*state]
+         :as state} @*state
+        state (assoc state :font-size-multiplier font-size-multiplier)]
     (when (and (pos? game-width) (pos? game-height))
       (if (::clear? game)
         (c/render game (update screen-entity :viewport assoc :width game-width :height game-height))
