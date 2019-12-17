@@ -86,7 +86,7 @@
           ;; go back to the original position
           (v/set-cursor-position vim cursor-line cursor-column)
           (v/input vim "<Esc>")))
-      (c/update-state!
+      (swap! session/*session c/update-state
         (fn [state]
           (-> state
               (assoc-in [:buffers current-buffer :needs-parinfer?] false)
@@ -124,14 +124,14 @@
     :else
     state))
 
-(defn init-ascii []
+(defn init-ascii! []
   (let [now (LocalDate/now)]
     (some->> (or (some (fn [[ascii date]]
                          (when (= now date)
                            ascii))
                        ascii-art)
                  "intro")
-             (c/update-state! assoc-ascii))))
+             (swap! session/*session c/update-state assoc-ascii))))
 
 (defn input [{:keys [mode command-text command-start command-completion] :as state} vim s]
   (if (= 'COMMAND_LINE mode)
@@ -205,7 +205,7 @@
 
 (defn on-input [game vim s]
   (input (c/get-state @session/*session) vim s)
-  (let [session (c/update-state! update-state-after-input game vim s)
+  (let [session (swap! session/*session c/update-state update-state-after-input game vim s)
         state (c/get-state session)]
     (when (and (= 'NORMAL (:mode state))
                (not= s "u"))
@@ -252,27 +252,33 @@
                           (c/parse-clojure-buffer state true)
                           (c/update-clojure-buffer state))
                       buffer)]
-        (c/update-current-buffer! buffer-ptr)
-        (c/update-current-tab! current-tab)
-        (c/update-tab! current-tab buffer-ptr)
-        (c/update-state!
-          (fn [state]
-            (-> state
-                (assoc-in [:buffers buffer-ptr] (c/update-cursor buffer state game))))))
+        (swap! session/*session
+          (fn [session]
+            (-> session
+                (c/update-current-buffer buffer-ptr)
+                (c/update-current-tab current-tab)
+                (c/update-tab current-tab buffer-ptr)
+                (c/update-state
+                  (fn [state]
+                    (-> state
+                        (assoc-in [:buffers buffer-ptr] (c/update-cursor buffer state game)))))))))
       ;; clear the files tab
-      (do
-        (c/update-current-buffer! nil)
-        (c/update-tab! :files nil)))))
+      (swap! session/*session
+        (fn [session]
+          (-> session
+              (c/update-current-buffer nil)
+              (c/update-tab :files nil)))))))
 
-(defn on-buf-update [vim buffer-ptr start-line end-line line-count-change]
+(defn on-buf-update [game vim buffer-ptr start-line end-line line-count-change]
   (let [first-line (dec start-line)
         last-line (+ (dec end-line) line-count-change)
         lines (vec (for [i (range first-line last-line)]
                      (v/get-line vim buffer-ptr (inc i))))]
-    (c/update-state! update :buffer-updates conj {:buffer-ptr buffer-ptr
-                                                  :lines lines
-                                                  :first-line first-line
-                                                  :line-count-change line-count-change})))
+    (swap! session/*session c/update-state update :buffer-updates conj
+                     {:buffer-ptr buffer-ptr
+                      :lines lines
+                      :first-line first-line
+                      :line-count-change line-count-change})))
 
 (defn ->vim []
   (doto (v/->vim)
@@ -312,11 +318,11 @@
                                  (when *update-ui?*
                                    (on-buf-enter game vim buffer-ptr))
                                  nil)))
-  (v/set-on-buffer-update vim (partial on-buf-update vim))
+  (v/set-on-buffer-update vim (partial on-buf-update game vim))
   (v/set-on-stop-search-highlight vim (fn []
-                                        (c/update-state! assoc :show-search? false)))
+                                        (swap! session/*session c/update-state assoc :show-search? false)))
   (v/set-on-unhandled-escape vim (fn []
-                                   (c/update-state!
+                                   (swap! session/*session c/update-state
                                      (fn [state]
                                        (let [current-buffer (:id (c/get-current-buffer @session/*session))
                                              state (assoc state :show-search? false)]
@@ -330,5 +336,5 @@
                              (str/join \newline lines)))
                          (catch Exception e (.printStackTrace e)))))
   (run! #(v/open-buffer vim (c/tab->path %)) [:repl-in :repl-out :files])
-  (init-ascii))
+  (init-ascii!))
 

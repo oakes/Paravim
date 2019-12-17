@@ -47,104 +47,84 @@
   ;(def get-buffer (:get-buffer query-fns))
   (def get-state (:get-state query-fns)))
 
-(defn update-mouse! [x y]
-  (swap! session/*session
-    (fn [session]
+(defn update-mouse [session x y]
+  (-> session
+      (clarax/merge (get-mouse-hover session) {:target nil :cursor nil})
+      (clarax/merge (get-mouse session) {:x x :y y})
+      clara/fire-rules))
+
+(defn update-window-size [session width height]
+  (-> session
+      (clarax/merge (get-window session) {:width width :height height})
+      clara/fire-rules))
+
+(defn update-current-tab [session id]
+  (-> session
+      (clarax/merge (get-current-tab session) {:id id})
+      clara/fire-rules))
+
+(defn shift-current-tab [session direction]
+  (let [current-tab (get-current-tab session)
+        id (:id current-tab)
+        index (+ (.indexOf session/tab-ids id)
+                 direction)
+        index (cond
+                (neg? index) (dec (count session/tab-ids))
+                (= index (count session/tab-ids)) 0
+                :else index)]
+    (-> session
+        (clarax/merge current-tab {:id (nth session/tab-ids index)})
+        clara/fire-rules)))
+
+(defn update-tab [session id buffer-id]
+  (-> session
+      (clarax/merge (get-tab session {:?id id}) {:buffer-id buffer-id})
+      clara/fire-rules))
+
+(defn update-current-buffer [session id]
+  (-> session
+      (clarax/merge (get-current-buffer session) {:id id})
+      clara/fire-rules))
+
+(defn click-mouse [session button reload-file!]
+  (-> session
+      (clara/insert (session/->MouseClick button reload-file!))
+      clara/fire-rules))
+
+(defn change-font-size [session diff]
+  (let [font (get-font session)
+        curr-val (:size font)
+        new-val (+ curr-val diff)]
+    (if (<= session/min-font-size new-val session/max-font-size)
       (-> session
-          (clarax/merge (get-mouse-hover session) {:target nil :cursor nil})
-          (clarax/merge (get-mouse session) {:x x :y y})
-          clara/fire-rules))))
+          (clarax/merge font {:size new-val})
+          clara/fire-rules)
+      session)))
 
-(defn update-window-size! [width height]
-  (swap! session/*session
-    (fn [session]
-      (-> session
-          (clarax/merge (get-window session) {:width width :height height})
-          clara/fire-rules))))
+(defn font-dec [session]
+  (change-font-size session (- session/font-size-step)))
 
-(defn update-current-tab! [id]
-  (swap! session/*session
-    (fn [session]
-      (-> session
-          (clarax/merge (get-current-tab session) {:id id})
-          clara/fire-rules))))
+(defn font-inc [session]
+  (change-font-size session session/font-size-step))
 
-(defn shift-current-tab! [direction]
-  (swap! session/*session
-    (fn [session]
-      (let [current-tab (get-current-tab session)
-            id (:id current-tab)
-            index (+ (.indexOf session/tab-ids id)
-                     direction)
-            index (cond
-                    (neg? index) (dec (count session/tab-ids))
-                    (= index (count session/tab-ids)) 0
-                    :else index)]
-        (-> session
-            (clarax/merge current-tab {:id (nth session/tab-ids index)})
-            clara/fire-rules)))))
-
-(defn update-tab! [id buffer-id]
-  (swap! session/*session
-    (fn [session]
-      (-> session
-          (clarax/merge (get-tab session {:?id id}) {:buffer-id buffer-id})
-          clara/fire-rules))))
-
-(defn update-current-buffer! [id]
-  (swap! session/*session
-    (fn [session]
-      (-> session
-          (clarax/merge (get-current-buffer session) {:id id})
-          clara/fire-rules))))
-
-(defn click-mouse! [button reload-file!]
-  (swap! session/*session
-    (fn [session]
-      (-> session
-          (clara/insert (session/->MouseClick button reload-file!))
-          clara/fire-rules))))
-
-(defn change-font-size! [diff]
-  (swap! session/*session
-    (fn [session]
-      (let [font (get-font session)
-            curr-val (:size font)
-            new-val (+ curr-val diff)]
-        (if (<= session/min-font-size new-val session/max-font-size)
-          (-> session
-              (clarax/merge font {:size new-val})
-              clara/fire-rules)
-          session)))))
-
-(defn font-dec! []
-  (change-font-size! (- session/font-size-step)))
-
-(defn font-inc! []
-  (change-font-size! session/font-size-step))
-
-(defn font-multiply! [n]
+(defn font-multiply [session n]
   (let [font-size (:size (get-font @session/*session))]
-    (change-font-size! (- (* font-size n) font-size))))
+    (change-font-size session (- (* font-size n) font-size))))
 #_
-(defn upsert-buffer! [buffer]
-  (swap! session/*session
-    (fn [session]
-      (if-let [existing-buffer (get-buffer session {:?id (:id buffer)})]
-        (-> session
-            (clarax/merge existing-buffer buffer)
-            clara/fire-rules)
-        (-> session
-            (clara/insert (session/map->Buffer buffer))
-            clara/fire-rules)))))
+(defn upsert-buffer [session buffer]
+  (if-let [existing-buffer (get-buffer session {:?id (:id buffer)})]
+    (-> session
+        (clarax/merge existing-buffer buffer)
+        clara/fire-rules)
+    (-> session
+        (clara/insert (session/map->Buffer buffer))
+        clara/fire-rules)))
 
-(defn update-state! [f & args]
-  (swap! session/*session
-    (fn [session]
-      (let [state (get-state session)]
-        (-> session
-            (clarax/merge state (apply f state args))
-            clara/fire-rules)))))
+(defn update-state [session f & args]
+  (let [state (get-state session)]
+    (-> session
+        (clarax/merge state (apply f state args))
+        clara/fire-rules)))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
 
@@ -630,7 +610,7 @@
   ;; create rect entities
   (let [rect-entity (e/->entity game primitives/rect)
         rects-entity (c/compile game (i/->instanced-entity rect-entity))]
-    (update-state! assoc
+    (swap! session/*session update-state assoc
       :base-rect-entity rect-entity
       :base-rects-entity rects-entity))
   ;; load fonts
@@ -653,7 +633,7 @@
              text-boxes {:files {:left 0 :right 0 :top snap-to-top :bottom snap-to-bottom}
                          :repl-in {:left 0 :right 0 :top repl-in-top :bottom snap-to-bottom}
                          :repl-out {:left 0 :right 0 :top snap-to-top :bottom repl-out-bottom}}]
-         (update-state! assoc
+         (swap! session/*session update-state assoc
                         :font-width font-width
                         :font-height font-height
                         :base-font-entity font-entity
@@ -714,7 +694,7 @@
                                                               (t/color yellow-color)))))
                                               button-entities
                                               buttons)]
-              (update-state! assoc
+              (swap! session/*session update-state assoc
                              :roboto-font-entity font-entity
                              :roboto-text-entity text-entity
                              :toolbar-text-entities (merge tab-entities button-entities)
