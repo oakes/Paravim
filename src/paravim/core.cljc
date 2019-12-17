@@ -19,13 +19,6 @@
             #?(:clj [paravim.text :refer [load-font-clj]]))
   #?(:cljs (:require-macros [paravim.text :refer [load-font-cljs]])))
 
-(def orig-camera (e/->camera true))
-(def tabs [{:id :files
-            :text "Files"}
-           {:id :repl-in
-            :text "REPL In"}
-           {:id :repl-out
-            :text "REPL Out"}])
 (def buttons [{:id :font-inc
                :text "Font +"
                :shortcut-char 5}
@@ -35,15 +28,9 @@
               {:id :reload-file
                :text "Reload File"
                :shortcut-char 7}])
-(def tab-ids (mapv :id tabs))
-(def tab? (set tab-ids))
 (def tab->path {:files "scratch.clj"
                 :repl-in "repl.in"
                 :repl-out "repl.out"})
-
-(def font-size-step (/ 1 16))
-(def min-font-size (/ 1 8))
-(def max-font-size 1)
 
 (defonce *state (atom {:current-buffer nil
                        :buffers {}
@@ -60,7 +47,8 @@
   (def get-window (:get-window query-fns))
   (def get-mouse (:get-mouse query-fns))
   (def get-mouse-hover (:get-mouse-hover query-fns))
-  (def get-prefs (:get-prefs query-fns)))
+  (def get-prefs (:get-prefs query-fns))
+  (def get-current-tab (:get-current-tab query-fns)))
 
 (defn update-mouse! [x y]
   (swap! session/*session
@@ -77,11 +65,18 @@
           (clarax/merge (get-window session) {:width width :height height})
           clara/fire-rules))))
 
-(defn update-prefs! [prefs]
+(defn update-current-tab! [id]
   (swap! session/*session
     (fn [session]
       (-> session
-          (clarax/merge (get-prefs session) prefs)
+          (clarax/merge (get-current-tab session) {:id id})
+          clara/fire-rules))))
+
+(defn click-mouse! [button reload-file!]
+  (swap! session/*session
+    (fn [session]
+      (-> session
+          (clara/insert (session/->MouseClick button reload-file!))
           clara/fire-rules))))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
@@ -336,7 +331,7 @@
                                camera-y)
                     [lines-to-skip-count lines-to-crop-count] (get-visible-lines text-entity state text-box game-height camera-y)]
                 (assoc buffer
-                  :camera (t/translate orig-camera camera-x (- camera-y text-top))
+                  :camera (t/translate session/orig-camera camera-x (- camera-y text-top))
                   :camera-x camera-x
                   :camera-y camera-y
                   :visible-start-line lines-to-skip-count
@@ -344,7 +339,7 @@
 
 (defn change-font-size [{:keys [font-size-multiplier current-buffer] :as state} game diff]
   (let [new-val (+ font-size-multiplier diff)]
-    (if (<= min-font-size new-val max-font-size)
+    (if (<= session/min-font-size new-val session/max-font-size)
       (let [state (assoc state :font-size-multiplier new-val)]
         (if current-buffer
           (update-in state [:buffers current-buffer] update-cursor state game)
@@ -352,28 +347,28 @@
       state)))
 
 (defn font-dec [state game]
-  (change-font-size state game (- font-size-step)))
+  (change-font-size state game (- session/font-size-step)))
 
 (defn font-inc [state game]
-  (change-font-size state game font-size-step))
+  (change-font-size state game session/font-size-step))
 
-(defn click-mouse [{:keys [mouse-hover] :as state} game reload-file]
-  (if (tab? mouse-hover)
+(defn click-mouse [{:keys [mouse-hover] :as state} game]
+  (if (session/tab? mouse-hover)
     (assoc state :current-tab mouse-hover)
     (case mouse-hover
       :font-dec (font-dec state game)
       :font-inc (font-inc state game)
-      :reload-file (reload-file state)
+      :reload-file (assoc state :current-tab (:id (get-current-tab @session/*session)))
       state)))
 
 (defn change-tab [{:keys [current-tab] :as state} direction]
-  (let [index (+ (.indexOf tab-ids current-tab)
+  (let [index (+ (.indexOf session/tab-ids current-tab)
                  direction)
         index (cond
-                (neg? index) (dec (count tab-ids))
-                (= index (count tab-ids)) 0
+                (neg? index) (dec (count session/tab-ids))
+                (= index (count session/tab-ids)) 0
                 :else index)]
-    (assoc state :current-tab (nth tab-ids index))))
+    (assoc state :current-tab (nth session/tab-ids index))))
 
 (defn update-uniforms [{:keys [characters] :as text-entity} font-height alpha]
   (update text-entity :uniforms assoc
@@ -497,7 +492,7 @@
 
 (defn ->buffer [{:keys [base-font-entity base-text-entity font-height text-boxes] :as state} path file-name lines current-tab]
   {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
-   :camera (t/translate orig-camera 0 0)
+   :camera (t/translate session/orig-camera 0 0)
    :camera-x 0
    :camera-y 0
    :path path
@@ -509,7 +504,7 @@
 
 (defn ->ascii [{:keys [base-font-entity base-text-entity font-height current-tab text-boxes] :as state} lines]
   {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
-   :camera (t/translate orig-camera 0 0)
+   :camera (t/translate session/orig-camera 0 0)
    :camera-x 0
    :camera-y 0
    :lines lines
@@ -639,15 +634,15 @@
                                  (fn [m {:keys [id text]}]
                                    (assoc m id (assoc-lines text-entity font-entity font-height [text])))
                                  {}
-                                 tabs)
+                                 session/tabs)
                   bounding-boxes (reduce-kv
                                    (fn [m i {:keys [id]}]
-                                     (let [last-tab (some->> (get tabs (dec i)) :id (get m))
+                                     (let [last-tab (some->> (get session/tabs (dec i)) :id (get m))
                                            left (if last-tab (+ (:x2 last-tab) tab-spacing) 0)
                                            right (-> tab-entities (get id) :characters first last :x-total (+ left))]
                                        (assoc m id {:x1 left :y1 0 :x2 right :y2 font-height})))
                                    {}
-                                   tabs)
+                                   session/tabs)
                   button-entities (reduce
                                     (fn [m {:keys [id text]}]
                                       (assoc m id (assoc-lines text-entity font-entity font-height [text])))

@@ -106,14 +106,10 @@
 (defn on-mouse-click! [{:keys [vim pipes game send-input!]} window button action mods]
   (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
              (= action GLFW/GLFW_PRESS))
+    (c/click-mouse! :left #(reload-file! @c/*state pipes))
     (let [old-state @c/*state
-          new-state (swap! c/*state c/click-mouse game
-                      (fn [state]
-                        (cond-> state
-                                (reload-file! state pipes)
-                                (assoc :current-tab :repl-in))))]
+          new-state (swap! c/*state c/click-mouse game)]
       (when (not= (:current-tab old-state) (:current-tab new-state))
-        (c/update-prefs! {:tab (:current-tab new-state)})
         (send-input! [:new-tab])))))
 
 (defn on-key! [{:keys [vim pipes game send-input!]} window keycode scancode action mods]
@@ -141,7 +137,7 @@
             (:tab :backtick)
             (do
               (swap! c/*state c/change-tab (if shift? -1 1))
-              (c/update-prefs! {:tab (:current-tab @c/*state)})
+              (c/update-current-tab! (:current-tab @c/*state))
               (send-input! [:new-tab]))
             :f (reload-file! state pipes)
             :- (swap! c/*state c/font-dec game)
