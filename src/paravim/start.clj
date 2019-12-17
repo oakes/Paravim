@@ -73,7 +73,7 @@
    :home "Home"
    :end "End"})
 
-(defn on-mouse-move! [{:keys [game]} window xpos ypos]
+(defn on-mouse-move! [game window xpos ypos]
   (let [density-ratio (float (get-density-ratio window))
         x (* xpos density-ratio)
         y (* ypos density-ratio)
@@ -103,7 +103,7 @@
         .flush)
       true)))
 
-(defn on-mouse-click! [{:keys [vim pipes game send-input!]} window button action mods]
+(defn on-mouse-click! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window button action mods]
   (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
              (= action GLFW/GLFW_PRESS))
     (c/click-mouse! :left #(reload-file! @c/*state pipes))
@@ -112,7 +112,7 @@
       (when (not= (:current-tab old-state) (:current-tab new-state))
         (send-input! [:new-tab])))))
 
-(defn on-key! [{:keys [vim pipes game send-input!]} window keycode scancode action mods]
+(defn on-key! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window keycode scancode action mods]
   (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
         ;alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
         shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))
@@ -152,10 +152,10 @@
           (when-let [key-name (keyword->name k)]
             (send-input! (str "<" key-name ">"))))))))
 
-(defn on-char! [{:keys [send-input!]} window codepoint]
+(defn on-char! [{:keys [::c/send-input!] :as game} window codepoint]
   (send-input! (str (char codepoint))))
 
-(defn on-resize! [{:keys [game send-input!]} window width height]
+(defn on-resize! [{:keys [::c/send-input!] :as game} window width height]
   (c/update-window-size! width height)
   (swap! c/*state
          (fn [{:keys [current-buffer current-tab tab->buffer] :as state}]
@@ -172,28 +172,28 @@
                    state))))
   (send-input! [:resize]))
 
-(defn- listen-for-events [utils window]
+(defn- listen-for-events [game window]
   (doto window
     (GLFW/glfwSetCursorPosCallback
       (reify GLFWCursorPosCallbackI
         (invoke [this window xpos ypos]
-          (on-mouse-move! utils window xpos ypos))))
+          (on-mouse-move! game window xpos ypos))))
     (GLFW/glfwSetMouseButtonCallback
       (reify GLFWMouseButtonCallbackI
         (invoke [this window button action mods]
-          (on-mouse-click! utils window button action mods))))
+          (on-mouse-click! game window button action mods))))
     (GLFW/glfwSetKeyCallback
       (reify GLFWKeyCallbackI
         (invoke [this window keycode scancode action mods]
-          (on-key! utils window keycode scancode action mods))))
+          (on-key! game window keycode scancode action mods))))
     (GLFW/glfwSetCharCallback
       (reify GLFWCharCallbackI
         (invoke [this window codepoint]
-          (on-char! utils window codepoint))))
+          (on-char! game window codepoint))))
     (GLFW/glfwSetWindowSizeCallback
       (reify GLFWWindowSizeCallbackI
         (invoke [this window width height]
-          (on-resize! utils window width height))))))
+          (on-resize! game window width height))))))
 
 (defn- poll-input [game vim vim-chan append-repl-chan]
   (async/go-loop [vim-input nil
@@ -257,7 +257,11 @@
                          (when (string? x)
                            (vim/on-input game vim x))))
          pipes (repl/create-pipes)
-         density-ratio (get-density-ratio (:context game))]
+         density-ratio (get-density-ratio (:context game))
+         game (assoc game
+                ::c/pipes pipes
+                ::c/send-input! send-input!
+                ::c/vim vim)]
      (when (pos-int? density-ratio)
        (swap! c/*state update :font-size-multiplier * density-ratio))
      (c/init game)
@@ -267,16 +271,13 @@
          (poll-input game vim vim-chan append-repl-chan)
          (async/put! vim-chan [:resize])
          (repl/start-repl-thread! nil pipes #(async/put! append-repl-chan [:append %]))))
-     {:pipes pipes
-      :send-input! send-input!
-      :vim vim
-      :game game})))
+     game)))
 
 (defn- start [game window]
   (let [game (assoc game :delta-time 0 :total-time 0 ::c/clear? true)
-        utils (init game)]
+        game (init game)]
     (GLFW/glfwShowWindow window)
-    (listen-for-events utils window)
+    (listen-for-events game window)
     (loop [game game]
       (when-not (GLFW/glfwWindowShouldClose window)
         (let [ts (GLFW/glfwGetTime)

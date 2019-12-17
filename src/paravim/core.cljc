@@ -6,6 +6,7 @@
             [clarax.rules :as clarax]
             [parinferish.core :as ps]
             [clojure.string :as str]
+            [clojure.set :as set]
             [play-cljc.gl.utils :as u]
             [play-cljc.gl.core :as c]
             [play-cljc.transforms :as t]
@@ -576,7 +577,11 @@
     (fn [session]
       (-> session
           (clara/insert
-            (session/map->Game game)
+            ;; the keys must have namespaces removed
+            ;; because predefined fields in records can't have namespaces
+            (session/map->Game (set/rename-keys game {::pipes :pipes
+                                                      ::send-input! :send-input
+                                                      ::vim :vim}))
             (session/->Window (utils/get-width game) (utils/get-height game)))
           clara/fire-rules)))
   ;; create rect entities

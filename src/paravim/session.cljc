@@ -20,7 +20,7 @@
 (def min-font-size (/ 1 8))
 (def max-font-size 1)
 
-(defrecord Game [total-time delta-time context])
+(defrecord Game [total-time delta-time context pipes send-input! vim])
 (defrecord Window [width height])
 (defrecord Mouse [x y])
 (defrecord MouseHover [target cursor mouse])
