@@ -33,10 +33,6 @@
                 :repl-in "repl.in"
                 :repl-out "repl.out"})
 
-(defonce *state (atom {:buffers {}
-                       :buffer-updates []
-                       :show-search? false}))
-
 (let [query-fns (clarax/query-fns @session/*session)]
   (def get-game (:get-game query-fns))
   (def get-window (:get-window query-fns))
@@ -47,7 +43,9 @@
   (def get-current-buffer (:get-current-buffer query-fns))
   (def get-tab (:get-tab query-fns))
   (def get-bounding-box (:get-bounding-box query-fns))
-  (def get-text-box (:get-text-box query-fns)))
+  (def get-text-box (:get-text-box query-fns))
+  ;(def get-buffer (:get-buffer query-fns))
+  (def get-state (:get-state query-fns)))
 
 (defn update-mouse! [x y]
   (swap! session/*session
@@ -128,6 +126,25 @@
 (defn font-multiply! [n]
   (let [font-size (:size (get-font @session/*session))]
     (change-font-size! (- (* font-size n) font-size))))
+#_
+(defn upsert-buffer! [buffer]
+  (swap! session/*session
+    (fn [session]
+      (if-let [existing-buffer (get-buffer session {:?id (:id buffer)})]
+        (-> session
+            (clarax/merge existing-buffer buffer)
+            clara/fire-rules)
+        (-> session
+            (clara/insert (session/map->Buffer buffer))
+            clara/fire-rules)))))
+
+(defn update-state! [f & args]
+  (swap! session/*session
+    (fn [session]
+      (let [state (get-state session)]
+        (-> session
+            (clarax/merge state (apply f state args))
+            clara/fire-rules)))))
 
 (def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
 
@@ -170,7 +187,7 @@
   (assoc color 3 alpha))
 
 (defn get-mode []
-  (:mode @*state))
+  (:mode (get-state @session/*session)))
 
 (defn clojurify-lines
   ([text-entity font-entity parsed-code parinfer?]
@@ -613,7 +630,7 @@
   ;; create rect entities
   (let [rect-entity (e/->entity game primitives/rect)
         rects-entity (c/compile game (i/->instanced-entity rect-entity))]
-    (swap! *state assoc
+    (update-state! assoc
       :base-rect-entity rect-entity
       :base-rects-entity rects-entity))
   ;; load fonts
@@ -636,11 +653,11 @@
              text-boxes {:files {:left 0 :right 0 :top snap-to-top :bottom snap-to-bottom}
                          :repl-in {:left 0 :right 0 :top repl-in-top :bottom snap-to-bottom}
                          :repl-out {:left 0 :right 0 :top snap-to-top :bottom repl-out-bottom}}]
-         (swap! *state assoc
-           :font-width font-width
-           :font-height font-height
-           :base-font-entity font-entity
-           :base-text-entity text-entity)
+         (update-state! assoc
+                        :font-width font-width
+                        :font-height font-height
+                        :base-font-entity font-entity
+                        :base-text-entity text-entity)
          (swap! session/*session
            (fn [session]
              (->> text-boxes
@@ -697,11 +714,11 @@
                                                               (t/color yellow-color)))))
                                               button-entities
                                               buttons)]
-              (swap! *state assoc
-                :roboto-font-entity font-entity
-                :roboto-text-entity text-entity
-                :toolbar-text-entities (merge tab-entities button-entities)
-                :highlight-text-entities highlight-button-entities)
+              (update-state! assoc
+                             :roboto-font-entity font-entity
+                             :roboto-text-entity text-entity
+                             :toolbar-text-entities (merge tab-entities button-entities)
+                             :highlight-text-entities highlight-button-entities)
               (swap! session/*session
                 (fn [session]
                   (->> bounding-boxes
@@ -761,7 +778,7 @@
                 command-text-entity command-completion-text-entity command-cursor-entity
                 font-height mode ascii
                 toolbar-text-entities highlight-text-entities]
-         :as state} @*state
+         :as state} (get-state session)
         state (assoc state
                 :font-size-multiplier font-size-multiplier
                 :current-tab current-tab

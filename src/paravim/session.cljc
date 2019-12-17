@@ -31,10 +31,13 @@
 (defrecord CurrentTab [id])
 (defrecord CurrentBuffer [id])
 (defrecord Tab [id buffer-id])
-(defrecord Buffer [id tab-id text-entity
+(defrecord Buffer [id tab-id
+                   text-entity parinfer-text-entity
+                   parsed-code needs-parinfer?
                    camera camera-x camera-y
                    path file-name
                    lines clojure?])
+(defrecord State [])
 
 (defn change-font-size! [{:keys [size] :as font} diff]
   (let [new-val (+ size diff)]
@@ -90,7 +93,16 @@
     (fn [?id]
       (let [text-box TextBox
             :when (= (:id text-box) ?id)]
-        text-box))})
+        text-box))
+    :get-buffer
+    (fn [?id]
+      (let [buffer Buffer
+            :when (= (:id buffer) ?id)]
+        buffer))
+    :get-state
+    (fn []
+      (let [state State]
+        state))})
 
 (def rules
   '{:mouse-hovers-over-text
@@ -174,7 +186,10 @@
           (->Tab :files nil)
           (->Tab :repl-in nil)
           (->Tab :repl-out nil)
-          (->Font (/ 1 4)))
+          (->Font (/ 1 4))
+          (map->State {:buffers {}
+                       :buffer-updates []
+                       :show-search? false}))
         clara/fire-rules)))
 
 (restart!)

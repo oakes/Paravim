@@ -80,7 +80,7 @@
         y (* ypos density-ratio)
         session (c/update-mouse! x y)
         mouse-hover (c/get-mouse-hover session)]
-    (swap! c/*state assoc
+    (c/update-state! assoc
            :mouse-hover (:target mouse-hover)
            :mouse-type (:cursor mouse-hover))
     (GLFW/glfwSetCursor window
@@ -107,8 +107,8 @@
 (defn on-mouse-click! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window button action mods]
   (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
              (= action GLFW/GLFW_PRESS))
-    (c/click-mouse! :left (partial reload-file! @c/*state))
-    (swap! c/*state c/update-cursor-if-necessary game)))
+    (c/click-mouse! :left (partial reload-file! (c/get-state @session/*session)))
+    (c/update-state! c/update-cursor-if-necessary game)))
 
 (defn on-key! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window keycode scancode action mods]
   (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
@@ -118,12 +118,12 @@
         release? (= action GLFW/GLFW_RELEASE)
         control-key? (control-keycode? keycode)]
     (when (or press? release?)
-      (swap! c/*state assoc :control? (or (and control? (not control-key?))
-                                          (and press? control-key?))))
+      (c/update-state! assoc :control? (or (and control? (not control-key?))
+                                           (and press? control-key?))))
     (when press?
-      (let [{:keys [mode] :as state} @c/*state
+      (let [session @session/*session
+            {:keys [mode] :as state} (c/get-state session)
             k (keycode->keyword keycode)
-            session @session/*session
             current-tab (:id (c/get-current-tab session))
             current-buffer (:id (c/get-current-buffer session))]
         (cond
@@ -140,10 +140,10 @@
             :f (reload-file! state pipes current-tab current-buffer)
             :- (do
                  (c/font-dec!)
-                 (swap! c/*state c/update-cursor-if-necessary game))
+                 (c/update-state! c/update-cursor-if-necessary game))
             := (do
                  (c/font-inc!)
-                 (swap! c/*state c/update-cursor-if-necessary game))
+                 (c/update-state! c/update-cursor-if-necessary game))
             ; else
             (when-let [key-name (if k
                                   (keyword->name k)
@@ -159,7 +159,7 @@
 
 (defn on-resize! [{:keys [::c/send-input!] :as game} window width height]
   (c/update-window-size! width height)
-  (swap! c/*state
+  (c/update-state!
          (fn [state]
            (let [session @session/*session
                  current-tab (:id (c/get-current-tab session))
@@ -214,12 +214,12 @@
         (case (first vim-input)
           :append (recur nil (conj append-inputs (second vim-input)))
           :new-tab (do
-                     (vim/open-buffer-for-tab! vim @c/*state @session/*session)
+                     (vim/open-buffer-for-tab! vim @session/*session)
                      (async/put! vim-chan [:resize])
                      (recur nil append-inputs))
           :resize (let [width (utils/get-width game)
                         height (utils/get-height game)]
-                    (vim/set-window-size! vim @c/*state @session/*session width height)
+                    (vim/set-window-size! vim @session/*session width height)
                     (recur nil append-inputs))))
       ;; append to the repl
       (vim/ready-to-append? vim append-inputs)
