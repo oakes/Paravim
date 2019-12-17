@@ -91,7 +91,7 @@
                             GLFW/GLFW_ARROW_CURSOR)))))
 
 (defn- reload-file! [state pipes current-tab current-buffer]
-  (let [{:keys [buffers tab->buffer]} state
+  (let [{:keys [buffers]} state
         {:keys [out-pipe]} pipes
         {:keys [lines file-name clojure?] :as buffer} (get buffers current-buffer)]
     (when (and clojure? (= current-tab :files))
@@ -160,7 +160,7 @@
 (defn on-resize! [{:keys [::c/send-input!] :as game} window width height]
   (c/update-window-size! width height)
   (swap! c/*state
-         (fn [{:keys [tab->buffer] :as state}]
+         (fn [state]
            (let [session @session/*session
                  current-tab (:id (c/get-current-tab session))
                  current-buffer (:id (c/get-current-buffer session))]
@@ -173,7 +173,8 @@
                                         :repl-in :repl-out
                                         :repl-out :repl-in
                                         nil)]
-                     (update-in state [:buffers (tab->buffer other-tab)] c/update-cursor state game)
+                     (let [other-buffer (:buffer-id (c/get-tab session {:?id other-tab}))]
+                       (update-in state [:buffers other-buffer] c/update-cursor state game))
                      state)))))
   (send-input! [:resize]))
 

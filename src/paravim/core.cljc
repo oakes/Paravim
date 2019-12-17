@@ -35,7 +35,6 @@
 
 (defonce *state (atom {:buffers {}
                        :buffer-updates []
-                       :tab->buffer {}
                        :text-boxes {}
                        :bounding-boxes {}
                        :show-search? false}))
@@ -47,7 +46,8 @@
   (def get-mouse-hover (:get-mouse-hover query-fns))
   (def get-font (:get-font query-fns))
   (def get-current-tab (:get-current-tab query-fns))
-  (def get-current-buffer (:get-current-buffer query-fns)))
+  (def get-current-buffer (:get-current-buffer query-fns))
+  (def get-tab (:get-tab query-fns)))
 
 (defn update-mouse! [x y]
   (swap! session/*session
@@ -85,6 +85,13 @@
         (-> session
             (clarax/merge current-tab {:id (nth session/tab-ids index)})
             clara/fire-rules)))))
+
+(defn update-tab! [id buffer-id]
+  (swap! session/*session
+    (fn [session]
+      (-> session
+          (clarax/merge (get-tab session {:?id id}) {:buffer-id buffer-id})
+          clara/fire-rules))))
 
 (defn update-current-buffer! [id]
   (swap! session/*session
@@ -753,7 +760,7 @@
                 base-rect-entity base-rects-entity
                 command-text-entity command-completion-text-entity command-cursor-entity
                 font-height mode ascii
-                toolbar-text-entities bounding-boxes tab->buffer highlight-text-entities]
+                toolbar-text-entities bounding-boxes highlight-text-entities]
          :as state} @*state
         state (assoc state
                 :font-size-multiplier font-size-multiplier
@@ -772,9 +779,9 @@
         (render-buffer game state game-width game-height current-tab ascii false)
         (render-buffer game state game-width game-height current-tab current-buffer true))
       (case current-tab
-        :repl-in (when-let [buffer-ptr (tab->buffer :repl-out)]
+        :repl-in (when-let [buffer-ptr (:buffer-id (get-tab session {:?id :repl-out}))]
                    (render-buffer game state game-width game-height :repl-out buffer-ptr false))
-        :repl-out (when-let [buffer-ptr (tab->buffer :repl-in)]
+        :repl-out (when-let [buffer-ptr (:buffer-id (get-tab session {:?id :repl-in}))]
                     (render-buffer game state game-width game-height :repl-in buffer-ptr false))
         nil)
       (when (and base-rects-entity base-rect-entity)

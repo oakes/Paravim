@@ -10,10 +10,10 @@
 
 (def ^:dynamic *update-ui?* true)
 
-(defn open-buffer-for-tab! [vim {:keys [tab->buffer] :as state} session]
+(defn open-buffer-for-tab! [vim state session]
   (let [current-buffer (:id (c/get-current-buffer session))
         current-tab (:id (c/get-current-tab session))]
-    (if-let [buffer-for-tab (tab->buffer current-tab)]
+    (if-let [buffer-for-tab (:buffer-id (c/get-tab session {:?id current-tab}))]
       (when (not= current-buffer buffer-for-tab)
         (v/set-current-buffer vim buffer-for-tab))
       (when-let [path (c/tab->path current-tab)]
@@ -209,7 +209,7 @@
       (apply-parinfer! state vim))))
 
 (defn append-to-buffer! [game vim input]
-  (when-let [buffer (-> @c/*state :tab->buffer :repl-out)]
+  (when-let [buffer (:buffer-id (c/get-tab @session/*session {:?id :repl-out}))]
     (let [current-buffer (v/get-current-buffer vim)
           cursor-line (v/get-cursor-line vim)
           cursor-column (v/get-cursor-column vim)
@@ -251,18 +251,15 @@
                       buffer)]
         (c/update-current-buffer! buffer-ptr)
         (c/update-current-tab! current-tab)
+        (c/update-tab! current-tab buffer-ptr)
         (swap! c/*state
           (fn [state]
             (-> state
-                (update :tab->buffer assoc current-tab buffer-ptr)
                 (assoc-in [:buffers buffer-ptr] (c/update-cursor buffer state game))))))
       ;; clear the files tab
       (do
         (c/update-current-buffer! nil)
-        (swap! c/*state
-          (fn [state]
-            (-> state
-                (update :tab->buffer assoc :files nil))))))))
+        (c/update-tab! :files nil)))))
 
 (defn on-buf-update [vim buffer-ptr start-line end-line line-count-change]
   (let [first-line (dec start-line)

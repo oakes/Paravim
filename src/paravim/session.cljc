@@ -30,6 +30,7 @@
 (defrecord Font [size])
 (defrecord CurrentTab [id])
 (defrecord CurrentBuffer [id])
+(defrecord Tab [id buffer-id])
 (defrecord Buffer [id text-entity
                    camera camera-x camera-y
                    path file-name
@@ -67,6 +68,11 @@
     (fn []
       (let [current-buffer CurrentBuffer]
         current-buffer))
+    :get-tab
+    (fn [?id]
+      (let [tab Tab
+            :when (= (:id tab) ?id)]
+        tab))
     :get-mouse-hover
     (fn []
       (let [mouse-hover MouseHover]
@@ -155,6 +161,9 @@
           (->MouseHover nil nil nil)
           (->CurrentTab :files)
           (->CurrentBuffer nil)
+          (->Tab :files nil)
+          (->Tab :repl-in nil)
+          (->Tab :repl-out nil)
           (->Font (/ 1 4)))
         clara/fire-rules)))
 
