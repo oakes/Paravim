@@ -31,10 +31,10 @@
 (defrecord CurrentTab [id])
 (defrecord CurrentBuffer [id])
 (defrecord Tab [id buffer-id])
-(defrecord Buffer [id text-entity
+(defrecord Buffer [id tab-id text-entity
                    camera camera-x camera-y
                    path file-name
-                   lines text-box clojure?])
+                   lines clojure?])
 
 (defn change-font-size! [{:keys [size] :as font} diff]
   (let [new-val (+ size diff)]
@@ -80,7 +80,17 @@
     :get-font
     (fn []
       (let [font Font]
-        font))})
+        font))
+    :get-bounding-box
+    (fn [?id]
+      (let [bounding-box BoundingBox
+            :when (= (:id bounding-box) ?id)]
+        bounding-box))
+    :get-text-box
+    (fn [?id]
+      (let [text-box TextBox
+            :when (= (:id text-box) ?id)]
+        text-box))})
 
 (def rules
   '{:mouse-hovers-over-text

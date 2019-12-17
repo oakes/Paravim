@@ -35,8 +35,6 @@
 
 (defonce *state (atom {:buffers {}
                        :buffer-updates []
-                       :text-boxes {}
-                       :bounding-boxes {}
                        :show-search? false}))
 
 (let [query-fns (clarax/query-fns @session/*session)]
@@ -47,7 +45,9 @@
   (def get-font (:get-font query-fns))
   (def get-current-tab (:get-current-tab query-fns))
   (def get-current-buffer (:get-current-buffer query-fns))
-  (def get-tab (:get-tab query-fns)))
+  (def get-tab (:get-tab query-fns))
+  (def get-bounding-box (:get-bounding-box query-fns))
+  (def get-text-box (:get-text-box query-fns)))
 
 (defn update-mouse! [x y]
   (swap! session/*session
@@ -349,8 +349,10 @@
                :width (* width font-size-multiplier)
                :height (* height font-size-multiplier)))))
 
-(defn update-cursor [{:keys [text-entity cursor-line cursor-column text-box] :as buffer} {:keys [base-rects-entity] :as state} game]
-  (let [font-size-multiplier (:size (get-font @session/*session))
+(defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} {:keys [base-rects-entity] :as state} game]
+  (let [session @session/*session
+        font-size-multiplier (:size (get-font session))
+        text-box (get-text-box session {:?id tab-id})
         line-chars (get-in buffer [:text-entity :characters cursor-line])
         {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars cursor-line cursor-column)]
     (-> buffer
@@ -515,7 +517,7 @@
         lines)
       (update-uniforms font-height text-alpha)))
 
-(defn ->buffer [{:keys [base-font-entity base-text-entity font-height text-boxes] :as state} path file-name lines current-tab]
+(defn ->buffer [{:keys [base-font-entity base-text-entity font-height] :as state} path file-name lines current-tab]
   {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
    :camera (t/translate session/orig-camera 0 0)
    :camera-x 0
@@ -523,17 +525,17 @@
    :path path
    :file-name file-name
    :lines lines
-   :text-box (get text-boxes current-tab)
+   :tab-id current-tab
    :clojure? (or (= current-tab :repl-in)
                  (clojure-path? path))})
 
-(defn ->ascii [{:keys [base-font-entity base-text-entity font-height text-boxes] :as state} lines]
+(defn ->ascii [{:keys [base-font-entity base-text-entity font-height] :as state} lines]
   {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
    :camera (t/translate session/orig-camera 0 0)
    :camera-x 0
    :camera-y 0
    :lines lines
-   :text-box (get text-boxes (:id (get-current-tab @session/*session)))})
+   :tab-id (get-current-tab @session/*session)})
 
 (defn parse-clojure-buffer [{:keys [lines cursor-line cursor-column] :as buffer} {:keys [mode] :as state} init?]
   (let [parse-opts (cond
@@ -638,8 +640,7 @@
            :font-width font-width
            :font-height font-height
            :base-font-entity font-entity
-           :base-text-entity text-entity
-           :text-boxes text-boxes)
+           :base-text-entity text-entity)
          (swap! session/*session
            (fn [session]
              (->> text-boxes
@@ -700,8 +701,7 @@
                 :roboto-font-entity font-entity
                 :roboto-text-entity text-entity
                 :toolbar-text-entities (merge tab-entities button-entities)
-                :highlight-text-entities highlight-button-entities
-                :bounding-boxes bounding-boxes)
+                :highlight-text-entities highlight-button-entities)
               (swap! session/*session
                 (fn [session]
                   (->> bounding-boxes
@@ -727,9 +727,9 @@
               'u_start_line lines-to-skip-count)
       (:attribute-lengths text-entity))))
 
-(defn render-buffer [game {:keys [buffers text-boxes font-size-multiplier] :as state} game-width game-height current-tab buffer-ptr show-cursor?]
+(defn render-buffer [game {:keys [buffers font-size-multiplier] :as state} session game-width game-height current-tab buffer-ptr show-cursor?]
   (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera camera-y]} (get buffers buffer-ptr)]
-    (when-let [text-box (get text-boxes current-tab)]
+    (when-let [text-box (get-text-box session {:?id current-tab})]
       (when (and rects-entity show-cursor?)
         (c/render game (-> rects-entity
                            (t/project game-width game-height)
@@ -760,7 +760,7 @@
                 base-rect-entity base-rects-entity
                 command-text-entity command-completion-text-entity command-cursor-entity
                 font-height mode ascii
-                toolbar-text-entities bounding-boxes highlight-text-entities]
+                toolbar-text-entities highlight-text-entities]
          :as state} @*state
         state (assoc state
                 :font-size-multiplier font-size-multiplier
@@ -776,13 +776,13 @@
                                           (t/translate 0 0)
                                           (t/scale game-width game-height))))))
       (if (and ascii (= current-tab :files))
-        (render-buffer game state game-width game-height current-tab ascii false)
-        (render-buffer game state game-width game-height current-tab current-buffer true))
+        (render-buffer game state session game-width game-height current-tab ascii false)
+        (render-buffer game state session game-width game-height current-tab current-buffer true))
       (case current-tab
         :repl-in (when-let [buffer-ptr (:buffer-id (get-tab session {:?id :repl-out}))]
-                   (render-buffer game state game-width game-height :repl-out buffer-ptr false))
+                   (render-buffer game state session game-width game-height :repl-out buffer-ptr false))
         :repl-out (when-let [buffer-ptr (:buffer-id (get-tab session {:?id :repl-in}))]
-                    (render-buffer game state game-width game-height :repl-in buffer-ptr false))
+                    (render-buffer game state session game-width game-height :repl-in buffer-ptr false))
         nil)
       (when (and base-rects-entity base-rect-entity)
         (c/render game (-> base-rects-entity
@@ -796,7 +796,7 @@
                                           (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                                           (t/scale game-width (* font-size-multiplier font-height)))))))
       (doseq [[k entity] toolbar-text-entities
-              :let [bounding-box (k bounding-boxes)
+              :let [bounding-box (get-bounding-box session {:?id k})
                     highlight-entity (when control?
                                        (get highlight-text-entities k))]
               ;; hide the reload file button when necessary
