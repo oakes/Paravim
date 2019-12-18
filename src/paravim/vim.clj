@@ -46,8 +46,8 @@
       (.write text)
       .flush)))
 
-(defn ready-to-append? [vim inputs]
-  (and (seq inputs)
+(defn ready-to-append? [vim output]
+  (and (seq output)
        (= 'NORMAL (v/get-mode vim))
        (not= :repl-out (:id (c/get-current-tab @session/*session)))))
 

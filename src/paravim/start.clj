@@ -202,38 +202,38 @@
         (invoke [this window width height]
           (on-resize! game window width height))))))
 
-(defn- poll-input [{:keys [::c/vim ::c/vim-chan ::c/append-repl-chan] :as game} append-inputs]
+(defn- poll-input [{:keys [::c/vim ::c/vim-chan ::c/append-repl-chan ::c/repl-output] :as game}]
   (loop [vim-input nil
-         append-inputs append-inputs]
+         repl-output repl-output]
     (cond
       ;; process input from either chan
       vim-input
       (if (string? vim-input)
         (do
           (vim/on-input game vim vim-input)
-          (recur nil append-inputs))
+          (recur nil repl-output))
         (case (first vim-input)
-          :append (recur nil (conj append-inputs (second vim-input)))
+          :append (recur nil (conj repl-output (second vim-input)))
           :new-tab (do
                      (vim/open-buffer-for-tab! vim @session/*session)
                      (async/put! vim-chan [:resize])
-                     (recur nil append-inputs))
+                     (recur nil repl-output))
           :resize (let [width (utils/get-width game)
                         height (utils/get-height game)]
                     (vim/set-window-size! vim @session/*session width height)
-                    (recur nil append-inputs))))
+                    (recur nil repl-output))))
       ;; append to the repl
-      (vim/ready-to-append? vim append-inputs)
+      (vim/ready-to-append? vim repl-output)
       (do
         (binding [vim/*update-ui?* false]
-          (vim/append-to-buffer! game vim (first append-inputs)))
+          (vim/append-to-buffer! game vim (first repl-output)))
         (recur nil []))
       ;; poll chans
       :else
       (if-let [input (or (async/poll! vim-chan)
                          (async/poll! append-repl-chan))]
-        (recur input append-inputs)
-        append-inputs))))
+        (recur input repl-output)
+        (assoc game ::c/repl-output repl-output)))))
 
 (defn ->window []
   (when-not (GLFW/glfwInit)
@@ -271,7 +271,9 @@
                 ::c/send-input! send-input!
                 ::c/vim vim
                 ::c/vim-chan vim-chan
-                ::c/append-repl-chan append-repl-chan)]
+                ::c/append-repl-chan append-repl-chan
+                ::c/repl-output []
+                ::c/poll-input poll-input)]
      (when (pos-int? density-ratio)
        (swap! session/*session c/font-multiply density-ratio))
      (c/init game)
@@ -286,8 +288,7 @@
         game (init game)]
     (GLFW/glfwShowWindow window)
     (listen-for-events game window)
-    (loop [game game
-           append-inputs []]
+    (loop [game game]
       (when-not (GLFW/glfwWindowShouldClose window)
         (let [ts (GLFW/glfwGetTime)
               game (assoc game
@@ -296,7 +297,7 @@
               game (c/tick game)]
           (GLFW/glfwSwapBuffers window)
           (GLFW/glfwPollEvents)
-          (recur game (poll-input game append-inputs)))))
+          (recur game))))
     (Callbacks/glfwFreeCallbacks window)
     (GLFW/glfwDestroyWindow window)
     (GLFW/glfwTerminate)))

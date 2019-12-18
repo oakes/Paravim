@@ -747,7 +747,7 @@
                            (t/camera camera)
                            (t/scale font-size-multiplier font-size-multiplier)))))))
 
-(defn tick [game]
+(defn tick [{:keys [::poll-input] :as game}]
   (let [session @session/*session
         font-size-multiplier (:size (get-font session))
         current-tab (:id (get-current-tab session))
@@ -831,5 +831,5 @@
               clara/fire-rules)))
       (init game)))
   ;; return the game map
-  game)
+  (poll-input game))
 
