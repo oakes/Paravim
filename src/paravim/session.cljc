@@ -27,7 +27,7 @@
                    path file-name
                    lines clojure?
                    cursor-line cursor-column
-                   font])
+                   font window])
 (defrecord Constants [base-rect-entity
                       base-rects-entity
                       font-width
@@ -200,7 +200,31 @@
       (clarax/merge! buffer
         (-> buffer
             (buffers/update-cursor state font text-box constants game)
-            (assoc :font font))))})
+            (assoc :font font))))
+    :update-cursor-when-window-resizes
+    (let [game Game
+          font Font
+          window Window
+          current-buffer CurrentBuffer
+          current-tab CurrentTab
+          buffer Buffer
+          :when (and (not= window (:window buffer))
+                     (or (= (:id buffer) (:id current-buffer))
+                         ;; if we're in the repl, make sure both the input and output are refreshed
+                         (= (:tab-id buffer) (case (:id current-tab)
+                                               :repl-in :repl-out
+                                               :repl-out :repl-in
+                                               nil))))
+          state State
+          text-box TextBox
+          :when (= (:id text-box) (:tab-id buffer))
+          constants Constants]
+      (clarax/merge! buffer
+        (-> buffer
+            (buffers/update-cursor state font text-box constants game)
+            (assoc :window window)))
+      (when (= (:id buffer) (:id current-buffer))
+        ((:paravim.core/send-input! game) [:resize])))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))

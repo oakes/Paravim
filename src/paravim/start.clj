@@ -4,7 +4,6 @@
             [paravim.vim :as vim]
             [paravim.utils :as utils]
             [paravim.session :as session]
-            [paravim.buffers :as buffers]
             [play-cljc.gl.core :as pc]
             [clojure.core.async :as async])
   (:import  [org.lwjgl.glfw GLFW Callbacks
@@ -137,28 +136,7 @@
   (send-input! (str (char codepoint))))
 
 (defn on-resize! [{:keys [::c/send-input!] :as game} window width height]
-  (swap! session/*session
-         (fn [session]
-           (let [current-tab (:id (c/get-current-tab session))
-                 current-buffer (:id (c/get-current-buffer session))
-                 buffer (c/get-buffer session {:?id current-buffer})
-                 state (c/get-state session)
-                 constants (c/get-constants session)]
-             (as-> session session
-                   (c/update-window-size session width height)
-                   (if buffer
-                     (c/upsert-buffer session (buffers/update-cursor buffer state (c/get-font session) (c/get-text-box session {:?id (:tab-id buffer)}) constants game))
-                     session)
-                   ;; if we're in the repl, make sure both the input and output are refreshed
-                   (if-let [other-tab (case current-tab
-                                        :repl-in :repl-out
-                                        :repl-out :repl-in
-                                        nil)]
-                     (let [other-buffer-id (:buffer-id (c/get-tab session {:?id other-tab}))
-                           other-buffer (c/get-buffer session {:?id other-buffer-id})]
-                       (c/upsert-buffer session (buffers/update-cursor other-buffer state (c/get-font session) (c/get-text-box session {:?id (:tab-id other-buffer)}) constants game)))
-                     session)))))
-  (send-input! [:resize]))
+  (swap! session/*session c/update-window-size width height))
 
 (defn- listen-for-events [game window]
   (doto window
