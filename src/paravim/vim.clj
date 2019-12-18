@@ -263,7 +263,7 @@
             buffer (if (:clojure? buffer)
                       (-> buffer
                           (buffers/parse-clojure-buffer state true)
-                          (buffers/update-clojure-buffer state))
+                          (buffers/update-clojure-buffer constants))
                       buffer)
             buffer (buffers/update-cursor buffer state (c/get-font session) (c/get-text-box session {:?id (:tab-id buffer)}) constants game)]
         (swap! session/*session
