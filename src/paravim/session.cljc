@@ -35,13 +35,11 @@
 (defrecord Tab [id buffer-id])
 (defrecord Buffer [id tab-id
                    text-entity parinfer-text-entity
-                   parsed-code needs-parinfer? needs-update?
+                   parsed-code needs-parinfer?
                    camera camera-x camera-y
                    path file-name
                    lines clojure?
                    cursor-line cursor-column])
-(defrecord BufferUpdate [buffer-ptr lines first-line line-count-change])
-(defrecord ClojureBufferUpdate [])
 (defrecord Constants [base-rect-entity
                       base-rects-entity
                       font-width
@@ -199,28 +197,7 @@
     :tab-changed
     (let [game Game
           current-tab CurrentTab]
-      ((:paravim.core/send-input! game) [:new-tab]))
-    :buffer-update
-    (let [buffer-update BufferUpdate
-          buffer Buffer
-          :when (= (:id buffer) (:buffer-ptr buffer-update))
-          constants Constants]
-      (clara/retract! buffer-update)
-      (let [{:keys [buffer-ptr lines first-line line-count-change]} buffer-update]
-        (clarax/merge! buffer (cond-> (buffers/update-text-buffer buffer constants lines first-line line-count-change)
-                                      (:clojure? buffer)
-                                      (assoc :needs-update? true)))))
-    :clojure-buffer-update
-    (let [clojure-buffer-update ClojureBufferUpdate
-          buffer [Buffer]
-          :when (= (:needs-update? buffer) true)
-          state State]
-      (clara/retract! clojure-buffer-update)
-      (doseq [buf buffer]
-        (clarax/merge! buf (-> buf
-                               (assoc :needs-update? false)
-                               (buffers/parse-clojure-buffer state false)
-                               (buffers/update-clojure-buffer state)))))})
+      ((:paravim.core/send-input! game) [:new-tab]))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))
@@ -239,7 +216,8 @@
           (->Tab :repl-in nil)
           (->Tab :repl-out nil)
           (->Font (/ 1 4))
-          (map->State {:show-search? false
+          (map->State {:buffer-updates []
+                       :show-search? false
                        :mode 'NORMAL}))
         clara/fire-rules)))
 

@@ -92,7 +92,7 @@
                (-> session
                    (c/upsert-buffer {:id current-buffer
                                      :needs-parinfer? false})
-                   (c/insert-clojure-buffer-update)))))))
+                   (c/update-buffers (c/get-constants session) state)))))))
 
 (defn read-text-resource [path]
   (-> path io/resource slurp str/split-lines))
@@ -191,7 +191,6 @@
         cursor-line (dec (v/get-cursor-line vim))
         cursor-column (v/get-cursor-column vim)
         constants (c/get-constants session)
-        buffer (c/get-buffer session {:?id current-buffer})
         session (change-ascii session constants s)
         session (c/update-state session
                   (fn [state]
@@ -207,14 +206,11 @@
                                 (c/update-command constants (v/get-command-position vim)))
                             (c/assoc-command-text state nil nil)))))
         state (c/get-state session)]
-    (if buffer
-      (c/upsert-buffer session
-        (-> buffer
-            (assoc :cursor-line cursor-line :cursor-column cursor-column)
-            (cond-> (:clojure? buffer)
-                    (-> (buffers/parse-clojure-buffer state false)
-                        (buffers/update-clojure-buffer constants)))
-            (update-buffer state constants game vim)))
+    (if-let [buffer (c/get-buffer session {:?id current-buffer})]
+      (as-> session $
+            (c/upsert-buffer $ (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
+            (c/update-buffers $ constants state)
+            (c/upsert-buffer $ (update-buffer (c/get-buffer $ {:?id current-buffer}) state constants game vim)))
       session)))
 
 (defn on-input [game vim s]
@@ -288,7 +284,7 @@
         last-line (+ (dec end-line) line-count-change)
         lines (vec (for [i (range first-line last-line)]
                      (v/get-line vim buffer-ptr (inc i))))]
-    (swap! session/*session c/insert-buffer-update
+    (swap! session/*session c/update-state update :buffer-updates conj
            {:buffer-ptr buffer-ptr
             :lines lines
             :first-line first-line

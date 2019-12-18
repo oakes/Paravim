@@ -3,6 +3,7 @@
             [paravim.chars :as chars]
             [paravim.session :as session]
             [paravim.colors :as colors]
+            [paravim.buffers :as buffers]
             [clara.rules :as clara]
             [clarax.rules :as clarax]
             [clojure.string :as str]
@@ -131,16 +132,6 @@
     (-> session
         (clarax/merge state (apply f state args))
         clara/fire-rules)))
-
-(defn insert-buffer-update [session buffer-update]
-  (-> session
-      (clara/insert (session/map->BufferUpdate buffer-update))
-      clara/fire-rules))
-
-(defn insert-clojure-buffer-update [session]
-  (-> session
-      (clara/insert (session/->ClojureBufferUpdate))
-      clara/fire-rules))
 
 (defn get-mode []
   (:mode (get-state @session/*session)))
@@ -330,6 +321,28 @@
 (defn update-search-highlights [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as constants} highlights]
   (let [rects (vec (mapcat (partial range->rects text-entity font-width font-height) highlights))]
     (update buffer :rects-entity assoc-rects base-rect-entity colors/search-color rects)))
+
+(defn update-buffers [session constants state]
+  (if-let [updates (not-empty (:buffer-updates (get-state session)))]
+    (let [buffer-ptrs (set (map :buffer-ptr updates))]
+      (as-> session $
+            (reduce
+              (fn [session {:keys [buffer-ptr lines first-line line-count-change]}]
+                (upsert-buffer session (-> (get-buffer session {:?id buffer-ptr})
+                                           (buffers/update-text-buffer constants lines first-line line-count-change))))
+              $
+              updates)
+            (update-state $ assoc :buffer-updates [])
+            (reduce (fn [session buffer-ptr]
+                      (let [buffer (get-buffer session {:?id buffer-ptr})]
+                        (if (:clojure? buffer)
+                          (upsert-buffer session
+                              (-> buffer
+                                  (buffers/parse-clojure-buffer state false)
+                                  (buffers/update-clojure-buffer constants)))
+                          session)))
+                    $ buffer-ptrs)))
+    session))
 
 (defn get-extension
   [path]
