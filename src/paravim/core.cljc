@@ -137,6 +137,11 @@
       (clara/insert (session/map->BufferUpdate buffer-update))
       clara/fire-rules))
 
+(defn insert-clojure-buffer-update [session]
+  (-> session
+      (clara/insert (session/->ClojureBufferUpdate))
+      clara/fire-rules))
+
 (defn get-mode []
   (:mode (get-state @session/*session)))
 

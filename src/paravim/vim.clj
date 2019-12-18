@@ -89,11 +89,10 @@
           (v/input vim "<Esc>")))
       (swap! session/*session
              (fn [session]
-               (c/upsert-buffer session
-                 (-> (c/get-buffer session {:?id current-buffer})
-                     (assoc :needs-parinfer? false)
-                     (buffers/parse-clojure-buffer state false)
-                     (buffers/update-clojure-buffer state))))))))
+               (-> session
+                   (c/upsert-buffer {:id current-buffer
+                                     :needs-parinfer? false})
+                   (c/insert-clojure-buffer-update)))))))
 
 (defn read-text-resource [path]
   (-> path io/resource slurp str/split-lines))
