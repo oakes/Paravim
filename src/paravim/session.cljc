@@ -18,6 +18,7 @@
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
 (defrecord CurrentTab [id])
+(defrecord NewTab [id])
 (defrecord CurrentBuffer [id])
 (defrecord Tab [id buffer-id])
 (defrecord Buffer [id tab-id
@@ -175,7 +176,7 @@
       (when (= :left (:button mouse-click))
         (let [{:keys [target]} mouse-hover]
           (if (constants/tab? target)
-            (clarax/merge! current-tab {:id target})
+            (clara/insert-unconditional! (->NewTab target))
             (case target
               :font-dec (font-dec! font)
               :font-inc (font-inc! font)
@@ -184,7 +185,10 @@
               nil)))))
     :tab-changed
     (let [game Game
-          current-tab CurrentTab]
+          current-tab CurrentTab
+          new-tab NewTab]
+      (clara/retract! new-tab)
+      (clarax/merge! current-tab {:id (:id new-tab)})
       ((:paravim.core/send-input! game) [:new-tab]))
     :update-cursor-when-font-changes
     (let [game Game

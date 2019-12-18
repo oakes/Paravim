@@ -50,7 +50,7 @@
 
 (defn update-current-tab [session id]
   (-> session
-      (clarax/merge (get-current-tab session) {:id id})
+      (clara/insert (session/->NewTab id))
       clara/fire-rules))
 
 (defn shift-current-tab [session direction]
@@ -63,7 +63,7 @@
                 (= index (count constants/tab-ids)) 0
                 :else index)]
     (-> session
-        (clarax/merge current-tab {:id (nth constants/tab-ids index)})
+        (clara/insert (session/->NewTab (nth constants/tab-ids index)))
         clara/fire-rules)))
 
 (defn update-tab [session id buffer-id]
