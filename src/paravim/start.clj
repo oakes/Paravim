@@ -168,17 +168,17 @@
       (if (string? vim-input)
         (do
           (vim/on-input game vim vim-input)
-          (assoc game ::c/repl-output repl-output))
+          game)
         (case (first vim-input)
           :append (assoc game ::c/repl-output (conj repl-output (second vim-input)))
           :new-tab (do
                      (vim/open-buffer-for-tab! vim @session/*session)
                      (async/put! vim-chan [:resize])
-                     (assoc game ::c/repl-output repl-output))
+                     game)
           :resize (let [width (utils/get-width game)
                         height (utils/get-height game)]
                     (vim/set-window-size! vim @session/*session width height)
-                    (assoc game ::c/repl-output repl-output))))
+                    game)))
       (if-let [input (async/poll! vim-chan)] ;; poll for user input
         (recur input repl-output)
         (if (vim/ready-to-append? vim repl-output) ;; append one repl buffer
@@ -188,7 +188,7 @@
             (assoc game ::c/repl-output (vec (rest repl-output))))
           (if-let [input (async/poll! append-repl-chan)] ;; poll for more repl output
             (recur input repl-output)
-            (assoc game ::c/repl-output repl-output)))))))
+            game))))))
 
 (defn ->window []
   (when-not (GLFW/glfwInit)
