@@ -50,7 +50,7 @@
 
 (defn update-current-tab [session id]
   (-> session
-      (clara/insert (session/->NewTab id))
+      (clarax/merge (get-current-tab session) {:id id})
       clara/fire-rules))
 
 (defn shift-current-tab [session direction]
@@ -66,14 +66,14 @@
         (clara/insert (session/->NewTab (nth constants/tab-ids index)))
         clara/fire-rules)))
 
+(defn new-tab [session id]
+  (-> session
+      (clara/insert (session/->NewTab id))
+      clara/fire-rules))
+
 (defn update-tab [session id buffer-id]
   (-> session
       (clarax/merge (get-tab session {:?id id}) {:buffer-id buffer-id})
-      clara/fire-rules))
-
-(defn update-current-buffer [session id]
-  (-> session
-      (clarax/merge (get-current-buffer session) {:id id})
       clara/fire-rules))
 
 (defn click-mouse [session button]
@@ -438,7 +438,7 @@
   (let [session @session/*session
         font-size-multiplier (:size (get-font session))
         current-tab (:id (get-current-tab session))
-        current-buffer (:id (get-current-buffer session))
+        current-buffer (get-current-buffer session)
         buffer (get-buffer session {:?id current-buffer})
         {game-width :width game-height :height :as window} (get-window session)
         {:keys [base-rect-entity base-rects-entity

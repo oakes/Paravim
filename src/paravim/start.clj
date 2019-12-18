@@ -4,6 +4,7 @@
             [paravim.vim :as vim]
             [paravim.utils :as utils]
             [paravim.session :as session]
+            [libvim-clj.core :as v]
             [play-cljc.gl.core :as pc]
             [clojure.core.async :as async])
   (:import  [org.lwjgl.glfw GLFW Callbacks
@@ -107,7 +108,7 @@
             {:keys [mode] :as state} (c/get-state session)
             k (keycode->keyword keycode)
             current-tab (:id (c/get-current-tab session))
-            current-buffer (:id (c/get-current-buffer session))]
+            current-buffer (c/get-current-buffer session)]
         (cond
           ;; pressing enter in the repl
           (and (= current-tab :repl-in)
@@ -171,8 +172,8 @@
           game)
         (case (first vim-input)
           :append (assoc game ::c/repl-output (conj repl-output (second vim-input)))
-          :new-tab (do
-                     (vim/open-buffer-for-tab! vim @session/*session)
+          :new-buf (let [buffer-id (second vim-input)]
+                     (v/set-current-buffer vim buffer-id)
                      (async/put! vim-chan [:resize])
                      game)
           :resize (let [width (utils/get-width game)

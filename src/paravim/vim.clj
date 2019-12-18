@@ -13,15 +13,6 @@
 
 (def ^:dynamic *update-ui?* true)
 
-(defn open-buffer-for-tab! [vim session]
-  (let [current-buffer (:id (c/get-current-buffer session))
-        current-tab (:id (c/get-current-tab session))]
-    (if-let [buffer-for-tab (:buffer-id (c/get-tab session {:?id current-tab}))]
-      (when (not= current-buffer buffer-for-tab)
-        (v/set-current-buffer vim buffer-for-tab))
-      (when-let [path (constants/tab->path current-tab)]
-        (v/open-buffer vim path)))))
-
 (defn set-window-size! [vim session width height]
   (let [{:keys [font-height font-width] :as constants} (c/get-constants session)
         current-tab (:id (c/get-current-tab session))]
@@ -55,7 +46,7 @@
 
 (defn apply-parinfer! [state vim]
   (let [session @session/*session
-        current-buffer (:id (c/get-current-buffer session))
+        current-buffer (c/get-current-buffer session)
         {:keys [parsed-code needs-parinfer?]} (c/get-buffer session {:?id current-buffer})]
     (when needs-parinfer?
       (let [cursor-line (v/get-cursor-line vim)
@@ -109,6 +100,7 @@
 (defn assoc-ascii [session constants ascii-name]
   (-> session
       (c/upsert-buffer (c/->ascii ascii-name constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
+      (c/new-tab :files)
       (c/update-state assoc :ascii ascii-name)))
 
 (defn dissoc-ascii [session ascii-name]
@@ -274,15 +266,13 @@
         (swap! session/*session
           (fn [session]
             (-> session
-                (c/update-current-buffer buffer-ptr)
-                (c/update-current-tab current-tab)
                 (c/update-tab current-tab buffer-ptr)
+                (c/update-current-tab current-tab)
                 (c/upsert-buffer buffer)))))
       ;; clear the files tab
       (swap! session/*session
         (fn [session]
           (-> session
-              (c/update-current-buffer nil)
               (c/update-tab :files nil)))))))
 
 (defn on-buf-update [game vim buffer-ptr start-line end-line line-count-change]
@@ -312,7 +302,7 @@
 
 (defn yank-lines [{:keys [start-line start-column end-line end-column]}]
   (let [session @session/*session
-        current-buffer (:id (c/get-current-buffer session))]
+        current-buffer (c/get-current-buffer session)]
     (when-let [{:keys [lines]} (c/get-buffer session {:?id current-buffer})]
       (let [yanked-lines (subvec lines (dec start-line) end-line)
             end-line (dec (count yanked-lines))
@@ -339,7 +329,7 @@
   (v/set-on-unhandled-escape vim (fn []
                                    (swap! session/*session
                                      (fn [session]
-                                       (let [current-buffer (:id (c/get-current-buffer session))
+                                       (let [current-buffer (c/get-current-buffer session)
                                              buffer (c/get-buffer session {:?id current-buffer})
                                              state (c/get-state session)]
                                          (-> session

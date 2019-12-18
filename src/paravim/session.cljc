@@ -8,7 +8,6 @@
                :cljs [clarax.macros-js :refer-macros [->session]]))
   #?(:cljs (:require-macros [paravim.session :refer [->session-wrapper]])))
 
-
 (defrecord Game [total-time delta-time context])
 (defrecord Window [width height])
 (defrecord Mouse [x y])
@@ -19,7 +18,6 @@
 (defrecord Font [size])
 (defrecord CurrentTab [id])
 (defrecord NewTab [id])
-(defrecord CurrentBuffer [id])
 (defrecord Tab [id buffer-id])
 (defrecord Buffer [id tab-id
                    text-entity parinfer-text-entity
@@ -84,8 +82,10 @@
         current-tab))
     :get-current-buffer
     (fn []
-      (let [current-buffer CurrentBuffer]
-        current-buffer))
+      (let [current-tab CurrentTab
+            tab Tab
+            :when (= (:id tab) (:id current-tab))]
+        (:buffer-id tab)))
     :get-tab
     (fn [?id]
       (let [tab Tab
@@ -168,9 +168,10 @@
           mouse-click MouseClick
           mouse-hover MouseHover
           current-tab CurrentTab
-          current-buffer CurrentBuffer
+          tab Tab
+          :when (= (:id tab) (:id current-tab))
           buffer Buffer
-          :when (= (:id buffer) (:id current-buffer))
+          :when (= (:id buffer) (:buffer-id tab))
           font Font]
       (clara/retract! mouse-click)
       (when (= :left (:button mouse-click))
@@ -181,15 +182,15 @@
               :font-dec (font-dec! font)
               :font-inc (font-inc! font)
               :reload-file (when (reload-file! buffer (:paravim.core/pipes game) (:id current-tab))
-                             (clarax/merge! current-tab {:id :repl-in}))
+                             (clara/insert-unconditional! (->NewTab :repl-in)))
               nil)))))
     :tab-changed
     (let [game Game
-          current-tab CurrentTab
-          new-tab NewTab]
+          new-tab NewTab
+          tab Tab
+          :when (= (:id new-tab) (:id tab))]
       (clara/retract! new-tab)
-      (clarax/merge! current-tab {:id (:id new-tab)})
-      ((:paravim.core/send-input! game) [:new-tab]))
+      ((:paravim.core/send-input! game) [:new-buf (:buffer-id tab)]))
     :update-cursor-when-font-changes
     (let [game Game
           font Font
@@ -209,11 +210,12 @@
     (let [game Game
           font Font
           window Window
-          current-buffer CurrentBuffer
           current-tab CurrentTab
+          tab Tab
+          :when (= (:id tab) (:id current-tab))
           buffer Buffer
           :when (and (not= window (:window buffer))
-                     (or (= (:id buffer) (:id current-buffer))
+                     (or (= (:id buffer) (:buffer-id tab))
                          ;; if we're in the repl, make sure both the input and output are refreshed
                          (= (:tab-id buffer) (case (:id current-tab)
                                                :repl-in :repl-out
@@ -227,7 +229,7 @@
         (-> buffer
             (buffers/update-cursor state font text-box constants game)
             (assoc :window window)))
-      (when (= (:id buffer) (:id current-buffer))
+      (when (= (:id buffer) (:buffer-id tab))
         ((:paravim.core/send-input! game) [:resize])))})
 
 #?(:clj (defmacro ->session-wrapper []
@@ -242,7 +244,6 @@
           (->Mouse 0 0)
           (->MouseHover nil nil nil)
           (->CurrentTab :files)
-          (->CurrentBuffer nil)
           (->Tab :files nil)
           (->Tab :repl-in nil)
           (->Tab :repl-out nil)
