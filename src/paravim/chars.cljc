@@ -103,6 +103,13 @@
            ("if" (== (.w o_color) "0.0")
              "discard"))}})
 
+(defn update-uniforms [{:keys [characters] :as text-entity} font-height alpha]
+  (update text-entity :uniforms assoc
+      'u_char_counts (mapv count characters)
+      'u_font_height font-height
+      'u_alpha alpha
+      'u_start_line 0))
+
 (def ^:const instanced-font-attrs->unis
   '{a_translate_matrix u_translate_matrix
     a_scale_matrix u_scale_matrix

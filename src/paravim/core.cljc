@@ -2,9 +2,9 @@
   (:require [paravim.utils :as utils]
             [paravim.chars :as chars]
             [paravim.session :as session]
+            [paravim.colors :as colors]
             [clara.rules :as clara]
             [clarax.rules :as clarax]
-            [parinferish.core :as ps]
             [clojure.string :as str]
             [clojure.set :as set]
             [play-cljc.gl.utils :as u]
@@ -126,177 +126,13 @@
         (clarax/merge state (apply f state args))
         clara/fire-rules)))
 
-(def bg-color [(/ 52 255) (/ 40 255) (/ 42 255) 0.95])
-
-(def text-color [1 1 1 1])
-(def cursor-color [(/ 112 255) (/ 128 255) (/ 144 255) 0.9])
-(def select-color [(/ 148 255) (/ 69 255) (/ 5 255) 0.8])
-(def search-color [(/ 127 255) (/ 52 255) (/ 83 255) 0.8])
-
-(def text-alpha 1.0)
-(def parinfer-alpha 0.15)
-(def highlight-alpha 0.05)
-(def unfocused-alpha 0.5)
-(def completion-alpha 0.65)
-
-(def yellow-color [(/ 255 255) (/ 193 255) (/ 94 255) 1])
-(def tan-color [(/ 209 255) (/ 153 255) (/ 101 255) 1])
-(def cyan-color [(/ 86 255) (/ 181 255) (/ 194 255) 1])
-(def gray-color [(/ 150 255) (/ 129 255) (/ 133 255) 1])
-
-(def colors {:number yellow-color
-             :string tan-color
-             :keyword cyan-color
-             :comment gray-color})
-
-(def orange-color [(/ 220 255) (/ 103 255) (/ 44 255) 1])
-(def red-color [(/ 210 255) (/ 45 255) (/ 58 255) 1])
-(def green-color [(/ 65 255) (/ 174 255) (/ 122 255) 1])
-
-(def rainbow-colors [orange-color
-                     red-color
-                     green-color])
-
-(defn get-color [class-name depth]
-  (or (colors class-name)
-      (case class-name
-        :delimiter (nth rainbow-colors (mod depth (count rainbow-colors)))
-        text-color)))
-
-(defn set-alpha [color alpha]
-  (assoc color 3 alpha))
+(defn insert-buffer-update [session buffer-update]
+  (-> session
+      (clara/insert (session/map->BufferUpdate buffer-update))
+      clara/fire-rules))
 
 (defn get-mode []
   (:mode (get-state @session/*session)))
-
-(defn clojurify-lines
-  ([text-entity font-entity parsed-code parinfer?]
-   (let [*line-num (volatile! 0)
-         *char-num (volatile! -1)
-         *char-counts (volatile! [])
-         *collections (volatile! [])
-         characters (reduce
-                      (fn [characters data]
-                        (clojurify-lines characters font-entity *line-num *char-num *char-counts *collections nil -1 data parinfer?))
-                      (:characters text-entity)
-                      parsed-code)
-         ;; the last line's char count
-         char-counts (vswap! *char-counts conj (inc @*char-num))
-         ;; make sure the parinfer entity doesn't render any trailing characters it removed
-         ;; see test: dedent-function-body
-         characters (if (and (seq characters) parinfer?)
-                      (reduce-kv
-                        (fn [characters line-num char-count]
-                          (update characters line-num
-                                  (fn [char-entities]
-                                    (if (> (count char-entities) char-count)
-                                      (rrb/subvec char-entities 0 char-count)
-                                      char-entities))))
-                        characters
-                        char-counts)
-                      characters)
-         ;; add characters to the attributes
-         text-entity (if (seq characters)
-                       (reduce-kv
-                         (fn [entity line-num char-entities]
-                           (if (not= (get-in entity [:characters line-num]) char-entities)
-                             (chars/assoc-line entity line-num char-entities)
-                             entity))
-                         text-entity
-                         characters)
-                       text-entity)]
-     (assoc text-entity :collections @*collections)))
-  ([characters font-entity *line-num *char-num *char-counts *collections class-name depth data parinfer?]
-   (if (vector? data)
-     (let [[class-name & children] data
-           depth (cond-> depth
-                         (= class-name :collection)
-                         inc)
-           line-num @*line-num
-           char-num @*char-num
-           characters (if (or (and parinfer? (-> data meta :action (= :remove)))
-                              (and (not parinfer?) (-> data meta :action (= :insert))))
-                        characters
-                        (reduce
-                          (fn [characters child]
-                            (clojurify-lines characters font-entity *line-num *char-num *char-counts *collections class-name depth child parinfer?))
-                          characters
-                          children))]
-       (when (= class-name :collection)
-         (vswap! *collections conj {:start-line line-num
-                                    :start-column (inc char-num)
-                                    :end-line @*line-num
-                                    :end-column (inc @*char-num)
-                                    :depth depth}))
-       characters)
-     (let [color (get-color class-name depth)]
-       (reduce
-         (fn [characters ch]
-           (if (= ch \newline)
-             (do
-               (vswap! *char-counts conj (inc @*char-num))
-               (vswap! *line-num inc)
-               (vreset! *char-num -1)
-               characters)
-             (update characters @*line-num
-               (fn [char-entities]
-                 (update char-entities (vswap! *char-num inc)
-                   (fn [entity]
-                     (-> (if (and parinfer?
-                                  (-> entity :character (not= ch)))
-                           (chars/crop-char font-entity ch)
-                           entity)
-                         (t/color color))))))))
-         characters
-         data)))))
-
-(defn update-lines [lines new-lines first-line line-count-change]
-  (if (= 0 line-count-change)
-    (reduce-kv
-      (fn [lines line-offset line]
-        (assoc lines (+ first-line line-offset) line))
-      lines
-      new-lines)
-    (let [lines-to-remove (if (neg? line-count-change)
-                            (+ (* -1 line-count-change) (count new-lines))
-                            (- (count new-lines) line-count-change))]
-      (rrb/catvec
-        (rrb/subvec lines 0 first-line)
-        new-lines
-        (if (seq lines) ;; see test: delete-all-lines
-          (rrb/subvec lines (+ first-line lines-to-remove))
-          [])))))
-
-(defn replace-lines [text-entity font-entity new-lines first-line line-count-change]
-  (let [new-chars (mapv
-                    (fn [line]
-                      (mapv
-                        (fn [ch]
-                          (chars/crop-char font-entity ch))
-                        line))
-                    new-lines)]
-    (if (= 0 line-count-change)
-      (reduce-kv
-        (fn [text-entity line-offset char-entities]
-          (chars/assoc-line text-entity (+ first-line line-offset) char-entities))
-        text-entity
-        new-chars)
-      (let [lines-to-remove (if (neg? line-count-change)
-                              (+ (* -1 line-count-change) (count new-lines))
-                              (- (count new-lines) line-count-change))
-            text-entity (if (seq (:characters text-entity)) ;; see test: delete-all-lines
-                          (reduce
-                            (fn [text-entity _]
-                              (chars/dissoc-line text-entity first-line))
-                            text-entity
-                            (range 0 lines-to-remove))
-                          text-entity)
-            text-entity (reduce-kv
-                          (fn [text-entity line-offset char-entities]
-                            (chars/insert-line text-entity (+ first-line line-offset) char-entities))
-                          text-entity
-                          new-chars)]
-        text-entity))))
 
 (defn get-visible-lines [{:keys [characters] :as text-entity}
                          {:keys [font-height] :as state}
@@ -338,7 +174,7 @@
         top (* line font-height)
         height (or height font-height)]
     (-> base-rect-entity
-        (t/color cursor-color)
+        (t/color colors/cursor-color)
         (t/translate left top)
         (t/scale width height)
         (assoc :left (* left font-size-multiplier)
@@ -394,13 +230,6 @@
     (update-in state [:buffers current-buffer] update-cursor state game)
     state))
 
-(defn update-uniforms [{:keys [characters] :as text-entity} font-height alpha]
-  (update text-entity :uniforms assoc
-      'u_char_counts (mapv count characters)
-      'u_font_height font-height
-      'u_alpha alpha
-      'u_start_line 0))
-
 (defn assoc-command-text [state text completion]
   (assoc state :command-text text :command-completion (when (some-> text str/trim seq) completion)))
 
@@ -411,12 +240,12 @@
   (if command-text
     (let [char-entities (mapv #(-> base-font-entity
                                    (chars/crop-char %)
-                                   (t/color bg-color))
+                                   (t/color colors/bg-color))
                           (str command-start command-text))
           completion-entities (when command-completion
                                 (mapv #(-> base-font-entity
                                            (chars/crop-char %)
-                                           (t/color (set-alpha bg-color completion-alpha)))
+                                           (t/color (colors/set-alpha colors/bg-color colors/completion-alpha)))
                                   (subs
                                     (str command-start
                                          (some->> (str/last-index-of command-text " ") inc (subs command-text 0))
@@ -424,7 +253,7 @@
                                     (count char-entities))))
           char-entities (into char-entities completion-entities)
           command-text-entity (-> (chars/assoc-line base-text-entity 0 char-entities)
-                                  (update-uniforms font-height text-alpha))
+                                  (chars/update-uniforms font-height colors/text-alpha))
           line-chars (get-in command-text-entity [:characters 0])
           command-cursor-entity (i/assoc base-rects-entity 0 (->cursor-entity state line-chars 0 (inc position)))]
       (assoc-command-entity state command-text-entity command-cursor-entity))
@@ -465,7 +294,7 @@
                                         (and (= end-line cursor-line)
                                              (> end-column cursor-column))))))
                      first)]
-    (let [color (set-alpha (get-color :delimiter (:depth coll)) highlight-alpha)
+    (let [color (colors/set-alpha (colors/get-color :delimiter (:depth coll)) colors/highlight-alpha)
           rects (range->rects text-entity font-width font-height coll)]
       (update buffer :rects-entity assoc-rects base-rect-entity color rects))
     buffer))
@@ -485,11 +314,11 @@
         ;; add it manually so it is included in the selection
         visual-range (update visual-range :end-column inc)
         rects (range->rects text-entity font-width font-height visual-range)]
-    (update buffer :rects-entity assoc-rects base-rect-entity select-color rects)))
+    (update buffer :rects-entity assoc-rects base-rect-entity colors/select-color rects)))
 
 (defn update-search-highlights [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as state} highlights]
   (let [rects (vec (mapcat (partial range->rects text-entity font-width font-height) highlights))]
-    (update buffer :rects-entity assoc-rects base-rect-entity search-color rects)))
+    (update buffer :rects-entity assoc-rects base-rect-entity colors/search-color rects)))
 
 (defn get-extension
   [path]
@@ -512,7 +341,7 @@
           (chars/assoc-line entity line-num (mapv #(chars/crop-char font-entity %) line)))
         text-entity
         lines)
-      (update-uniforms font-height text-alpha)))
+      (chars/update-uniforms font-height colors/text-alpha)))
 
 (defn ->buffer [{:keys [base-font-entity base-text-entity font-height] :as state} path file-name lines current-tab]
   {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
@@ -533,53 +362,6 @@
    :camera-y 0
    :lines lines
    :tab-id (get-current-tab @session/*session)})
-
-(defn parse-clojure-buffer [{:keys [lines cursor-line cursor-column] :as buffer} {:keys [mode] :as state} init?]
-  (let [parse-opts (cond
-                     init? {:mode :paren} ;; see test: fix-bad-indentation
-                     (= 'INSERT mode) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}
-                     :else {:mode :indent})
-        parsed-code (ps/parse (str/join "\n" lines) parse-opts)]
-    (assoc buffer
-      :parsed-code parsed-code
-      :needs-parinfer? true)))
-
-(defn update-clojure-buffer [{:keys [text-entity parsed-code lines] :as buffer} {:keys [base-font-entity font-height] :as state}]
-  (let [text-entity (clojurify-lines text-entity base-font-entity parsed-code false)
-        parinfer-text-entity (clojurify-lines text-entity base-font-entity parsed-code true)]
-    (assoc buffer
-      :text-entity (update-uniforms text-entity font-height text-alpha)
-      :parinfer-text-entity (update-uniforms parinfer-text-entity font-height parinfer-alpha))))
-
-(defn update-text-buffer [{:keys [lines] :as buffer} {:keys [base-font-entity font-height] :as state} new-lines first-line line-count-change]
-  (-> buffer
-      (assoc :lines (update-lines lines new-lines first-line line-count-change))
-      (update :text-entity
-              (fn [text-entity]
-                (-> text-entity
-                    (replace-lines base-font-entity new-lines first-line line-count-change)
-                    (update-uniforms font-height text-alpha))))))
-
-(defn update-buffers [state]
-  (if-let [updates (not-empty (:buffer-updates state))]
-    (let [buffer-ptrs (set (map :buffer-ptr updates))]
-      (as-> state state
-            (reduce
-              (fn [state {:keys [buffer-ptr lines first-line line-count-change]}]
-                (update-in state [:buffers buffer-ptr] update-text-buffer state lines first-line line-count-change))
-              state
-              updates)
-            (assoc state :buffer-updates [])
-            (reduce (fn [state buffer-ptr]
-                      (if (:clojure? (get-buffer state buffer-ptr))
-                        (update-in state [:buffers buffer-ptr]
-                          (fn [buffer]
-                            (-> buffer
-                                (parse-clojure-buffer state false)
-                                (update-clojure-buffer state))))
-                        state))
-                    state buffer-ptrs)))
-    state))
 
 (defn assoc-attr-lengths [text-entity]
   (reduce
@@ -613,7 +395,7 @@
   (#?(:clj load-font-clj :cljs load-font-cljs) :firacode
      (fn [{:keys [data]} baked-font]
        (let [font-entity (-> (text/->font-entity game data baked-font)
-                             (t/color text-color))
+                             (t/color colors/text-color))
              text-entity (-> (i/->instanced-entity font-entity)
                              (assoc :vertex chars/instanced-font-vertex-shader
                                     :fragment chars/instanced-font-fragment-shader
@@ -645,7 +427,7 @@
          (#?(:clj load-font-clj :cljs load-font-cljs) :roboto
           (fn [{:keys [data]} baked-font]
             (let [font-entity (-> (text/->font-entity game data baked-font)
-                                  (t/color text-color))
+                                  (t/color colors/text-color))
                   text-entity (-> (i/->instanced-entity font-entity)
                                   (assoc :vertex chars/instanced-font-vertex-shader
                                          :fragment chars/instanced-font-fragment-shader
@@ -687,7 +469,7 @@
                                                   (update m id i/assoc shortcut-char
                                                           (-> character
                                                               (chars/update-translation-matrix (:left character) 0)
-                                                              (t/color yellow-color)))))
+                                                              (t/color colors/yellow-color)))))
                                               button-entities
                                               buttons)]
               (swap! session/*session update-state assoc
@@ -707,7 +489,7 @@
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
-   :clear {:color bg-color :depth 1}})
+   :clear {:color colors/bg-color :depth 1}})
 
 (defn crop-text-entity [text-entity lines-to-skip-count lines-to-crop-count]
   (let [[chars-to-skip-count chars-to-crop-count char-counts] (get-visible-chars text-entity lines-to-skip-count lines-to-crop-count)]
@@ -739,7 +521,7 @@
         (c/render game (-> text-entity
                            (crop-text-entity lines-to-skip-count lines-to-crop-count)
                            (cond-> (not show-cursor?)
-                                   (assoc-in [:uniforms 'u_alpha] unfocused-alpha))
+                                   (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha))
                            (t/project game-width game-height)
                            (t/camera camera)
                            (t/scale font-size-multiplier font-size-multiplier)))))))
@@ -766,7 +548,7 @@
         (c/render game (-> base-rects-entity
                            (t/project game-width game-height)
                            (i/assoc 0 (-> base-rect-entity
-                                          (t/color bg-color)
+                                          (t/color colors/bg-color)
                                           (t/translate 0 0)
                                           (t/scale game-width game-height))))))
       (if (and ascii (= current-tab :files))
@@ -782,11 +564,11 @@
         (c/render game (-> base-rects-entity
                            (t/project game-width game-height)
                            (i/assoc 0 (-> base-rect-entity
-                                          (t/color bg-color)
+                                          (t/color colors/bg-color)
                                           (t/translate 0 0)
                                           (t/scale game-width (* font-size-multiplier font-height))))
                            (i/assoc 1 (-> base-rect-entity
-                                          (t/color (if (= 'COMMAND_LINE mode) tan-color bg-color))
+                                          (t/color (if (= 'COMMAND_LINE mode) colors/tan-color colors/bg-color))
                                           (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                                           (t/scale game-width (* font-size-multiplier font-height)))))))
       (doseq [[k entity] toolbar-text-entities
@@ -800,8 +582,8 @@
         (c/render game (-> (or highlight-entity entity)
                            (assoc-in [:uniforms 'u_alpha] (if (or (= k current-tab)
                                                                   highlight-entity)
-                                                            text-alpha
-                                                            unfocused-alpha))
+                                                            colors/text-alpha
+                                                            colors/unfocused-alpha))
                            (t/project game-width game-height)
                            (t/translate (-> bounding-box :x1 (* font-size-multiplier)
                                             (cond->> (= :right (:align bounding-box))

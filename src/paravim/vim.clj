@@ -1,6 +1,7 @@
 (ns paravim.vim
   (:require [paravim.core :as c]
             [paravim.session :as session]
+            [paravim.buffers :as buffers]
             [libvim-clj.core :as v]
             [clojure.string :as str]
             [clojure.java.io :as io]
@@ -86,11 +87,12 @@
           ;; go back to the original position
           (v/set-cursor-position vim cursor-line cursor-column)
           (v/input vim "<Esc>")))
-      (swap! session/*session c/update-state
-        (fn [state]
-          (-> state
-              (assoc-in [:buffers current-buffer :needs-parinfer?] false)
-              (c/update-buffers)))))))
+      (swap! session/*session c/update-state update-in [:buffers current-buffer]
+        (fn [buffer]
+          (-> buffer
+              (assoc :needs-parinfer? false)
+              (buffers/parse-clojure-buffer state false)
+              (buffers/update-clojure-buffer state)))))))
 
 (defn read-text-resource [path]
   (-> path io/resource slurp str/split-lines))
@@ -197,10 +199,14 @@
                 (c/update-command (v/get-command-position vim)))
             (c/assoc-command-text state nil nil))
           (if (c/get-buffer state current-buffer)
-            (as-> state state
-                  (update-in state [:buffers current-buffer] assoc :cursor-line cursor-line :cursor-column cursor-column)
-                  (c/update-buffers state)
-                  (update-in state [:buffers current-buffer] update-buffer state game vim))
+            (update-in state [:buffers current-buffer]
+                       (fn [buffer]
+                         (-> buffer
+                             (assoc :cursor-line cursor-line :cursor-column cursor-column)
+                             (cond-> (:clojure? buffer)
+                                     (-> (buffers/parse-clojure-buffer state false)
+                                         (buffers/update-clojure-buffer state)))
+                             (update-buffer state game vim))))
             state))))
 
 (defn on-input [game vim s]
@@ -249,8 +255,8 @@
                          :cursor-column (v/get-cursor-column vim)))
             buffer (if (:clojure? buffer)
                       (-> buffer
-                          (c/parse-clojure-buffer state true)
-                          (c/update-clojure-buffer state))
+                          (buffers/parse-clojure-buffer state true)
+                          (buffers/update-clojure-buffer state))
                       buffer)]
         (swap! session/*session
           (fn [session]
@@ -274,11 +280,11 @@
         last-line (+ (dec end-line) line-count-change)
         lines (vec (for [i (range first-line last-line)]
                      (v/get-line vim buffer-ptr (inc i))))]
-    (swap! session/*session c/update-state update :buffer-updates conj
-                     {:buffer-ptr buffer-ptr
-                      :lines lines
-                      :first-line first-line
-                      :line-count-change line-count-change})))
+    (swap! session/*session c/insert-buffer-update
+           {:buffer-ptr buffer-ptr
+            :lines lines
+            :first-line first-line
+            :line-count-change line-count-change})))
 
 (defn ->vim []
   (doto (v/->vim)

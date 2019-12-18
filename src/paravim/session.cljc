@@ -1,5 +1,6 @@
 (ns paravim.session
-  (:require [clara.rules :as clara]
+  (:require [paravim.buffers :as buffers]
+            [clara.rules :as clara]
             [clarax.rules :as clarax]
             [play-cljc.gl.entities-2d :as e]
             #?(:clj  [clarax.macros-java :refer [->session]]
@@ -37,6 +38,7 @@
                    camera camera-x camera-y
                    path file-name
                    lines clojure?])
+(defrecord BufferUpdate [buffer-ptr lines first-line line-count-change])
 (defrecord State [])
 
 (defn change-font-size! [{:keys [size] :as font} diff]
@@ -168,7 +170,13 @@
       ((:paravim.core/send-input! game) [:new-tab]))
     :font-changed
     (let [font Font]
-      (println font))})
+      (println font))
+    :buffer-update
+    (let [buffer-update BufferUpdate
+          state State]
+      (clara/retract! buffer-update)
+      (let [{:keys [buffer-ptr lines first-line line-count-change]} buffer-update]
+        (clarax/merge! state (update-in state [:buffers buffer-ptr] buffers/update-text-buffer state lines first-line line-count-change))))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))
