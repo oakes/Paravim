@@ -202,7 +202,7 @@
         (invoke [this window width height]
           (on-resize! game window width height))))))
 
-(defn- poll-input [{:keys [::c/vim ::c/vim-chan ::c/append-repl-chan ::c/repl-output] :as game}]
+(defn- poll-input! [{:keys [::c/vim ::c/vim-chan ::c/append-repl-chan ::c/repl-output] :as game}]
   (loop [vim-input nil
          repl-output repl-output]
     (cond
@@ -269,11 +269,11 @@
          game (assoc game
                 ::c/pipes pipes
                 ::c/send-input! send-input!
+                ::c/poll-input! poll-input!
                 ::c/vim vim
                 ::c/vim-chan vim-chan
                 ::c/append-repl-chan append-repl-chan
-                ::c/repl-output []
-                ::c/poll-input poll-input)]
+                ::c/repl-output [])]
      (when (pos-int? density-ratio)
        (swap! session/*session c/font-multiply density-ratio))
      (c/init game)

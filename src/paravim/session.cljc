@@ -20,7 +20,7 @@
 (def min-font-size (/ 1 8))
 (def max-font-size 1)
 
-(defrecord Game [total-time delta-time context pipes send-input! vim])
+(defrecord Game [total-time delta-time context])
 (defrecord Window [width height])
 (defrecord Mouse [x y])
 (defrecord MouseHover [target cursor mouse])
@@ -165,7 +165,7 @@
     :tab-changed
     (let [game Game
           current-tab CurrentTab]
-      ((:send-input! game) [:new-tab]))
+      ((:paravim.core/send-input! game) [:new-tab]))
     :font-changed
     (let [font Font]
       (println font))})
@@ -189,7 +189,8 @@
           (->Font (/ 1 4))
           (map->State {:buffers {}
                        :buffer-updates []
-                       :show-search? false}))
+                       :show-search? false
+                       :mode 'NORMAL}))
         clara/fire-rules)))
 
 (restart!)

@@ -600,11 +600,7 @@
     (fn [session]
       (-> session
           (clara/insert
-            ;; the keys must have namespaces removed
-            ;; because predefined fields in records can't have namespaces
-            (session/map->Game (set/rename-keys game {::pipes :pipes
-                                                      ::send-input! :send-input!
-                                                      ::vim :vim}))
+            (session/map->Game game)
             (session/->Window (utils/get-width game) (utils/get-height game)))
           clara/fire-rules)))
   ;; create rect entities
@@ -706,7 +702,8 @@
                          (fn [session id bounding-box]
                            (clara/insert session (session/map->BoundingBox (assoc bounding-box :id id))))
                          session)
-                       clara/fire-rules))))))))))
+                       clara/fire-rules)))))))))
+  game)
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
@@ -747,7 +744,7 @@
                            (t/camera camera)
                            (t/scale font-size-multiplier font-size-multiplier)))))))
 
-(defn tick [{:keys [::poll-input] :as game}]
+(defn tick [game]
   (let [session @session/*session
         font-size-multiplier (:size (get-font session))
         current-tab (:id (get-current-tab session))
@@ -824,12 +821,13 @@
                            (t/scale font-size-multiplier font-size-multiplier)))))
     ;; insert/update the game record
     (if-let [game' (get-game session)]
-      (swap! session/*session
-        (fn [session]
-          (-> session
-              (clarax/merge game' game)
-              clara/fire-rules)))
-      (init game)))
-  ;; return the game map
-  (poll-input game))
+      (let [game (merge game' game)
+            poll-input! (::poll-input! game)]
+        (swap! session/*session
+          (fn [session]
+            (-> session
+                (clarax/merge game' game)
+                clara/fire-rules)))
+        (poll-input! game))
+      (init game))))
 
