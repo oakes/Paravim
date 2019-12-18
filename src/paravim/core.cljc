@@ -22,39 +22,24 @@
             #?(:clj [paravim.text :refer [load-font-clj]]))
   #?(:cljs (:require-macros [paravim.text :refer [load-font-cljs]])))
 
-(let [query-fns (clarax/query-fns @session/*session)]
-  (def get-game (:get-game query-fns))
-  (def get-window (:get-window query-fns))
-  (def get-mouse (:get-mouse query-fns))
-  (def get-mouse-hover (:get-mouse-hover query-fns))
-  (def get-font (:get-font query-fns))
-  (def get-current-tab (:get-current-tab query-fns))
-  (def get-current-buffer (:get-current-buffer query-fns))
-  (def get-tab (:get-tab query-fns))
-  (def get-bounding-box (:get-bounding-box query-fns))
-  (def get-text-box (:get-text-box query-fns))
-  (def get-buffer (:get-buffer query-fns))
-  (def get-state (:get-state query-fns))
-  (def get-constants (:get-constants query-fns)))
-
 (defn update-mouse [session x y]
   (-> session
-      (clarax/merge (get-mouse-hover session) {:target nil :cursor nil})
-      (clarax/merge (get-mouse session) {:x x :y y})
+      (clarax/merge (session/get-mouse-hover session) {:target nil :cursor nil})
+      (clarax/merge (session/get-mouse session) {:x x :y y})
       clara/fire-rules))
 
 (defn update-window-size [session width height]
   (-> session
-      (clarax/merge (get-window session) {:width width :height height})
+      (clarax/merge (session/get-window session) {:width width :height height})
       clara/fire-rules))
 
 (defn update-current-tab [session id]
   (-> session
-      (clarax/merge (get-current-tab session) {:id id})
+      (clarax/merge (session/get-current-tab session) {:id id})
       clara/fire-rules))
 
 (defn shift-current-tab [session direction]
-  (let [current-tab (get-current-tab session)
+  (let [current-tab (session/get-current-tab session)
         id (:id current-tab)
         index (+ (.indexOf constants/tab-ids id)
                  direction)
@@ -73,7 +58,7 @@
 
 (defn update-tab [session id buffer-id]
   (-> session
-      (clarax/merge (get-tab session {:?id id}) {:buffer-id buffer-id})
+      (clarax/merge (session/get-tab session {:?id id}) {:buffer-id buffer-id})
       clara/fire-rules))
 
 (defn click-mouse [session button]
@@ -82,7 +67,7 @@
       clara/fire-rules))
 
 (defn change-font-size [session diff]
-  (let [font (get-font session)
+  (let [font (session/get-font session)
         curr-val (:size font)
         new-val (+ curr-val diff)]
     (if (<= constants/min-font-size new-val constants/max-font-size)
@@ -98,11 +83,11 @@
   (change-font-size session constants/font-size-step))
 
 (defn font-multiply [session n]
-  (let [font-size (:size (get-font session))]
+  (let [font-size (:size (session/get-font session))]
     (change-font-size session (- (* font-size n) font-size))))
 
 (defn upsert-buffer [session buffer]
-  (if-let [existing-buffer (get-buffer session {:?id (:id buffer)})]
+  (if-let [existing-buffer (session/get-buffer session {:?id (:id buffer)})]
     (-> session
         (clarax/merge existing-buffer buffer)
         clara/fire-rules)
@@ -112,17 +97,17 @@
 
 (defn remove-buffer [session buffer-id]
   (-> session
-      (clara/retract (get-buffer session {:?id buffer-id}))
+      (clara/retract (session/get-buffer session {:?id buffer-id}))
       clara/fire-rules))
 
 (defn update-state [session f & args]
-  (let [state (get-state session)]
+  (let [state (session/get-state session)]
     (-> session
         (clarax/merge state (apply f state args))
         clara/fire-rules)))
 
 (defn get-mode []
-  (:mode (get-state @session/*session)))
+  (:mode (session/get-state @session/*session)))
 
 (defn assoc-command-text [state text completion]
   (assoc state :command-text text :command-completion (when (some-> text str/trim seq) completion)))
@@ -217,18 +202,18 @@
     (update buffer :rects-entity assoc-rects base-rect-entity colors/search-color rects)))
 
 (defn update-buffers [session constants state]
-  (if-let [updates (not-empty (:buffer-updates (get-state session)))]
+  (if-let [updates (not-empty (:buffer-updates (session/get-state session)))]
     (let [buffer-ptrs (set (map :buffer-ptr updates))]
       (as-> session $
             (reduce
               (fn [session {:keys [buffer-ptr lines first-line line-count-change]}]
-                (upsert-buffer session (-> (get-buffer session {:?id buffer-ptr})
+                (upsert-buffer session (-> (session/get-buffer session {:?id buffer-ptr})
                                            (buffers/update-text-buffer constants lines first-line line-count-change))))
               $
               updates)
             (update-state $ assoc :buffer-updates [])
             (reduce (fn [session buffer-ptr]
-                      (let [buffer (get-buffer session {:?id buffer-ptr})]
+                      (let [buffer (session/get-buffer session {:?id buffer-ptr})]
                         (if (:clojure? buffer)
                           (upsert-buffer session
                               (-> buffer
@@ -412,8 +397,8 @@
       (:attribute-lengths text-entity))))
 
 (defn render-buffer [game session constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor?]
-  (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera camera-y]} (get-buffer session {:?id buffer-ptr})]
-    (when-let [text-box (get-text-box session {:?id current-tab})]
+  (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera camera-y]} (session/get-buffer session {:?id buffer-ptr})]
+    (when-let [text-box (session/get-text-box session {:?id current-tab})]
       (when (and rects-entity show-cursor?)
         (c/render game (-> rects-entity
                            (t/project game-width game-height)
@@ -436,19 +421,19 @@
 
 (defn tick [game]
   (let [session @session/*session
-        font-size-multiplier (:size (get-font session))
-        current-tab (:id (get-current-tab session))
-        current-buffer (get-current-buffer session)
-        buffer (get-buffer session {:?id current-buffer})
-        {game-width :width game-height :height :as window} (get-window session)
+        font-size-multiplier (:size (session/get-font session))
+        current-tab (:id (session/get-current-tab session))
+        current-buffer (session/get-current-buffer session)
+        buffer (session/get-buffer session {:?id current-buffer})
+        {game-width :width game-height :height :as window} (session/get-window session)
         {:keys [base-rect-entity base-rects-entity
                 font-height
                 toolbar-text-entities highlight-text-entities]
-         :as constants} (get-constants session)
+         :as constants} (session/get-constants session)
         {:keys [control?
                 command-text-entity command-completion-text-entity command-cursor-entity
                 mode ascii]
-         :as state} (get-state session)]
+         :as state} (session/get-state session)]
     (when (and (pos? game-width) (pos? game-height))
       (if (:paravim.core/clear? game)
         (c/render game (update screen-entity :viewport assoc :width game-width :height game-height))
@@ -462,9 +447,9 @@
         (render-buffer game session constants font-size-multiplier game-width game-height current-tab ascii false)
         (render-buffer game session constants font-size-multiplier game-width game-height current-tab current-buffer true))
       (case current-tab
-        :repl-in (when-let [buffer-ptr (:buffer-id (get-tab session {:?id :repl-out}))]
+        :repl-in (when-let [buffer-ptr (:buffer-id (session/get-tab session {:?id :repl-out}))]
                    (render-buffer game session constants font-size-multiplier game-width game-height :repl-out buffer-ptr false))
-        :repl-out (when-let [buffer-ptr (:buffer-id (get-tab session {:?id :repl-in}))]
+        :repl-out (when-let [buffer-ptr (:buffer-id (session/get-tab session {:?id :repl-in}))]
                     (render-buffer game session constants font-size-multiplier game-width game-height :repl-in buffer-ptr false))
         nil)
       (when (and base-rects-entity base-rect-entity)
@@ -479,7 +464,7 @@
                                           (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                                           (t/scale game-width (* font-size-multiplier font-height)))))))
       (doseq [[k entity] toolbar-text-entities
-              :let [bounding-box (get-bounding-box session {:?id k})
+              :let [bounding-box (session/get-bounding-box session {:?id k})
                     highlight-entity (when control?
                                        (get highlight-text-entities k))]
               ;; hide the reload file button when necessary
@@ -509,7 +494,7 @@
                            (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                            (t/scale font-size-multiplier font-size-multiplier)))))
     ;; insert/update the game record
-    (if-let [game' (get-game session)]
+    (if-let [game' (session/get-game session)]
       (let [game (merge game' game)
             poll-input! (:paravim.core/poll-input! game)]
         (swap! session/*session

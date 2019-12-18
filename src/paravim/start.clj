@@ -79,7 +79,7 @@
         x (* xpos density-ratio)
         y (* ypos density-ratio)
         session (swap! session/*session c/update-mouse x y)
-        mouse-hover (c/get-mouse-hover session)]
+        mouse-hover (session/get-mouse-hover session)]
     (GLFW/glfwSetCursor window
                         (GLFW/glfwCreateStandardCursor
                           (case (:cursor mouse-hover)
@@ -105,10 +105,10 @@
                            (and press? control-key?))))
     (when press?
       (let [session @session/*session
-            {:keys [mode] :as state} (c/get-state session)
+            {:keys [mode] :as state} (session/get-state session)
             k (keycode->keyword keycode)
-            current-tab (:id (c/get-current-tab session))
-            current-buffer (c/get-current-buffer session)]
+            current-tab (:id (session/get-current-tab session))
+            current-buffer (session/get-current-buffer session)]
         (cond
           ;; pressing enter in the repl
           (and (= current-tab :repl-in)
@@ -120,7 +120,7 @@
           (case k
             (:tab :backtick)
             (swap! session/*session c/shift-current-tab (if shift? -1 1))
-            :f (session/reload-file! (c/get-buffer session {:?id current-buffer}) pipes current-tab)
+            :f (session/reload-file! (session/get-buffer session {:?id current-buffer}) pipes current-tab)
             :- (swap! session/*session c/font-dec)
             := (swap! session/*session c/font-inc)
             ; else

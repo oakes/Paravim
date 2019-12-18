@@ -255,3 +255,18 @@
 
 (restart!)
 
+(let [query-fns (clarax/query-fns @*session)]
+  (def get-game (:get-game query-fns))
+  (def get-window (:get-window query-fns))
+  (def get-mouse (:get-mouse query-fns))
+  (def get-mouse-hover (:get-mouse-hover query-fns))
+  (def get-font (:get-font query-fns))
+  (def get-current-tab (:get-current-tab query-fns))
+  (def get-current-buffer (:get-current-buffer query-fns))
+  (def get-tab (:get-tab query-fns))
+  (def get-bounding-box (:get-bounding-box query-fns))
+  (def get-text-box (:get-text-box query-fns))
+  (def get-buffer (:get-buffer query-fns))
+  (def get-state (:get-state query-fns))
+  (def get-constants (:get-constants query-fns)))
+
