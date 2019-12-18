@@ -172,8 +172,8 @@
           game)
         (case (first vim-input)
           :append (assoc game ::c/repl-output (conj repl-output (second vim-input)))
-          :new-buf (let [buffer-id (second vim-input)]
-                     (v/set-current-buffer vim buffer-id)
+          :new-buf (do
+                     (some->> (second vim-input) (v/set-current-buffer vim))
                      (async/put! vim-chan [:resize])
                      game)
           :resize (let [width (utils/get-width game)
