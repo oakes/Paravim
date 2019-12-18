@@ -98,7 +98,7 @@
   (change-font-size session constants/font-size-step))
 
 (defn font-multiply [session n]
-  (let [font-size (:size (get-font @session/*session))]
+  (let [font-size (:size (get-font session))]
     (change-font-size session (- (* font-size n) font-size))))
 
 (defn upsert-buffer [session buffer]
