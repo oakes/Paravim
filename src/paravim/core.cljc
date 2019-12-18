@@ -44,7 +44,7 @@
   (def get-tab (:get-tab query-fns))
   (def get-bounding-box (:get-bounding-box query-fns))
   (def get-text-box (:get-text-box query-fns))
-  ;(def get-buffer (:get-buffer query-fns))
+  (def get-buffer (:get-buffer query-fns))
   (def get-state (:get-state query-fns))
   (def get-constants (:get-constants query-fns)))
 
@@ -111,7 +111,7 @@
 (defn font-multiply [session n]
   (let [font-size (:size (get-font @session/*session))]
     (change-font-size session (- (* font-size n) font-size))))
-#_
+
 (defn upsert-buffer [session buffer]
   (if-let [existing-buffer (get-buffer session {:?id (:id buffer)})]
     (-> session
@@ -120,6 +120,11 @@
     (-> session
         (clara/insert (session/map->Buffer buffer))
         clara/fire-rules)))
+
+(defn remove-buffer [session buffer-id]
+  (-> session
+      (clara/retract (get-buffer session {:?id buffer-id}))
+      clara/fire-rules))
 
 (defn update-state [session f & args]
   (let [state (get-state session)]
@@ -226,10 +231,10 @@
                   :visible-start-line lines-to-skip-count
                   :visible-end-line lines-to-crop-count))))))
 
-(defn update-cursor-if-necessary [state constants game]
-  (if-let [current-buffer (:id (get-current-buffer @session/*session))]
-    (update-in state [:buffers current-buffer] update-cursor state constants game)
-    state))
+(defn update-cursor-if-necessary [session constants game]
+  (if-let [current-buffer (:id (get-current-buffer session))]
+    (upsert-buffer session (update-cursor (get-buffer session {:?id current-buffer}) (get-state session) constants game))
+    session))
 
 (defn assoc-command-text [state text completion]
   (assoc state :command-text text :command-completion (when (some-> text str/trim seq) completion)))
@@ -330,9 +335,6 @@
 
 (def clojure-exts #{"clj" "cljs" "cljc" "edn"})
 
-(defn get-buffer [state buffer-ptr]
-  (get-in state [:buffers buffer-ptr]))
-
 (defn clojure-path? [path]
   (-> path get-extension clojure-exts))
 
@@ -344,8 +346,9 @@
         lines)
       (chars/update-uniforms font-height colors/text-alpha)))
 
-(defn ->buffer [{:keys [base-font-entity base-text-entity font-height] :as constants} path file-name lines current-tab]
-  {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
+(defn ->buffer [id {:keys [base-font-entity base-text-entity font-height] :as constants} path file-name lines current-tab]
+  {:id id
+   :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
    :camera (t/translate session/orig-camera 0 0)
    :camera-x 0
    :camera-y 0
@@ -356,13 +359,14 @@
    :clojure? (or (= current-tab :repl-in)
                  (clojure-path? path))})
 
-(defn ->ascii [{:keys [base-font-entity base-text-entity font-height] :as constants} lines]
-  {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
+(defn ->ascii [id {:keys [base-font-entity base-text-entity font-height] :as constants} lines]
+  {:id id
+   :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
    :camera (t/translate session/orig-camera 0 0)
    :camera-x 0
    :camera-y 0
    :lines lines
-   :tab-id (get-current-tab @session/*session)})
+   :tab-id :files})
 
 (defn assoc-attr-lengths [text-entity]
   (reduce
@@ -495,8 +499,8 @@
               'u_start_line lines-to-skip-count)
       (:attribute-lengths text-entity))))
 
-(defn render-buffer [game {:keys [buffers] :as state} session constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor?]
-  (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera camera-y]} (get buffers buffer-ptr)]
+(defn render-buffer [game session constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor?]
+  (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera camera-y]} (get-buffer session {:?id buffer-ptr})]
     (when-let [text-box (get-text-box session {:?id current-tab})]
       (when (and rects-entity show-cursor?)
         (c/render game (-> rects-entity
@@ -523,17 +527,18 @@
         font-size-multiplier (:size (get-font session))
         current-tab (:id (get-current-tab session))
         current-buffer (:id (get-current-buffer session))
+        buffer (get-buffer session {:?id current-buffer})
         {game-width :width game-height :height :as window} (get-window session)
         {:keys [base-rect-entity base-rects-entity
                 font-height
                 toolbar-text-entities highlight-text-entities]
          :as constants} (get-constants session)
-        {:keys [buffers control?
+        {:keys [control?
                 command-text-entity command-completion-text-entity command-cursor-entity
                 mode ascii]
          :as state} (get-state session)]
     (when (and (pos? game-width) (pos? game-height))
-      (if (::clear? game)
+      (if (:paravim.core/clear? game)
         (c/render game (update screen-entity :viewport assoc :width game-width :height game-height))
         (c/render game (-> base-rects-entity
                            (t/project game-width game-height)
@@ -542,13 +547,13 @@
                                           (t/translate 0 0)
                                           (t/scale game-width game-height))))))
       (if (and ascii (= current-tab :files))
-        (render-buffer game state session constants font-size-multiplier game-width game-height current-tab ascii false)
-        (render-buffer game state session constants font-size-multiplier game-width game-height current-tab current-buffer true))
+        (render-buffer game session constants font-size-multiplier game-width game-height current-tab ascii false)
+        (render-buffer game session constants font-size-multiplier game-width game-height current-tab current-buffer true))
       (case current-tab
         :repl-in (when-let [buffer-ptr (:buffer-id (get-tab session {:?id :repl-out}))]
-                   (render-buffer game state session constants font-size-multiplier game-width game-height :repl-out buffer-ptr false))
+                   (render-buffer game session constants font-size-multiplier game-width game-height :repl-out buffer-ptr false))
         :repl-out (when-let [buffer-ptr (:buffer-id (get-tab session {:?id :repl-in}))]
-                    (render-buffer game state session constants font-size-multiplier game-width game-height :repl-in buffer-ptr false))
+                    (render-buffer game session constants font-size-multiplier game-width game-height :repl-in buffer-ptr false))
         nil)
       (when (and base-rects-entity base-rect-entity)
         (c/render game (-> base-rects-entity
@@ -568,7 +573,7 @@
               ;; hide the reload file button when necessary
               :when (or (not= k :reload-file)
                         (and (= current-tab :files)
-                             (->> current-buffer (get buffers) :clojure?)))]
+                             (:clojure? buffer)))]
         (c/render game (-> (or highlight-entity entity)
                            (assoc-in [:uniforms 'u_alpha] (if (or (= k current-tab)
                                                                   highlight-entity)
@@ -594,7 +599,7 @@
     ;; insert/update the game record
     (if-let [game' (get-game session)]
       (let [game (merge game' game)
-            poll-input! (::poll-input! game)]
+            poll-input! (:paravim.core/poll-input! game)]
         (swap! session/*session
           (fn [session]
             (-> session

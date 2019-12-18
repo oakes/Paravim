@@ -96,7 +96,7 @@
            (fn [session]
              (-> session
                  (c/click-mouse :left)
-                 (c/update-state c/update-cursor-if-necessary (c/get-constants session) game))))))
+                 (c/update-cursor-if-necessary (c/get-constants session) game))))))
 
 (defn on-key! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window keycode scancode action mods]
   (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
@@ -126,17 +126,17 @@
           (case k
             (:tab :backtick)
             (swap! session/*session c/shift-current-tab (if shift? -1 1))
-            :f (session/reload-file! state pipes current-tab current-buffer)
+            :f (session/reload-file! (c/get-buffer session {:?id current-buffer}) pipes current-tab)
             :- (swap! session/*session
                       (fn [session]
                         (-> session
                             c/font-dec
-                            (c/update-state c/update-cursor-if-necessary (c/get-constants session) game))))
+                            (c/update-cursor-if-necessary (c/get-constants session) game))))
             := (swap! session/*session
                       (fn [session]
                         (-> session
                             c/font-inc
-                            (c/update-state c/update-cursor-if-necessary (c/get-constants session) game))))
+                            (c/update-cursor-if-necessary (c/get-constants session) game))))
             ; else
             (when-let [key-name (if k
                                   (keyword->name k)
@@ -153,25 +153,25 @@
 (defn on-resize! [{:keys [::c/send-input!] :as game} window width height]
   (swap! session/*session
          (fn [session]
-           (-> session
-               (c/update-window-size width height)
-               (c/update-state
-                 (fn [state]
-                   (let [session @session/*session
-                         current-tab (:id (c/get-current-tab session))
-                         current-buffer (:id (c/get-current-buffer session))]
-                     (as-> state state
-                           (if current-buffer
-                             (update-in state [:buffers current-buffer] c/update-cursor state (c/get-constants session) game)
-                             state)
-                           ;; if we're in the repl, make sure both the input and output are refreshed
-                           (if-let [other-tab (case current-tab
-                                                :repl-in :repl-out
-                                                :repl-out :repl-in
-                                                nil)]
-                             (let [other-buffer (:buffer-id (c/get-tab session {:?id other-tab}))]
-                               (update-in state [:buffers other-buffer] c/update-cursor state (c/get-constants session) game))
-                             state))))))))
+           (let [current-tab (:id (c/get-current-tab session))
+                 current-buffer (:id (c/get-current-buffer session))
+                 buffer (c/get-buffer session {:?id current-buffer})
+                 state (c/get-state session)
+                 constants (c/get-constants session)]
+             (as-> session session
+                   (c/update-window-size session width height)
+                   (if buffer
+                     (c/upsert-buffer session (c/update-cursor buffer state constants game))
+                     session)
+                   ;; if we're in the repl, make sure both the input and output are refreshed
+                   (if-let [other-tab (case current-tab
+                                        :repl-in :repl-out
+                                        :repl-out :repl-in
+                                        nil)]
+                     (let [other-buffer-id (:buffer-id (c/get-tab session {:?id other-tab}))
+                           other-buffer (c/get-buffer session {:?id other-buffer-id})]
+                       (c/upsert-buffer session (c/update-cursor other-buffer state constants game)))
+                     session)))))
   (send-input! [:resize]))
 
 (defn- listen-for-events [game window]

@@ -38,7 +38,8 @@
                    parsed-code needs-parinfer?
                    camera camera-x camera-y
                    path file-name
-                   lines clojure?])
+                   lines clojure?
+                   cursor-line cursor-column])
 (defrecord BufferUpdate [buffer-ptr lines first-line line-count-change])
 (defrecord Constants [base-rect-entity
                       base-rects-entity
@@ -63,10 +64,9 @@
 (defn font-inc! [font]
   (change-font-size! font font-size-step))
 
-(defn reload-file! [state pipes current-tab current-buffer]
-  (let [{:keys [buffers]} state
-        {:keys [out-pipe]} pipes
-        {:keys [lines file-name clojure?] :as buffer} (get buffers current-buffer)]
+(defn reload-file! [buffer pipes current-tab]
+  (let [{:keys [out-pipe]} pipes
+        {:keys [lines file-name clojure?]} buffer]
     (when (and clojure? (= current-tab :files))
       (doto out-pipe
         (.write (str "(do "
@@ -177,11 +177,12 @@
                                   :mouse mouse}))
     :mouse-clicked
     (let [game Game
-          state State
           mouse-click MouseClick
           mouse-hover MouseHover
           current-tab CurrentTab
           current-buffer CurrentBuffer
+          buffer Buffer
+          :when (= (:id buffer) (:id current-buffer))
           font Font]
       (clara/retract! mouse-click)
       (when (= :left (:button mouse-click))
@@ -191,23 +192,22 @@
             (case target
               :font-dec (font-dec! font)
               :font-inc (font-inc! font)
-              :reload-file (when (reload-file! state (:paravim.core/pipes game) (:id current-tab) (:id current-buffer))
+              :reload-file (when (reload-file! buffer (:paravim.core/pipes game) (:id current-tab))
                              (clarax/merge! current-tab {:id :repl-in}))
               nil)))))
     :tab-changed
     (let [game Game
           current-tab CurrentTab]
       ((:paravim.core/send-input! game) [:new-tab]))
-    :font-changed
-    (let [font Font]
-      (println font))
     :buffer-update
     (let [buffer-update BufferUpdate
+          buffer Buffer
+          :when (= (:id buffer) (:buffer-ptr buffer-update))
           state State
           constants Constants]
       (clara/retract! buffer-update)
       (let [{:keys [buffer-ptr lines first-line line-count-change]} buffer-update]
-        (clarax/merge! state (update-in state [:buffers buffer-ptr] buffers/update-text-buffer constants lines first-line line-count-change))))})
+        (clarax/merge! buffer (buffers/update-text-buffer buffer constants lines first-line line-count-change))))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))
@@ -226,9 +226,7 @@
           (->Tab :repl-in nil)
           (->Tab :repl-out nil)
           (->Font (/ 1 4))
-          (map->State {:buffers {}
-                       :buffer-updates []
-                       :show-search? false
+          (map->State {:show-search? false
                        :mode 'NORMAL}))
         clara/fire-rules)))
 
