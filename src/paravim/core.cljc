@@ -140,12 +140,14 @@
                                 (mapv #(-> base-font-entity
                                            (chars/crop-char %)
                                            (t/color (colors/set-alpha colors/bg-color colors/completion-alpha)))
-                                  (subs
                                     (str command-start
                                          (some->> (str/last-index-of command-text " ") inc (subs command-text 0))
-                                         command-completion)
-                                    (count char-entities))))
-          char-entities (into char-entities completion-entities)
+                                         command-completion)))
+          char-count (count char-entities)
+          comp-count (count completion-entities)
+          char-entities (if (> comp-count char-count)
+                          (into char-entities (subvec completion-entities char-count))
+                          char-entities)
           command-text-entity (-> (chars/assoc-line base-text-entity 0 char-entities)
                                   (chars/update-uniforms font-height colors/text-alpha))
           line-chars (get-in command-text-entity [:characters 0])
