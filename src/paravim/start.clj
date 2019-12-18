@@ -263,6 +263,10 @@
                        (fn [x]
                          (when (string? x)
                            (vim/on-input game vim x))))
+         poll-input! (if vim-chan
+                       poll-input!
+                       ;; only used in tests
+                       identity)
          append-repl-chan (when vim-chan (async/chan))
          pipes (repl/create-pipes)
          density-ratio (get-density-ratio (:context game))

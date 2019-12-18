@@ -2,6 +2,7 @@
   (:require [clojure.test :refer :all]
             [paravim.start :as start]
             [paravim.vim :as vim]
+            [paravim.session :as session]
             [libvim-clj.core :as v]
             [paravim.core :as c]
             [play-cljc.gl.core :as pc])
@@ -10,16 +11,16 @@
 (def window (start/->window))
 (def vim (vim/->vim))
 (def game (pc/->game window))
-(def paravim-utils (start/init game vim nil))
+(def inited-game (start/init game vim nil))
 
 (defn get-characters [buffer-ptr entity-key]
-  (get-in @c/*state [:buffers buffer-ptr entity-key :characters]))
+  (get-in (c/get-state @session/*session) [:buffers buffer-ptr entity-key :characters]))
 
 (defn count-lines [buffer-ptr]
   (count (get-characters buffer-ptr :text-entity)))
 
 (defn get-line [buffer-ptr line-num]
-  (get-in @c/*state [:buffers buffer-ptr :lines line-num]))
+  (get-in (c/get-state @session/*session) [:buffers buffer-ptr :lines line-num]))
 
 (def core-buffer (v/open-buffer vim "test/resources/core.clj"))
 (def bad-indent-buffer (v/open-buffer vim "test/resources/bad_indent.clj"))
@@ -68,13 +69,14 @@
 (deftest dont-break-play-cljc-template
   (v/set-current-buffer vim core-buffer)
   (is (= (c/get-mode) 'NORMAL))
-  (is (map? paravim-utils))
+  (is (map? inited-game))
+  (c/tick game) ;; this will NPE if it can't handle un-inited maps
   (let [handle (:context game)]
-    (start/on-mouse-move! paravim-utils handle 0 0)
-    (start/on-mouse-click! paravim-utils handle GLFW/GLFW_MOUSE_BUTTON_LEFT GLFW/GLFW_PRESS 0)
-    (start/on-key! paravim-utils handle GLFW/GLFW_KEY_DOWN 0 GLFW/GLFW_PRESS 0)
-    (start/on-char! paravim-utils handle (int \j))
-    (start/on-resize! paravim-utils handle 800 600)))
+    (start/on-mouse-move! inited-game handle 0 0)
+    (start/on-mouse-click! inited-game handle GLFW/GLFW_MOUSE_BUTTON_LEFT GLFW/GLFW_PRESS 0)
+    (start/on-key! inited-game handle GLFW/GLFW_KEY_DOWN 0 GLFW/GLFW_PRESS 0)
+    (start/on-char! inited-game handle (int \j))
+    (start/on-resize! inited-game handle 800 600)))
 
 ;; this test reproduces a crash in libvim
 ;; when search highlighting is enabled
