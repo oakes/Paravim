@@ -107,8 +107,11 @@
 (defn on-mouse-click! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window button action mods]
   (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
              (= action GLFW/GLFW_PRESS))
-    (swap! session/*session c/click-mouse :left (partial reload-file! (c/get-state @session/*session)))
-    (swap! session/*session c/update-state c/update-cursor-if-necessary game)))
+    (swap! session/*session
+           (fn [session]
+             (-> session
+                 (c/click-mouse :left (partial reload-file! (c/get-state @session/*session)))
+                 (c/update-state c/update-cursor-if-necessary (c/get-constants session) game))))))
 
 (defn on-key! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window keycode scancode action mods]
   (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
@@ -139,12 +142,16 @@
             (:tab :backtick)
             (swap! session/*session c/shift-current-tab (if shift? -1 1))
             :f (reload-file! state pipes current-tab current-buffer)
-            :- (do
-                 (swap! session/*session c/font-dec)
-                 (swap! session/*session c/update-state c/update-cursor-if-necessary game))
-            := (do
-                 (swap! session/*session c/font-inc)
-                 (swap! session/*session c/update-state c/update-cursor-if-necessary game))
+            :- (swap! session/*session
+                      (fn [session]
+                        (-> session
+                            c/font-dec
+                            (c/update-state c/update-cursor-if-necessary (c/get-constants session) game))))
+            := (swap! session/*session
+                      (fn [session]
+                        (-> session
+                            c/font-inc
+                            (c/update-state c/update-cursor-if-necessary (c/get-constants session) game))))
             ; else
             (when-let [key-name (if k
                                   (keyword->name k)
@@ -159,24 +166,27 @@
   (send-input! (str (char codepoint))))
 
 (defn on-resize! [{:keys [::c/send-input!] :as game} window width height]
-  (swap! session/*session c/update-window-size width height)
-  (swap! session/*session c/update-state
-         (fn [state]
-           (let [session @session/*session
-                 current-tab (:id (c/get-current-tab session))
-                 current-buffer (:id (c/get-current-buffer session))]
-             (as-> state state
-                   (if current-buffer
-                     (update-in state [:buffers current-buffer] c/update-cursor state game)
-                     state)
-                   ;; if we're in the repl, make sure both the input and output are refreshed
-                   (if-let [other-tab (case current-tab
-                                        :repl-in :repl-out
-                                        :repl-out :repl-in
-                                        nil)]
-                     (let [other-buffer (:buffer-id (c/get-tab session {:?id other-tab}))]
-                       (update-in state [:buffers other-buffer] c/update-cursor state game))
-                     state)))))
+  (swap! session/*session
+         (fn [session]
+           (-> session
+               (c/update-window-size width height)
+               (c/update-state
+                 (fn [state]
+                   (let [session @session/*session
+                         current-tab (:id (c/get-current-tab session))
+                         current-buffer (:id (c/get-current-buffer session))]
+                     (as-> state state
+                           (if current-buffer
+                             (update-in state [:buffers current-buffer] c/update-cursor state (c/get-constants session) game)
+                             state)
+                           ;; if we're in the repl, make sure both the input and output are refreshed
+                           (if-let [other-tab (case current-tab
+                                                :repl-in :repl-out
+                                                :repl-out :repl-in
+                                                nil)]
+                             (let [other-buffer (:buffer-id (c/get-tab session {:?id other-tab}))]
+                               (update-in state [:buffers other-buffer] c/update-cursor state (c/get-constants session) game))
+                             state))))))))
   (send-input! [:resize]))
 
 (defn- listen-for-events [game window]

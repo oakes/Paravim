@@ -45,7 +45,8 @@
   (def get-bounding-box (:get-bounding-box query-fns))
   (def get-text-box (:get-text-box query-fns))
   ;(def get-buffer (:get-buffer query-fns))
-  (def get-state (:get-state query-fns)))
+  (def get-state (:get-state query-fns))
+  (def get-constants (:get-constants query-fns)))
 
 (defn update-mouse [session x y]
   (-> session
@@ -135,7 +136,7 @@
   (:mode (get-state @session/*session)))
 
 (defn get-visible-lines [{:keys [characters] :as text-entity}
-                         {:keys [font-height] :as state}
+                         {:keys [font-height] :as constants}
                          {:keys [top bottom] :as text-box}
                          game-height
                          camera-y]
@@ -159,7 +160,7 @@
         chars-to-crop-count (+ chars-to-skip-count (reduce + 0 char-counts))]
     [chars-to-skip-count chars-to-crop-count char-counts]))
 
-(defn ->cursor-entity [{:keys [font-width font-height base-rect-entity mode] :as state} line-chars line column]
+(defn ->cursor-entity [{:keys [mode] :as state} {:keys [font-width font-height base-rect-entity] :as constants} line-chars line column]
   (let [font-size-multiplier (:size (get-font @session/*session))
         left-char (get line-chars (dec column))
         curr-char (get line-chars column)
@@ -182,12 +183,12 @@
                :width (* width font-size-multiplier)
                :height (* height font-size-multiplier)))))
 
-(defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} {:keys [base-rects-entity] :as state} game]
+(defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} state {:keys [base-rects-entity] :as constants} game]
   (let [session @session/*session
         font-size-multiplier (:size (get-font session))
         text-box (get-text-box session {:?id tab-id})
         line-chars (get-in buffer [:text-entity :characters cursor-line])
-        {:keys [left top width height] :as cursor-entity} (->cursor-entity state line-chars cursor-line cursor-column)]
+        {:keys [left top width height] :as cursor-entity} (->cursor-entity state constants line-chars cursor-line cursor-column)]
     (-> buffer
         (assoc :rects-entity (-> base-rects-entity
                                  (i/assoc 0 cursor-entity)
@@ -217,7 +218,7 @@
                                (- cursor-bottom text-height)
                                :else
                                camera-y)
-                    [lines-to-skip-count lines-to-crop-count] (get-visible-lines text-entity state text-box game-height camera-y)]
+                    [lines-to-skip-count lines-to-crop-count] (get-visible-lines text-entity constants text-box game-height camera-y)]
                 (assoc buffer
                   :camera (t/translate session/orig-camera camera-x (- camera-y text-top))
                   :camera-x camera-x
@@ -225,9 +226,9 @@
                   :visible-start-line lines-to-skip-count
                   :visible-end-line lines-to-crop-count))))))
 
-(defn update-cursor-if-necessary [state game]
+(defn update-cursor-if-necessary [state constants game]
   (if-let [current-buffer (:id (get-current-buffer @session/*session))]
-    (update-in state [:buffers current-buffer] update-cursor state game)
+    (update-in state [:buffers current-buffer] update-cursor state constants game)
     state))
 
 (defn assoc-command-text [state text completion]
@@ -236,7 +237,7 @@
 (defn assoc-command-entity [state text-entity cursor-entity]
   (assoc state :command-text-entity text-entity :command-cursor-entity cursor-entity))
 
-(defn update-command [{:keys [base-text-entity base-font-entity base-rects-entity font-height command-start command-text command-completion] :as state} position]
+(defn update-command [{:keys [command-start command-text command-completion] :as state} {:keys [base-text-entity base-font-entity base-rects-entity font-height] :as constants} position]
   (if command-text
     (let [char-entities (mapv #(-> base-font-entity
                                    (chars/crop-char %)
@@ -255,7 +256,7 @@
           command-text-entity (-> (chars/assoc-line base-text-entity 0 char-entities)
                                   (chars/update-uniforms font-height colors/text-alpha))
           line-chars (get-in command-text-entity [:characters 0])
-          command-cursor-entity (i/assoc base-rects-entity 0 (->cursor-entity state line-chars 0 (inc position)))]
+          command-cursor-entity (i/assoc base-rects-entity 0 (->cursor-entity state constants line-chars 0 (inc position)))]
       (assoc-command-entity state command-text-entity command-cursor-entity))
     (assoc-command-entity state nil nil)))
 
@@ -284,7 +285,7 @@
     (update rects-entity :rect-count + (count rects))
     rects))
 
-(defn update-highlight [{:keys [text-entity cursor-line cursor-column] :as buffer} {:keys [font-width font-height base-rect-entity] :as state}]
+(defn update-highlight [{:keys [text-entity cursor-line cursor-column] :as buffer} {:keys [font-width font-height base-rect-entity] :as constants}]
   (if-let [coll (->> (:collections text-entity)
                      (filter (fn [{:keys [start-line start-column end-line end-column]}]
                                (and (or (< start-line cursor-line)
@@ -299,7 +300,7 @@
       (update buffer :rects-entity assoc-rects base-rect-entity color rects))
     buffer))
 
-(defn update-selection [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as state} visual-range]
+(defn update-selection [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as constants} visual-range]
   (let [{:keys [start-line start-column end-line end-column]} visual-range
         ;; make sure the range is always going the same direction
         visual-range (if (or (> start-line end-line)
@@ -316,7 +317,7 @@
         rects (range->rects text-entity font-width font-height visual-range)]
     (update buffer :rects-entity assoc-rects base-rect-entity colors/select-color rects)))
 
-(defn update-search-highlights [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as state} highlights]
+(defn update-search-highlights [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as constants} highlights]
   (let [rects (vec (mapcat (partial range->rects text-entity font-width font-height) highlights))]
     (update buffer :rects-entity assoc-rects base-rect-entity colors/search-color rects)))
 
@@ -343,7 +344,7 @@
         lines)
       (chars/update-uniforms font-height colors/text-alpha)))
 
-(defn ->buffer [{:keys [base-font-entity base-text-entity font-height] :as state} path file-name lines current-tab]
+(defn ->buffer [{:keys [base-font-entity base-text-entity font-height] :as constants} path file-name lines current-tab]
   {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
    :camera (t/translate session/orig-camera 0 0)
    :camera-x 0
@@ -355,7 +356,7 @@
    :clojure? (or (= current-tab :repl-in)
                  (clojure-path? path))})
 
-(defn ->ascii [{:keys [base-font-entity base-text-entity font-height] :as state} lines]
+(defn ->ascii [{:keys [base-font-entity base-text-entity font-height] :as constants} lines]
   {:text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
    :camera (t/translate session/orig-camera 0 0)
    :camera-x 0
@@ -377,114 +378,105 @@
   ;; allow transparency in images
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
-  ;; insert game record
-  (swap! session/*session
-    (fn [session]
-      (-> session
-          (clara/insert
-            (session/map->Game game)
-            (session/->Window (utils/get-width game) (utils/get-height game)))
-          clara/fire-rules)))
   ;; create rect entities
-  (let [rect-entity (e/->entity game primitives/rect)
-        rects-entity (c/compile game (i/->instanced-entity rect-entity))]
-    (swap! session/*session update-state assoc
-      :base-rect-entity rect-entity
-      :base-rects-entity rects-entity))
-  ;; load fonts
-  (#?(:clj load-font-clj :cljs load-font-cljs) :firacode
-     (fn [{:keys [data]} baked-font]
-       (let [font-entity (-> (text/->font-entity game data baked-font)
-                             (t/color colors/text-color))
-             text-entity (-> (i/->instanced-entity font-entity)
-                             (assoc :vertex chars/instanced-font-vertex-shader
-                                    :fragment chars/instanced-font-fragment-shader
-                                    :characters [])
-                             assoc-attr-lengths)
-             text-entity (c/compile game text-entity)
-             font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :xadv)
-             font-height (:font-height baked-font)
-             snap-to-top (fn [game-height multiplier] (* font-height multiplier))
-             snap-to-bottom (fn [game-height multiplier] (- game-height (* font-height multiplier)))
-             repl-in-top (fn [game-height multiplier] (- game-height (* 5 font-height multiplier)))
-             repl-out-bottom (fn [game-height multiplier] (- game-height (* 6 font-height multiplier)))
-             text-boxes {:files {:left 0 :right 0 :top snap-to-top :bottom snap-to-bottom}
-                         :repl-in {:left 0 :right 0 :top repl-in-top :bottom snap-to-bottom}
-                         :repl-out {:left 0 :right 0 :top snap-to-top :bottom repl-out-bottom}}]
-         (swap! session/*session update-state assoc
-                        :font-width font-width
-                        :font-height font-height
-                        :base-font-entity font-entity
-                        :base-text-entity text-entity)
-         (swap! session/*session
-           (fn [session]
-             (->> text-boxes
-                  (reduce-kv
-                    (fn [session id text-box]
-                      (clara/insert session (session/map->TextBox (assoc text-box :id id))))
-                    session)
-                  clara/fire-rules)))
-         (#?(:clj load-font-clj :cljs load-font-cljs) :roboto
-          (fn [{:keys [data]} baked-font]
-            (let [font-entity (-> (text/->font-entity game data baked-font)
-                                  (t/color colors/text-color))
-                  text-entity (-> (i/->instanced-entity font-entity)
-                                  (assoc :vertex chars/instanced-font-vertex-shader
-                                         :fragment chars/instanced-font-fragment-shader
-                                         :characters [])
-                                  assoc-attr-lengths)
-                  text-entity (c/compile game text-entity)
-                  tab-spacing (* font-width 2)
-                  tab-entities (reduce
-                                 (fn [m {:keys [id text]}]
-                                   (assoc m id (assoc-lines text-entity font-entity font-height [text])))
-                                 {}
-                                 session/tabs)
-                  bounding-boxes (reduce-kv
-                                   (fn [m i {:keys [id]}]
-                                     (let [last-tab (some->> (get session/tabs (dec i)) :id (get m))
-                                           left (if last-tab (+ (:x2 last-tab) tab-spacing) 0)
-                                           right (-> tab-entities (get id) :characters first last :x-total (+ left))]
-                                       (assoc m id {:x1 left :y1 0 :x2 right :y2 font-height})))
+  (let [base-rect-entity (e/->entity game primitives/rect)
+        base-rects-entity (c/compile game (i/->instanced-entity base-rect-entity))]
+    ;; load fonts
+    (#?(:clj load-font-clj :cljs load-font-cljs) :firacode
+       (fn [{:keys [data]} baked-font]
+         (let [base-font-entity (-> (text/->font-entity game data baked-font)
+                                    (t/color colors/text-color))
+               base-text-entity (-> (i/->instanced-entity base-font-entity)
+                                    (assoc :vertex chars/instanced-font-vertex-shader
+                                           :fragment chars/instanced-font-fragment-shader
+                                           :characters [])
+                                    assoc-attr-lengths)
+               base-text-entity (c/compile game base-text-entity)
+               font-width (-> baked-font :baked-chars (nth (- 115 (:first-char baked-font))) :xadv)
+               font-height (:font-height baked-font)
+               snap-to-top (fn [game-height multiplier] (* font-height multiplier))
+               snap-to-bottom (fn [game-height multiplier] (- game-height (* font-height multiplier)))
+               repl-in-top (fn [game-height multiplier] (- game-height (* 5 font-height multiplier)))
+               repl-out-bottom (fn [game-height multiplier] (- game-height (* 6 font-height multiplier)))
+               text-boxes {:files {:left 0 :right 0 :top snap-to-top :bottom snap-to-bottom}
+                           :repl-in {:left 0 :right 0 :top repl-in-top :bottom snap-to-bottom}
+                           :repl-out {:left 0 :right 0 :top snap-to-top :bottom repl-out-bottom}}]
+           (#?(:clj load-font-clj :cljs load-font-cljs) :roboto
+            (fn [{:keys [data]} baked-font]
+              (let [roboto-font-entity (-> (text/->font-entity game data baked-font)
+                                           (t/color colors/text-color))
+                    roboto-text-entity (-> (i/->instanced-entity roboto-font-entity)
+                                           (assoc :vertex chars/instanced-font-vertex-shader
+                                                  :fragment chars/instanced-font-fragment-shader
+                                                  :characters [])
+                                           assoc-attr-lengths)
+                    roboto-text-entity (c/compile game roboto-text-entity)
+                    tab-spacing (* font-width 2)
+                    tab-entities (reduce
+                                   (fn [m {:keys [id text]}]
+                                     (assoc m id (assoc-lines roboto-text-entity roboto-font-entity font-height [text])))
                                    {}
                                    session/tabs)
-                  button-entities (reduce
-                                    (fn [m {:keys [id text]}]
-                                      (assoc m id (assoc-lines text-entity font-entity font-height [text])))
-                                    {}
-                                    buttons)
-                  bounding-boxes (reduce-kv
-                                   (fn [m i {:keys [id]}]
-                                     (let [last-button (some->> (get buttons (dec i)) :id (get m))
-                                           right (if last-button (+ (:x1 last-button) tab-spacing) 0)
-                                           left (-> button-entities (get id) :characters first last :x-total (+ right))]
-                                      (assoc m id {:x1 left :y1 0 :x2 right :y2 font-height :align :right})))
-                                   bounding-boxes
-                                   buttons)
-                  ;; when the user holds down control, we want to show the shortcut character
-                  ;; for each button in a different color so they can learn the shortcut
-                  highlight-button-entities (reduce
-                                              (fn [m {:keys [id text shortcut-char]}]
-                                                (let [character (get-in m [id :characters 0 shortcut-char])]
-                                                  (update m id i/assoc shortcut-char
-                                                          (-> character
-                                                              (chars/update-translation-matrix (:left character) 0)
-                                                              (t/color colors/yellow-color)))))
-                                              button-entities
-                                              buttons)]
-              (swap! session/*session update-state assoc
-                             :roboto-font-entity font-entity
-                             :roboto-text-entity text-entity
-                             :toolbar-text-entities (merge tab-entities button-entities)
-                             :highlight-text-entities highlight-button-entities)
-              (swap! session/*session
-                (fn [session]
-                  (->> bounding-boxes
-                       (reduce-kv
-                         (fn [session id bounding-box]
-                           (clara/insert session (session/map->BoundingBox (assoc bounding-box :id id))))
-                         session)
-                       clara/fire-rules)))))))))
+                    bounding-boxes (reduce-kv
+                                     (fn [m i {:keys [id]}]
+                                       (let [last-tab (some->> (get session/tabs (dec i)) :id (get m))
+                                             left (if last-tab (+ (:x2 last-tab) tab-spacing) 0)
+                                             right (-> tab-entities (get id) :characters first last :x-total (+ left))]
+                                         (assoc m id {:x1 left :y1 0 :x2 right :y2 font-height})))
+                                     {}
+                                     session/tabs)
+                    button-entities (reduce
+                                      (fn [m {:keys [id text]}]
+                                        (assoc m id (assoc-lines roboto-text-entity roboto-font-entity font-height [text])))
+                                      {}
+                                      buttons)
+                    bounding-boxes (reduce-kv
+                                     (fn [m i {:keys [id]}]
+                                       (let [last-button (some->> (get buttons (dec i)) :id (get m))
+                                             right (if last-button (+ (:x1 last-button) tab-spacing) 0)
+                                             left (-> button-entities (get id) :characters first last :x-total (+ right))]
+                                        (assoc m id {:x1 left :y1 0 :x2 right :y2 font-height :align :right})))
+                                     bounding-boxes
+                                     buttons)
+                    ;; when the user holds down control, we want to show the shortcut character
+                    ;; for each button in a different color so they can learn the shortcut
+                    highlight-button-entities (reduce
+                                                (fn [m {:keys [id text shortcut-char]}]
+                                                  (let [character (get-in m [id :characters 0 shortcut-char])]
+                                                    (update m id i/assoc shortcut-char
+                                                            (-> character
+                                                                (chars/update-translation-matrix (:left character) 0)
+                                                                (t/color colors/yellow-color)))))
+                                                button-entities
+                                                buttons)]
+                (swap! session/*session
+                  (fn [session]
+                    (as-> session $
+                          (clara/insert $
+                            (session/map->Game game)
+                            (session/->Window (utils/get-width game) (utils/get-height game))
+                            (session/map->Constants
+                              {:base-rect-entity base-rect-entity
+                               :base-rects-entity base-rects-entity
+                               :font-width font-width
+                               :font-height font-height
+                               :base-font-entity base-font-entity
+                               :base-text-entity base-text-entity
+                               :roboto-font-entity roboto-font-entity
+                               :roboto-text-entity roboto-text-entity
+                               :toolbar-text-entities (merge tab-entities button-entities)
+                               :highlight-text-entities highlight-button-entities}))
+                          (reduce-kv
+                            (fn [session id text-box]
+                              (clara/insert session (session/map->TextBox (assoc text-box :id id))))
+                            $
+                            text-boxes)
+                          (reduce-kv
+                            (fn [session id bounding-box]
+                              (clara/insert session (session/map->BoundingBox (assoc bounding-box :id id))))
+                            $
+                            bounding-boxes)
+                          (clara/fire-rules $)))))))))))
   game)
 
 (def screen-entity
@@ -503,7 +495,7 @@
               'u_start_line lines-to-skip-count)
       (:attribute-lengths text-entity))))
 
-(defn render-buffer [game {:keys [buffers font-size-multiplier] :as state} session game-width game-height current-tab buffer-ptr show-cursor?]
+(defn render-buffer [game {:keys [buffers] :as state} session constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor?]
   (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera camera-y]} (get buffers buffer-ptr)]
     (when-let [text-box (get-text-box session {:?id current-tab})]
       (when (and rects-entity show-cursor?)
@@ -511,7 +503,7 @@
                            (t/project game-width game-height)
                            (t/camera camera)
                            (t/scale font-size-multiplier font-size-multiplier))))
-      (let [[lines-to-skip-count lines-to-crop-count] (get-visible-lines text-entity state text-box game-height camera-y)]
+      (let [[lines-to-skip-count lines-to-crop-count] (get-visible-lines text-entity constants text-box game-height camera-y)]
         (when parinfer-text-entity
           (c/render game (-> parinfer-text-entity
                              (crop-text-entity lines-to-skip-count lines-to-crop-count)
@@ -532,16 +524,14 @@
         current-tab (:id (get-current-tab session))
         current-buffer (:id (get-current-buffer session))
         {game-width :width game-height :height :as window} (get-window session)
-        {:keys [buffers control?
-                base-rect-entity base-rects-entity
-                command-text-entity command-completion-text-entity command-cursor-entity
-                font-height mode ascii
+        {:keys [base-rect-entity base-rects-entity
+                font-height
                 toolbar-text-entities highlight-text-entities]
-         :as state} (get-state session)
-        state (assoc state
-                :font-size-multiplier font-size-multiplier
-                :current-tab current-tab
-                :current-buffer current-buffer)]
+         :as constants} (get-constants session)
+        {:keys [buffers control?
+                command-text-entity command-completion-text-entity command-cursor-entity
+                mode ascii]
+         :as state} (get-state session)]
     (when (and (pos? game-width) (pos? game-height))
       (if (::clear? game)
         (c/render game (update screen-entity :viewport assoc :width game-width :height game-height))
@@ -552,13 +542,13 @@
                                           (t/translate 0 0)
                                           (t/scale game-width game-height))))))
       (if (and ascii (= current-tab :files))
-        (render-buffer game state session game-width game-height current-tab ascii false)
-        (render-buffer game state session game-width game-height current-tab current-buffer true))
+        (render-buffer game state session constants font-size-multiplier game-width game-height current-tab ascii false)
+        (render-buffer game state session constants font-size-multiplier game-width game-height current-tab current-buffer true))
       (case current-tab
         :repl-in (when-let [buffer-ptr (:buffer-id (get-tab session {:?id :repl-out}))]
-                   (render-buffer game state session game-width game-height :repl-out buffer-ptr false))
+                   (render-buffer game state session constants font-size-multiplier game-width game-height :repl-out buffer-ptr false))
         :repl-out (when-let [buffer-ptr (:buffer-id (get-tab session {:?id :repl-in}))]
-                    (render-buffer game state session game-width game-height :repl-in buffer-ptr false))
+                    (render-buffer game state session constants font-size-multiplier game-width game-height :repl-in buffer-ptr false))
         nil)
       (when (and base-rects-entity base-rect-entity)
         (c/render game (-> base-rects-entity

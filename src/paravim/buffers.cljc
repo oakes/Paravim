@@ -145,14 +145,14 @@
       :parsed-code parsed-code
       :needs-parinfer? true)))
 
-(defn update-clojure-buffer [{:keys [text-entity parsed-code lines] :as buffer} {:keys [base-font-entity font-height] :as state}]
+(defn update-clojure-buffer [{:keys [text-entity parsed-code lines] :as buffer} {:keys [base-font-entity font-height] :as constants}]
   (let [text-entity (clojurify-lines text-entity base-font-entity parsed-code false)
         parinfer-text-entity (clojurify-lines text-entity base-font-entity parsed-code true)]
     (assoc buffer
       :text-entity (chars/update-uniforms text-entity font-height colors/text-alpha)
       :parinfer-text-entity (chars/update-uniforms parinfer-text-entity font-height colors/parinfer-alpha))))
 
-(defn update-text-buffer [{:keys [lines] :as buffer} {:keys [base-font-entity font-height] :as state} new-lines first-line line-count-change]
+(defn update-text-buffer [{:keys [lines] :as buffer} {:keys [base-font-entity font-height] :as constants} new-lines first-line line-count-change]
   (-> buffer
       (assoc :lines (update-lines lines new-lines first-line line-count-change))
       (update :text-entity

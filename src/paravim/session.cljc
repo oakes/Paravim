@@ -39,6 +39,16 @@
                    path file-name
                    lines clojure?])
 (defrecord BufferUpdate [buffer-ptr lines first-line line-count-change])
+(defrecord Constants [base-rect-entity
+                      base-rects-entity
+                      font-width
+                      font-height
+                      base-font-entity
+                      base-text-entity
+                      roboto-font-entity
+                      roboto-text-entity
+                      toolbar-text-entities
+                      highlight-text-entities])
 (defrecord State [])
 
 (defn change-font-size! [{:keys [size] :as font} diff]
@@ -104,7 +114,11 @@
     :get-state
     (fn []
       (let [state State]
-        state))})
+        state))
+    :get-constants
+    (fn []
+      (let [constants Constants]
+        constants))})
 
 (def rules
   '{:mouse-hovers-over-text
@@ -161,7 +175,7 @@
             (case target
               :font-dec (font-dec! font)
               :font-inc (font-inc! font)
-              :reload-file (when ((:reload-file! mouse-click) (:pipes game) (:id current-tab) (:id current-buffer))
+              :reload-file (when ((:reload-file! mouse-click) (:paravim.core/pipes game) (:id current-tab) (:id current-buffer))
                              (clarax/merge! current-tab {:id :repl-in}))
               nil)))))
     :tab-changed
@@ -173,10 +187,11 @@
       (println font))
     :buffer-update
     (let [buffer-update BufferUpdate
-          state State]
+          state State
+          constants Constants]
       (clara/retract! buffer-update)
       (let [{:keys [buffer-ptr lines first-line line-count-change]} buffer-update]
-        (clarax/merge! state (update-in state [:buffers buffer-ptr] buffers/update-text-buffer state lines first-line line-count-change))))})
+        (clarax/merge! state (update-in state [:buffers buffer-ptr] buffers/update-text-buffer constants lines first-line line-count-change))))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))

@@ -12,8 +12,7 @@
 (def ^:dynamic *update-ui?* true)
 
 (defn open-buffer-for-tab! [vim session]
-  (let [state (c/get-state session)
-        current-buffer (:id (c/get-current-buffer session))
+  (let [current-buffer (:id (c/get-current-buffer session))
         current-tab (:id (c/get-current-tab session))]
     (if-let [buffer-for-tab (:buffer-id (c/get-tab session {:?id current-tab}))]
       (when (not= current-buffer buffer-for-tab)
@@ -22,7 +21,7 @@
         (v/open-buffer vim path)))))
 
 (defn set-window-size! [vim session width height]
-  (let [{:keys [font-height font-width] :as state} (c/get-state session)
+  (let [{:keys [font-height font-width] :as constants} (c/get-constants session)
         current-tab (:id (c/get-current-tab session))]
     (when-let [{:keys [top bottom]} (c/get-text-box session {:?id current-tab})]
       (let [font-size-multiplier (:size (c/get-font session))
@@ -104,9 +103,9 @@
                 "usa" (LocalDate/of current-year 7 4)
                 "christmas" (LocalDate/of current-year 12 25)})
 
-(defn assoc-ascii [state ascii-name]
+(defn assoc-ascii [state constants ascii-name]
   (-> state
-      (assoc-in [:buffers ascii-name] (c/->ascii state (read-text-resource (str "ascii/" ascii-name ".txt"))))
+      (assoc-in [:buffers ascii-name] (c/->ascii constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
       (assoc :ascii ascii-name)))
 
 (defn dissoc-ascii [state ascii-name]
@@ -114,7 +113,7 @@
       (update :buffers dissoc ascii-name)
       (assoc :ascii nil)))
 
-(defn change-ascii [{:keys [mode command-text command-start ascii] :as state} s]
+(defn change-ascii [{:keys [mode command-text command-start ascii] :as state} constants s]
   (cond
     (and ascii *update-ui?*)
     (dissoc-ascii state ascii)
@@ -122,18 +121,20 @@
          (= s "<Enter>")
          (= command-start ":")
          (contains? ascii-art command-text))
-    (assoc-ascii state command-text)
+    (assoc-ascii state constants command-text)
     :else
     state))
 
 (defn init-ascii! []
   (let [now (LocalDate/now)]
-    (some->> (or (some (fn [[ascii date]]
-                         (when (= now date)
-                           ascii))
-                       ascii-art)
-                 "intro")
-             (swap! session/*session c/update-state assoc-ascii))))
+    (when-let [ascii (or (some (fn [[ascii date]]
+                                 (when (= now date)
+                                   ascii))
+                               ascii-art)
+                         "intro")]
+      (swap! session/*session
+             (fn [session]
+               (c/update-state session assoc-ascii (c/get-constants session) ascii))))))
 
 (defn input [{:keys [mode command-text command-start command-completion] :as state} vim s]
   (if (= 'COMMAND_LINE mode)
@@ -173,21 +174,21 @@
       (c/update-search-highlights buffer state highlights))
     buffer))
 
-(defn update-buffer [buffer state game vim]
+(defn update-buffer [buffer state constants game vim]
   (-> buffer
-      (c/update-cursor state game)
-      (c/update-highlight state)
-      (update-selection state vim)
-      (update-search-highlights state vim)))
+      (c/update-cursor state constants game)
+      (c/update-highlight constants)
+      (update-selection constants vim)
+      (update-search-highlights constants vim)))
 
-(defn update-state-after-input [state game vim s]
+(defn update-state-after-input [state constants game vim s]
   (let [current-buffer (v/get-current-buffer vim)
         old-mode (:mode state)
         mode (v/get-mode vim)
         cursor-line (dec (v/get-cursor-line vim))
         cursor-column (v/get-cursor-column vim)]
     (as-> state state
-          (change-ascii state s)
+          (change-ascii state constants s)
           (assoc state :mode mode)
           (if (= mode 'COMMAND_LINE)
             (-> state
@@ -196,7 +197,7 @@
                         (assoc :command-start s)
                         (#{"/" "?"} (:command-start state))
                         (assoc :show-search? true))
-                (c/update-command (v/get-command-position vim)))
+                (c/update-command constants (v/get-command-position vim)))
             (c/assoc-command-text state nil nil))
           (if (c/get-buffer state current-buffer)
             (update-in state [:buffers current-buffer]
@@ -205,13 +206,15 @@
                              (assoc :cursor-line cursor-line :cursor-column cursor-column)
                              (cond-> (:clojure? buffer)
                                      (-> (buffers/parse-clojure-buffer state false)
-                                         (buffers/update-clojure-buffer state)))
-                             (update-buffer state game vim))))
+                                         (buffers/update-clojure-buffer constants)))
+                             (update-buffer state constants game vim))))
             state))))
 
 (defn on-input [game vim s]
   (input (c/get-state @session/*session) vim s)
-  (let [session (swap! session/*session c/update-state update-state-after-input game vim s)
+  (let [session (swap! session/*session
+                       (fn [session]
+                         (c/update-state session update-state-after-input (c/get-constants session) game vim s)))
         state (c/get-state session)]
     (when (and (= 'NORMAL (:mode state))
                (not= s "u"))
@@ -248,9 +251,11 @@
                                   tab))
                               c/tab->path)
                             :files)
-            state (c/get-state @session/*session)
+            session @session/*session
+            state (c/get-state session)
+            constants (c/get-constants session)
             buffer (or (c/get-buffer state buffer-ptr)
-                       (assoc (c/->buffer state path file-name lines current-tab)
+                       (assoc (c/->buffer constants path file-name lines current-tab)
                          :cursor-line (dec (v/get-cursor-line vim))
                          :cursor-column (v/get-cursor-column vim)))
             buffer (if (:clojure? buffer)
@@ -267,7 +272,7 @@
                 (c/update-state
                   (fn [state]
                     (-> state
-                        (assoc-in [:buffers buffer-ptr] (c/update-cursor buffer state game)))))))))
+                        (assoc-in [:buffers buffer-ptr] (c/update-cursor buffer state constants game)))))))))
       ;; clear the files tab
       (swap! session/*session
         (fn [session]
@@ -328,13 +333,15 @@
   (v/set-on-stop-search-highlight vim (fn []
                                         (swap! session/*session c/update-state assoc :show-search? false)))
   (v/set-on-unhandled-escape vim (fn []
-                                   (swap! session/*session c/update-state
-                                     (fn [state]
-                                       (let [current-buffer (:id (c/get-current-buffer @session/*session))
-                                             state (assoc state :show-search? false)]
-                                         (if (c/get-buffer state current-buffer)
-                                           (update-in state [:buffers current-buffer] update-buffer state game vim)
-                                           state))))))
+                                   (swap! session/*session
+                                     (fn [session]
+                                       (c/update-state session
+                                         (fn [state]
+                                           (let [current-buffer (:id (c/get-current-buffer @session/*session))
+                                                 state (assoc state :show-search? false)]
+                                             (if (c/get-buffer state current-buffer)
+                                               (update-in state [:buffers current-buffer] update-buffer state (c/get-constants session) game vim)
+                                               state))))))))
   (v/set-on-yank vim (fn [yank-info]
                        (try
                          (when-let [lines (yank-lines yank-info)]
