@@ -106,6 +106,11 @@
         (clarax/merge state (apply f state args))
         clara/fire-rules)))
 
+(defn update-vim [session mode]
+  (-> session
+      (clarax/merge (session/get-vim session) {:mode mode})
+      clara/fire-rules))
+
 (defn get-mode []
   (:mode (session/get-state @session/*session)))
 
@@ -115,7 +120,7 @@
 (defn assoc-command-entity [state text-entity cursor-entity]
   (assoc state :command-text-entity text-entity :command-cursor-entity cursor-entity))
 
-(defn update-command [{:keys [command-start command-text command-completion] :as state} {:keys [base-text-entity base-font-entity base-rects-entity font-height] :as constants} font position]
+(defn update-command [{:keys [command-start command-text command-completion] :as state} {:keys [base-text-entity base-font-entity base-rects-entity font-height] :as constants} vim font position]
   (if command-text
     (let [char-entities (mapv #(-> base-font-entity
                                    (chars/crop-char %)
@@ -136,7 +141,7 @@
           command-text-entity (-> (chars/assoc-line base-text-entity 0 char-entities)
                                   (chars/update-uniforms font-height colors/text-alpha))
           line-chars (get-in command-text-entity [:characters 0])
-          command-cursor-entity (i/assoc base-rects-entity 0 (buffers/->cursor-entity state constants line-chars 0 (inc position) (:size font)))]
+          command-cursor-entity (i/assoc base-rects-entity 0 (buffers/->cursor-entity vim constants line-chars 0 (inc position) (:size font)))]
       (assoc-command-entity state command-text-entity command-cursor-entity))
     (assoc-command-entity state nil nil)))
 
@@ -201,9 +206,10 @@
   (let [rects (vec (mapcat (partial range->rects text-entity font-width font-height) highlights))]
     (update buffer :rects-entity assoc-rects base-rect-entity colors/search-color rects)))
 
-(defn update-buffers [session constants state]
+(defn update-buffers [session constants]
   (if-let [updates (not-empty (:buffer-updates (session/get-state session)))]
-    (let [buffer-ptrs (set (map :buffer-ptr updates))]
+    (let [buffer-ptrs (set (map :buffer-ptr updates))
+          vim (session/get-vim session)]
       (as-> session $
             (reduce
               (fn [session {:keys [buffer-ptr lines first-line line-count-change]}]
@@ -217,7 +223,7 @@
                         (if (:clojure? buffer)
                           (upsert-buffer session
                               (-> buffer
-                                  (buffers/parse-clojure-buffer state false)
+                                  (buffers/parse-clojure-buffer vim false)
                                   (buffers/update-clojure-buffer constants)))
                           session)))
                     $ buffer-ptrs)))
@@ -430,10 +436,9 @@
                 font-height
                 toolbar-text-entities highlight-text-entities]
          :as constants} (session/get-constants session)
-        {:keys [control?
-                command-text-entity command-completion-text-entity command-cursor-entity
-                mode ascii]
-         :as state} (session/get-state session)]
+        {:keys [control? command-text-entity command-completion-text-entity command-cursor-entity ascii]
+         :as state} (session/get-state session)
+        {:keys [mode]} (session/get-vim session)]
     (when (and (pos? game-width) (pos? game-height))
       (if (:paravim.core/clear? game)
         (c/render game (update screen-entity :viewport assoc :width game-width :height game-height))

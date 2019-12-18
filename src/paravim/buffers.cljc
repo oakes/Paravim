@@ -138,7 +138,7 @@
                           new-chars)]
         text-entity))))
 
-(defn parse-clojure-buffer [{:keys [lines cursor-line cursor-column] :as buffer} {:keys [mode] :as state} init?]
+(defn parse-clojure-buffer [{:keys [lines cursor-line cursor-column] :as buffer} {:keys [mode] :as vim} init?]
   (let [parse-opts (cond
                      init? {:mode :paren} ;; see test: fix-bad-indentation
                      (= 'INSERT mode) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}
@@ -189,7 +189,7 @@
         chars-to-crop-count (+ chars-to-skip-count (reduce + 0 char-counts))]
     [chars-to-skip-count chars-to-crop-count char-counts]))
 
-(defn ->cursor-entity [{:keys [mode] :as state} {:keys [font-width font-height base-rect-entity] :as constants} line-chars line column font-size-multiplier]
+(defn ->cursor-entity [{:keys [mode] :as vim} {:keys [font-width font-height base-rect-entity] :as constants} line-chars line column font-size-multiplier]
   (let [left-char (get line-chars (dec column))
         curr-char (get line-chars column)
         {:keys [left width height]} curr-char
@@ -211,10 +211,10 @@
                :width (* width font-size-multiplier)
                :height (* height font-size-multiplier)))))
 
-(defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} state font text-box {:keys [base-rects-entity] :as constants} game]
+(defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} vim font text-box {:keys [base-rects-entity] :as constants} game]
   (let [font-size-multiplier (:size font)
         line-chars (get-in buffer [:text-entity :characters cursor-line])
-        {:keys [left top width height] :as cursor-entity} (->cursor-entity state constants line-chars cursor-line cursor-column font-size-multiplier)]
+        {:keys [left top width height] :as cursor-entity} (->cursor-entity vim constants line-chars cursor-line cursor-column font-size-multiplier)]
     (-> buffer
         (assoc :rects-entity (-> base-rects-entity
                                  (i/assoc 0 cursor-entity)

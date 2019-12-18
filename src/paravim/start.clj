@@ -105,7 +105,7 @@
                            (and press? control-key?))))
     (when press?
       (let [session @session/*session
-            {:keys [mode] :as state} (session/get-state session)
+            {:keys [mode]} (session/get-vim session)
             k (keycode->keyword keycode)
             current-tab (:id (session/get-current-tab session))
             current-buffer (session/get-current-buffer session)]
@@ -168,7 +168,7 @@
     (if vim-input ;; process one command
       (if (string? vim-input)
         (do
-          (vim/on-input game vim vim-input)
+          (vim/on-input game @session/*session vim-input)
           game)
         (case (first vim-input)
           :append (assoc game ::c/repl-output (conj repl-output (second vim-input)))
@@ -185,7 +185,7 @@
         (if (vim/ready-to-append? vim repl-output) ;; append one repl buffer
           (do
             (binding [vim/*update-ui?* false]
-              (vim/append-to-buffer! game vim (first repl-output)))
+              (vim/append-to-buffer! game @session/*session (first repl-output)))
             (assoc game ::c/repl-output (vec (rest repl-output))))
           (if-let [input (async/poll! append-repl-chan)] ;; poll for more repl output
             (recur input repl-output)
@@ -218,7 +218,7 @@
                        ;; only used in tests
                        (fn [x]
                          (when (string? x)
-                           (vim/on-input game vim x))))
+                           (vim/on-input game @session/*session x))))
          poll-input! (if vim-chan
                        poll-input!
                        ;; only used in tests

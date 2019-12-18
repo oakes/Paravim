@@ -16,6 +16,7 @@
 (defrecord TextBox [id left right top bottom])
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
+(defrecord Vim [mode])
 (defrecord CurrentTab [id])
 (defrecord NewTab [id])
 (defrecord Tab [id buffer-id])
@@ -99,6 +100,10 @@
     (fn []
       (let [font Font]
         font))
+    :get-vim
+    (fn []
+      (let [vim Vim]
+        vim))
     :get-bounding-box
     (fn [?id]
       (let [bounding-box BoundingBox
@@ -198,13 +203,13 @@
           :when (and (not= font (:font buffer))
                      ;; ignore ascii buffers
                      (number? (:id buffer)))
-          state State
+          vim Vim
           text-box TextBox
           :when (= (:id text-box) (:tab-id buffer))
           constants Constants]
       (clarax/merge! buffer
         (-> buffer
-            (buffers/update-cursor state font text-box constants game)
+            (buffers/update-cursor vim font text-box constants game)
             (assoc :font font))))
     :update-cursor-when-window-resizes
     (let [game Game
@@ -221,13 +226,13 @@
                                                :repl-in :repl-out
                                                :repl-out :repl-in
                                                nil))))
-          state State
+          vim Vim
           text-box TextBox
           :when (= (:id text-box) (:tab-id buffer))
           constants Constants]
       (clarax/merge! buffer
         (-> buffer
-            (buffers/update-cursor state font text-box constants game)
+            (buffers/update-cursor vim font text-box constants game)
             (assoc :window window)))
       (when (= (:id buffer) (:buffer-id tab))
         ((:paravim.core/send-input! game) [:resize])))})
@@ -248,9 +253,9 @@
           (->Tab :repl-in nil)
           (->Tab :repl-out nil)
           (->Font (/ 1 4))
+          (->Vim 'NORMAL)
           (map->State {:buffer-updates []
-                       :show-search? false
-                       :mode 'NORMAL}))
+                       :show-search? false}))
         clara/fire-rules)))
 
 (restart!)
@@ -261,6 +266,7 @@
   (def get-mouse (:get-mouse query-fns))
   (def get-mouse-hover (:get-mouse-hover query-fns))
   (def get-font (:get-font query-fns))
+  (def get-vim (:get-vim query-fns))
   (def get-current-tab (:get-current-tab query-fns))
   (def get-current-buffer (:get-current-buffer query-fns))
   (def get-tab (:get-tab query-fns))
