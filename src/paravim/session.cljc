@@ -2,6 +2,7 @@
   (:require [paravim.buffers :as buffers]
             [clara.rules :as clara]
             [clarax.rules :as clarax]
+            [clojure.string :as str]
             [play-cljc.gl.entities-2d :as e]
             #?(:clj  [clarax.macros-java :refer [->session]]
                :cljs [clarax.macros-js :refer-macros [->session]]))
@@ -25,7 +26,7 @@
 (defrecord Window [width height])
 (defrecord Mouse [x y])
 (defrecord MouseHover [target cursor mouse])
-(defrecord MouseClick [button reload-file!])
+(defrecord MouseClick [button])
 (defrecord TextBox [id left right top bottom])
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
@@ -61,6 +62,20 @@
 
 (defn font-inc! [font]
   (change-font-size! font font-size-step))
+
+(defn reload-file! [state pipes current-tab current-buffer]
+  (let [{:keys [buffers]} state
+        {:keys [out-pipe]} pipes
+        {:keys [lines file-name clojure?] :as buffer} (get buffers current-buffer)]
+    (when (and clojure? (= current-tab :files))
+      (doto out-pipe
+        (.write (str "(do "
+                     (pr-str '(println))
+                     (pr-str (list 'println "Reloading" file-name))
+                     (str/join \newline lines)
+                     ")\n"))
+        .flush)
+      true)))
 
 (def queries
   '{:get-game
@@ -162,6 +177,7 @@
                                   :mouse mouse}))
     :mouse-clicked
     (let [game Game
+          state State
           mouse-click MouseClick
           mouse-hover MouseHover
           current-tab CurrentTab
@@ -175,7 +191,7 @@
             (case target
               :font-dec (font-dec! font)
               :font-inc (font-inc! font)
-              :reload-file (when ((:reload-file! mouse-click) (:paravim.core/pipes game) (:id current-tab) (:id current-buffer))
+              :reload-file (when (reload-file! state (:paravim.core/pipes game) (:id current-tab) (:id current-buffer))
                              (clarax/merge! current-tab {:id :repl-in}))
               nil)))))
     :tab-changed

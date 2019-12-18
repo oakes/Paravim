@@ -87,9 +87,9 @@
       (clarax/merge (get-current-buffer session) {:id id})
       clara/fire-rules))
 
-(defn click-mouse [session button reload-file!]
+(defn click-mouse [session button]
   (-> session
-      (clara/insert (session/->MouseClick button reload-file!))
+      (clara/insert (session/->MouseClick button))
       clara/fire-rules))
 
 (defn change-font-size [session diff]

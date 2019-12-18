@@ -4,7 +4,6 @@
             [paravim.vim :as vim]
             [paravim.utils :as utils]
             [paravim.session :as session]
-            [clojure.string :as str]
             [play-cljc.gl.core :as pc]
             [clojure.core.async :as async])
   (:import  [org.lwjgl.glfw GLFW Callbacks
@@ -90,27 +89,13 @@
                             :hand GLFW/GLFW_HAND_CURSOR
                             GLFW/GLFW_ARROW_CURSOR)))))
 
-(defn- reload-file! [state pipes current-tab current-buffer]
-  (let [{:keys [buffers]} state
-        {:keys [out-pipe]} pipes
-        {:keys [lines file-name clojure?] :as buffer} (get buffers current-buffer)]
-    (when (and clojure? (= current-tab :files))
-      (doto out-pipe
-        (.write (str "(do "
-                     (pr-str '(println))
-                     (pr-str (list 'println "Reloading" file-name))
-                     (str/join \newline lines)
-                     ")\n"))
-        .flush)
-      true)))
-
 (defn on-mouse-click! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window button action mods]
   (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
              (= action GLFW/GLFW_PRESS))
     (swap! session/*session
            (fn [session]
              (-> session
-                 (c/click-mouse :left (partial reload-file! (c/get-state @session/*session)))
+                 (c/click-mouse :left)
                  (c/update-state c/update-cursor-if-necessary (c/get-constants session) game))))))
 
 (defn on-key! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window keycode scancode action mods]
@@ -141,7 +126,7 @@
           (case k
             (:tab :backtick)
             (swap! session/*session c/shift-current-tab (if shift? -1 1))
-            :f (reload-file! state pipes current-tab current-buffer)
+            :f (session/reload-file! state pipes current-tab current-buffer)
             :- (swap! session/*session
                       (fn [session]
                         (-> session
