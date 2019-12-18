@@ -7,8 +7,10 @@
 (defn remove-returns [^String s]
   (str/escape s {\return ""}))
 
+(def ^:const repl-buffer-size 100)
+
 (defn pipe-into-console! [in-pipe callback]
-  (let [ca (char-array 8)]
+  (let [ca (char-array repl-buffer-size)]
     (.start
       (Thread.
         (fn []

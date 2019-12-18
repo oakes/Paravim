@@ -3,6 +3,7 @@
             [paravim.session :as session]
             [paravim.buffers :as buffers]
             [paravim.constants :as constants]
+            [paravim.repl :as repl]
             [libvim-clj.core :as v]
             [clojure.string :as str]
             [clojure.java.io :as io]
@@ -230,13 +231,17 @@
           _ (v/set-current-buffer vim buffer)
           line-count (v/get-line-count vim buffer)
           char-count (count (v/get-line vim buffer line-count))]
+      (v/execute vim "set paste") ;; prevents auto indent
       (v/set-cursor-position vim line-count (dec char-count))
       (on-input game vim "a")
       (doseq [ch input]
+        (when (>= (v/get-cursor-column vim) repl/repl-buffer-size)
+          (on-input game vim "<Enter>"))
         (on-input game vim (str ch)))
       (on-input game vim "<Esc>")
       (v/set-current-buffer vim current-buffer)
-      (v/set-cursor-position vim cursor-line cursor-column))))
+      (v/set-cursor-position vim cursor-line cursor-column)
+      (v/execute vim "set nopaste"))))
 
 (defn on-buf-enter [game vim buffer-ptr]
   (let [path (v/get-file-name vim buffer-ptr)
