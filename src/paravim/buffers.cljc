@@ -1,8 +1,11 @@
 (ns paravim.buffers
   (:require [paravim.chars :as chars]
             [paravim.colors :as colors]
+            [paravim.utils :as utils]
+            [paravim.constants :as constants]
             [parinferish.core :as ps]
             [play-cljc.transforms :as t]
+            [play-cljc.instances :as i]
             [clojure.core.rrb-vector :as rrb]
             [clojure.string :as str]))
 
@@ -160,4 +163,92 @@
                 (-> text-entity
                     (replace-lines base-font-entity new-lines first-line line-count-change)
                     (chars/update-uniforms font-height colors/text-alpha))))))
+
+(defn get-visible-lines [{:keys [characters] :as text-entity}
+                         {:keys [font-height] :as constants}
+                         {:keys [top bottom] :as text-box}
+                         game-height
+                         camera-y
+                         font-size-multiplier]
+  (let [text-height (- (bottom game-height font-size-multiplier)
+                       (top game-height font-size-multiplier))
+        char-height (* font-height font-size-multiplier)
+        line-count (count characters)
+        lines-to-skip-count (max 0 (min (int (/ camera-y char-height))
+                                        line-count))
+        lines-to-crop-count (max 0 (min (+ lines-to-skip-count
+                                           (int (/ text-height char-height))
+                                           1)
+                                        line-count))]
+    [lines-to-skip-count lines-to-crop-count]))
+
+(defn get-visible-chars [{:keys [characters] :as text-entity} lines-to-skip-count lines-to-crop-count]
+  (let [char-counts (get-in text-entity [:uniforms 'u_char_counts])
+        chars-to-skip-count (reduce + 0 (subvec char-counts 0 lines-to-skip-count))
+        char-counts (subvec char-counts lines-to-skip-count lines-to-crop-count)
+        chars-to-crop-count (+ chars-to-skip-count (reduce + 0 char-counts))]
+    [chars-to-skip-count chars-to-crop-count char-counts]))
+
+(defn ->cursor-entity [{:keys [mode] :as state} {:keys [font-width font-height base-rect-entity] :as constants} line-chars line column font-size-multiplier]
+  (let [left-char (get line-chars (dec column))
+        curr-char (get line-chars column)
+        {:keys [left width height]} curr-char
+        width (cond-> (or width font-width)
+                      ('#{INSERT COMMAND_LINE} mode)
+                      (/ 4))
+        left (or left
+                 (some-> (:left left-char)
+                         (+ (:width left-char)))
+                 0)
+        top (* line font-height)
+        height (or height font-height)]
+    (-> base-rect-entity
+        (t/color colors/cursor-color)
+        (t/translate left top)
+        (t/scale width height)
+        (assoc :left (* left font-size-multiplier)
+               :top (* top font-size-multiplier)
+               :width (* width font-size-multiplier)
+               :height (* height font-size-multiplier)))))
+
+(defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} state font text-box {:keys [base-rects-entity] :as constants} game]
+  (let [font-size-multiplier (:size font)
+        line-chars (get-in buffer [:text-entity :characters cursor-line])
+        {:keys [left top width height] :as cursor-entity} (->cursor-entity state constants line-chars cursor-line cursor-column font-size-multiplier)]
+    (-> buffer
+        (assoc :rects-entity (-> base-rects-entity
+                                 (i/assoc 0 cursor-entity)
+                                 (assoc :rect-count 1)))
+        (as-> buffer
+              (let [{:keys [camera camera-x camera-y]} buffer
+                    game-width (utils/get-width game)
+                    game-height (utils/get-height game)
+                    text-top ((:top text-box) game-height font-size-multiplier)
+                    text-bottom ((:bottom text-box) game-height font-size-multiplier)
+                    cursor-bottom (+ top height)
+                    cursor-right (+ left width)
+                    text-height (- text-bottom text-top)
+                    camera-bottom (+ camera-y text-height)
+                    camera-right (+ camera-x game-width)
+                    camera-x (cond
+                               (< left camera-x)
+                               left
+                               (> cursor-right camera-right)
+                               (- cursor-right game-width)
+                               :else
+                               camera-x)
+                    camera-y (cond
+                               (< top camera-y)
+                               top
+                               (> cursor-bottom camera-bottom 0)
+                               (- cursor-bottom text-height)
+                               :else
+                               camera-y)
+                    [lines-to-skip-count lines-to-crop-count] (get-visible-lines text-entity constants text-box game-height camera-y font-size-multiplier)]
+                (assoc buffer
+                  :camera (t/translate constants/orig-camera camera-x (- camera-y text-top))
+                  :camera-x camera-x
+                  :camera-y camera-y
+                  :visible-start-line lines-to-skip-count
+                  :visible-end-line lines-to-crop-count))))))
 

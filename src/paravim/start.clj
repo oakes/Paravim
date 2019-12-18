@@ -4,6 +4,7 @@
             [paravim.vim :as vim]
             [paravim.utils :as utils]
             [paravim.session :as session]
+            [paravim.buffers :as buffers]
             [play-cljc.gl.core :as pc]
             [clojure.core.async :as async])
   (:import  [org.lwjgl.glfw GLFW Callbacks
@@ -79,9 +80,6 @@
         y (* ypos density-ratio)
         session (swap! session/*session c/update-mouse x y)
         mouse-hover (c/get-mouse-hover session)]
-    (swap! session/*session c/update-state assoc
-           :mouse-hover (:target mouse-hover)
-           :mouse-type (:cursor mouse-hover))
     (GLFW/glfwSetCursor window
                         (GLFW/glfwCreateStandardCursor
                           (case (:cursor mouse-hover)
@@ -161,7 +159,7 @@
              (as-> session session
                    (c/update-window-size session width height)
                    (if buffer
-                     (c/upsert-buffer session (c/update-cursor buffer state constants game))
+                     (c/upsert-buffer session (buffers/update-cursor buffer state (c/get-font session) (c/get-text-box session {:?id (:tab-id buffer)}) constants game))
                      session)
                    ;; if we're in the repl, make sure both the input and output are refreshed
                    (if-let [other-tab (case current-tab
@@ -170,7 +168,7 @@
                                         nil)]
                      (let [other-buffer-id (:buffer-id (c/get-tab session {:?id other-tab}))
                            other-buffer (c/get-buffer session {:?id other-buffer-id})]
-                       (c/upsert-buffer session (c/update-cursor other-buffer state constants game)))
+                       (c/upsert-buffer session (buffers/update-cursor other-buffer state (c/get-font session) (c/get-text-box session {:?id (:tab-id other-buffer)}) constants game)))
                      session)))))
   (send-input! [:resize]))
 

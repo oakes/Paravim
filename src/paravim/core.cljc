@@ -4,6 +4,7 @@
             [paravim.session :as session]
             [paravim.colors :as colors]
             [paravim.buffers :as buffers]
+            [paravim.constants :as constants]
             [clara.rules :as clara]
             [clarax.rules :as clarax]
             [clojure.string :as str]
@@ -20,19 +21,6 @@
                :cljs [play-cljc.macros-js :refer-macros [gl math]])
             #?(:clj [paravim.text :refer [load-font-clj]]))
   #?(:cljs (:require-macros [paravim.text :refer [load-font-cljs]])))
-
-(def buttons [{:id :font-inc
-               :text "Font +"
-               :shortcut-char 5}
-              {:id :font-dec
-               :text "Font -"
-               :shortcut-char 5}
-              {:id :reload-file
-               :text "Reload File"
-               :shortcut-char 7}])
-(def tab->path {:files "scratch.clj"
-                :repl-in "repl.in"
-                :repl-out "repl.out"})
 
 (let [query-fns (clarax/query-fns @session/*session)]
   (def get-game (:get-game query-fns))
@@ -68,14 +56,14 @@
 (defn shift-current-tab [session direction]
   (let [current-tab (get-current-tab session)
         id (:id current-tab)
-        index (+ (.indexOf session/tab-ids id)
+        index (+ (.indexOf constants/tab-ids id)
                  direction)
         index (cond
-                (neg? index) (dec (count session/tab-ids))
-                (= index (count session/tab-ids)) 0
+                (neg? index) (dec (count constants/tab-ids))
+                (= index (count constants/tab-ids)) 0
                 :else index)]
     (-> session
-        (clarax/merge current-tab {:id (nth session/tab-ids index)})
+        (clarax/merge current-tab {:id (nth constants/tab-ids index)})
         clara/fire-rules)))
 
 (defn update-tab [session id buffer-id]
@@ -97,17 +85,17 @@
   (let [font (get-font session)
         curr-val (:size font)
         new-val (+ curr-val diff)]
-    (if (<= session/min-font-size new-val session/max-font-size)
+    (if (<= constants/min-font-size new-val constants/max-font-size)
       (-> session
           (clarax/merge font {:size new-val})
           clara/fire-rules)
       session)))
 
 (defn font-dec [session]
-  (change-font-size session (- session/font-size-step)))
+  (change-font-size session (- constants/font-size-step)))
 
 (defn font-inc [session]
-  (change-font-size session session/font-size-step))
+  (change-font-size session constants/font-size-step))
 
 (defn font-multiply [session n]
   (let [font-size (:size (get-font @session/*session))]
@@ -136,100 +124,15 @@
 (defn get-mode []
   (:mode (get-state @session/*session)))
 
-(defn get-visible-lines [{:keys [characters] :as text-entity}
-                         {:keys [font-height] :as constants}
-                         {:keys [top bottom] :as text-box}
-                         game-height
-                         camera-y]
-  (let [font-size-multiplier (:size (get-font @session/*session))
-        text-height (- (bottom game-height font-size-multiplier)
-                       (top game-height font-size-multiplier))
-        char-height (* font-height font-size-multiplier)
-        line-count (count characters)
-        lines-to-skip-count (max 0 (min (int (/ camera-y char-height))
-                                        line-count))
-        lines-to-crop-count (max 0 (min (+ lines-to-skip-count
-                                           (int (/ text-height char-height))
-                                           1)
-                                        line-count))]
-    [lines-to-skip-count lines-to-crop-count]))
-
-(defn get-visible-chars [{:keys [characters] :as text-entity} lines-to-skip-count lines-to-crop-count]
-  (let [char-counts (get-in text-entity [:uniforms 'u_char_counts])
-        chars-to-skip-count (reduce + 0 (subvec char-counts 0 lines-to-skip-count))
-        char-counts (subvec char-counts lines-to-skip-count lines-to-crop-count)
-        chars-to-crop-count (+ chars-to-skip-count (reduce + 0 char-counts))]
-    [chars-to-skip-count chars-to-crop-count char-counts]))
-
-(defn ->cursor-entity [{:keys [mode] :as state} {:keys [font-width font-height base-rect-entity] :as constants} line-chars line column]
-  (let [font-size-multiplier (:size (get-font @session/*session))
-        left-char (get line-chars (dec column))
-        curr-char (get line-chars column)
-        {:keys [left width height]} curr-char
-        width (cond-> (or width font-width)
-                      ('#{INSERT COMMAND_LINE} mode)
-                      (/ 4))
-        left (or left
-                 (some-> (:left left-char)
-                         (+ (:width left-char)))
-                 0)
-        top (* line font-height)
-        height (or height font-height)]
-    (-> base-rect-entity
-        (t/color colors/cursor-color)
-        (t/translate left top)
-        (t/scale width height)
-        (assoc :left (* left font-size-multiplier)
-               :top (* top font-size-multiplier)
-               :width (* width font-size-multiplier)
-               :height (* height font-size-multiplier)))))
-
-(defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} state {:keys [base-rects-entity] :as constants} game]
-  (let [session @session/*session
-        font-size-multiplier (:size (get-font session))
-        text-box (get-text-box session {:?id tab-id})
-        line-chars (get-in buffer [:text-entity :characters cursor-line])
-        {:keys [left top width height] :as cursor-entity} (->cursor-entity state constants line-chars cursor-line cursor-column)]
-    (-> buffer
-        (assoc :rects-entity (-> base-rects-entity
-                                 (i/assoc 0 cursor-entity)
-                                 (assoc :rect-count 1)))
-        (as-> buffer
-              (let [{:keys [camera camera-x camera-y]} buffer
-                    game-width (utils/get-width game)
-                    game-height (utils/get-height game)
-                    text-top ((:top text-box) game-height font-size-multiplier)
-                    text-bottom ((:bottom text-box) game-height font-size-multiplier)
-                    cursor-bottom (+ top height)
-                    cursor-right (+ left width)
-                    text-height (- text-bottom text-top)
-                    camera-bottom (+ camera-y text-height)
-                    camera-right (+ camera-x game-width)
-                    camera-x (cond
-                               (< left camera-x)
-                               left
-                               (> cursor-right camera-right)
-                               (- cursor-right game-width)
-                               :else
-                               camera-x)
-                    camera-y (cond
-                               (< top camera-y)
-                               top
-                               (> cursor-bottom camera-bottom 0)
-                               (- cursor-bottom text-height)
-                               :else
-                               camera-y)
-                    [lines-to-skip-count lines-to-crop-count] (get-visible-lines text-entity constants text-box game-height camera-y)]
-                (assoc buffer
-                  :camera (t/translate session/orig-camera camera-x (- camera-y text-top))
-                  :camera-x camera-x
-                  :camera-y camera-y
-                  :visible-start-line lines-to-skip-count
-                  :visible-end-line lines-to-crop-count))))))
-
 (defn update-cursor-if-necessary [session constants game]
   (if-let [current-buffer (:id (get-current-buffer session))]
-    (upsert-buffer session (update-cursor (get-buffer session {:?id current-buffer}) (get-state session) constants game))
+    (let [buffer (get-buffer session {:?id current-buffer})]
+      (upsert-buffer session (buffers/update-cursor buffer
+                                                    (get-state session)
+                                                    (get-font session)
+                                                    (get-text-box session {:?id (:tab-id buffer)})
+                                                    constants
+                                                    game)))
     session))
 
 (defn assoc-command-text [state text completion]
@@ -238,7 +141,7 @@
 (defn assoc-command-entity [state text-entity cursor-entity]
   (assoc state :command-text-entity text-entity :command-cursor-entity cursor-entity))
 
-(defn update-command [{:keys [command-start command-text command-completion] :as state} {:keys [base-text-entity base-font-entity base-rects-entity font-height] :as constants} position]
+(defn update-command [{:keys [command-start command-text command-completion] :as state} {:keys [base-text-entity base-font-entity base-rects-entity font-height] :as constants} font position]
   (if command-text
     (let [char-entities (mapv #(-> base-font-entity
                                    (chars/crop-char %)
@@ -257,7 +160,7 @@
           command-text-entity (-> (chars/assoc-line base-text-entity 0 char-entities)
                                   (chars/update-uniforms font-height colors/text-alpha))
           line-chars (get-in command-text-entity [:characters 0])
-          command-cursor-entity (i/assoc base-rects-entity 0 (->cursor-entity state constants line-chars 0 (inc position)))]
+          command-cursor-entity (i/assoc base-rects-entity 0 (buffers/->cursor-entity state constants line-chars 0 (inc position) (:size font)))]
       (assoc-command-entity state command-text-entity command-cursor-entity))
     (assoc-command-entity state nil nil)))
 
@@ -367,7 +270,7 @@
 (defn ->buffer [id {:keys [base-font-entity base-text-entity font-height] :as constants} path file-name lines current-tab]
   {:id id
    :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
-   :camera (t/translate session/orig-camera 0 0)
+   :camera (t/translate constants/orig-camera 0 0)
    :camera-x 0
    :camera-y 0
    :path path
@@ -380,7 +283,7 @@
 (defn ->ascii [id {:keys [base-font-entity base-text-entity font-height] :as constants} lines]
   {:id id
    :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
-   :camera (t/translate session/orig-camera 0 0)
+   :camera (t/translate constants/orig-camera 0 0)
    :camera-x 0
    :camera-y 0
    :lines lines
@@ -438,28 +341,28 @@
                                    (fn [m {:keys [id text]}]
                                      (assoc m id (assoc-lines roboto-text-entity roboto-font-entity font-height [text])))
                                    {}
-                                   session/tabs)
+                                   constants/tabs)
                     bounding-boxes (reduce-kv
                                      (fn [m i {:keys [id]}]
-                                       (let [last-tab (some->> (get session/tabs (dec i)) :id (get m))
+                                       (let [last-tab (some->> (get constants/tabs (dec i)) :id (get m))
                                              left (if last-tab (+ (:x2 last-tab) tab-spacing) 0)
                                              right (-> tab-entities (get id) :characters first last :x-total (+ left))]
                                          (assoc m id {:x1 left :y1 0 :x2 right :y2 font-height})))
                                      {}
-                                     session/tabs)
+                                     constants/tabs)
                     button-entities (reduce
                                       (fn [m {:keys [id text]}]
                                         (assoc m id (assoc-lines roboto-text-entity roboto-font-entity font-height [text])))
                                       {}
-                                      buttons)
+                                      constants/buttons)
                     bounding-boxes (reduce-kv
                                      (fn [m i {:keys [id]}]
-                                       (let [last-button (some->> (get buttons (dec i)) :id (get m))
+                                       (let [last-button (some->> (get constants/buttons (dec i)) :id (get m))
                                              right (if last-button (+ (:x1 last-button) tab-spacing) 0)
                                              left (-> button-entities (get id) :characters first last :x-total (+ right))]
                                         (assoc m id {:x1 left :y1 0 :x2 right :y2 font-height :align :right})))
                                      bounding-boxes
-                                     buttons)
+                                     constants/buttons)
                     ;; when the user holds down control, we want to show the shortcut character
                     ;; for each button in a different color so they can learn the shortcut
                     highlight-button-entities (reduce
@@ -470,7 +373,7 @@
                                                                 (chars/update-translation-matrix (:left character) 0)
                                                                 (t/color colors/yellow-color)))))
                                                 button-entities
-                                                buttons)]
+                                                constants/buttons)]
                 (swap! session/*session
                   (fn [session]
                     (as-> session $
@@ -506,7 +409,7 @@
    :clear {:color colors/bg-color :depth 1}})
 
 (defn crop-text-entity [text-entity lines-to-skip-count lines-to-crop-count]
-  (let [[chars-to-skip-count chars-to-crop-count char-counts] (get-visible-chars text-entity lines-to-skip-count lines-to-crop-count)]
+  (let [[chars-to-skip-count chars-to-crop-count char-counts] (buffers/get-visible-chars text-entity lines-to-skip-count lines-to-crop-count)]
     (reduce-kv
       (fn [text-entity attr-name length]
         (update-in text-entity [:attributes attr-name :data] rrb/subvec
@@ -525,7 +428,7 @@
                            (t/project game-width game-height)
                            (t/camera camera)
                            (t/scale font-size-multiplier font-size-multiplier))))
-      (let [[lines-to-skip-count lines-to-crop-count] (get-visible-lines text-entity constants text-box game-height camera-y)]
+      (let [[lines-to-skip-count lines-to-crop-count] (buffers/get-visible-lines text-entity constants text-box game-height camera-y font-size-multiplier)]
         (when parinfer-text-entity
           (c/render game (-> parinfer-text-entity
                              (crop-text-entity lines-to-skip-count lines-to-crop-count)

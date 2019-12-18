@@ -1,26 +1,13 @@
 (ns paravim.session
   (:require [paravim.buffers :as buffers]
+            [paravim.constants :as constants]
             [clara.rules :as clara]
             [clarax.rules :as clarax]
             [clojure.string :as str]
-            [play-cljc.gl.entities-2d :as e]
             #?(:clj  [clarax.macros-java :refer [->session]]
                :cljs [clarax.macros-js :refer-macros [->session]]))
   #?(:cljs (:require-macros [paravim.session :refer [->session-wrapper]])))
 
-(def orig-camera (e/->camera true))
-(def tabs [{:id :files
-            :text "Files"}
-           {:id :repl-in
-            :text "REPL In"}
-           {:id :repl-out
-            :text "REPL Out"}])
-(def tab-ids (mapv :id tabs))
-(def tab? (set tab-ids))
-
-(def font-size-step (/ 1 16))
-(def min-font-size (/ 1 8))
-(def max-font-size 1)
 
 (defrecord Game [total-time delta-time context])
 (defrecord Window [width height])
@@ -54,14 +41,14 @@
 
 (defn change-font-size! [{:keys [size] :as font} diff]
   (let [new-val (+ size diff)]
-    (when (<= min-font-size new-val max-font-size)
+    (when (<= constants/min-font-size new-val constants/max-font-size)
       (clarax/merge! font {:size new-val}))))
 
 (defn font-dec! [font]
-  (change-font-size! font (- font-size-step)))
+  (change-font-size! font (- constants/font-size-step)))
 
 (defn font-inc! [font]
-  (change-font-size! font font-size-step))
+  (change-font-size! font constants/font-size-step))
 
 (defn reload-file! [buffer pipes current-tab]
   (let [{:keys [out-pipe]} pipes
@@ -186,7 +173,7 @@
       (clara/retract! mouse-click)
       (when (= :left (:button mouse-click))
         (let [{:keys [target]} mouse-hover]
-          (if (tab? target)
+          (if (constants/tab? target)
             (clarax/merge! current-tab {:id target})
             (case target
               :font-dec (font-dec! font)

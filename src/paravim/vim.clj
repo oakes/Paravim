@@ -2,6 +2,7 @@
   (:require [paravim.core :as c]
             [paravim.session :as session]
             [paravim.buffers :as buffers]
+            [paravim.constants :as constants]
             [libvim-clj.core :as v]
             [clojure.string :as str]
             [clojure.java.io :as io]
@@ -17,7 +18,7 @@
     (if-let [buffer-for-tab (:buffer-id (c/get-tab session {:?id current-tab}))]
       (when (not= current-buffer buffer-for-tab)
         (v/set-current-buffer vim buffer-for-tab))
-      (when-let [path (c/tab->path current-tab)]
+      (when-let [path (constants/tab->path current-tab)]
         (v/open-buffer vim path)))))
 
 (defn set-window-size! [vim session width height]
@@ -176,9 +177,9 @@
       (c/update-search-highlights buffer state highlights))
     buffer))
 
-(defn update-buffer [buffer state constants game vim]
+(defn update-buffer [buffer session state constants game vim]
   (-> buffer
-      (c/update-cursor state constants game)
+      (buffers/update-cursor state (c/get-font session) (c/get-text-box session {:?id (:tab-id buffer)}) constants game)
       (c/update-highlight constants)
       (update-selection constants vim)
       (update-search-highlights constants vim)))
@@ -203,14 +204,14 @@
                                         (assoc :command-start s)
                                         (#{"/" "?"} (:command-start state))
                                         (assoc :show-search? true))
-                                (c/update-command constants (v/get-command-position vim)))
+                                (c/update-command constants (c/get-font session) (v/get-command-position vim)))
                             (c/assoc-command-text state nil nil)))))
         state (c/get-state session)]
     (if-let [buffer (c/get-buffer session {:?id current-buffer})]
       (as-> session $
             (c/upsert-buffer $ (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
             (c/update-buffers $ constants state)
-            (c/upsert-buffer $ (update-buffer (c/get-buffer $ {:?id current-buffer}) state constants game vim)))
+            (c/upsert-buffer $ (update-buffer (c/get-buffer $ {:?id current-buffer}) session state constants game vim)))
       session)))
 
 (defn on-input [game vim s]
@@ -250,7 +251,7 @@
                               (fn [[tab path]]
                                 (when (= canon-path (-> path java.io.File. .getCanonicalPath))
                                   tab))
-                              c/tab->path)
+                              constants/tab->path)
                             :files)
             session @session/*session
             state (c/get-state session)
@@ -264,7 +265,7 @@
                           (buffers/parse-clojure-buffer state true)
                           (buffers/update-clojure-buffer state))
                       buffer)
-            buffer (c/update-cursor buffer state constants game)]
+            buffer (buffers/update-cursor buffer state (c/get-font session) (c/get-text-box session {:?id (:tab-id buffer)}) constants game)]
         (swap! session/*session
           (fn [session]
             (-> session
@@ -339,13 +340,13 @@
                                          (-> session
                                              (c/update-state assoc :show-search? false)
                                              (cond-> buffer
-                                                     (c/upsert-buffer (update-buffer buffer state (c/get-constants session) game vim)))))))))
+                                                     (c/upsert-buffer (update-buffer buffer session state (c/get-constants session) game vim)))))))))
   (v/set-on-yank vim (fn [yank-info]
                        (try
                          (when-let [lines (yank-lines yank-info)]
                            (GLFW/glfwSetClipboardString (:context game)
                              (str/join \newline lines)))
                          (catch Exception e (.printStackTrace e)))))
-  (run! #(v/open-buffer vim (c/tab->path %)) [:repl-in :repl-out :files])
+  (run! #(v/open-buffer vim (constants/tab->path %)) [:repl-in :repl-out :files])
   (init-ascii!))
 
