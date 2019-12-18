@@ -26,7 +26,8 @@
                    camera camera-x camera-y
                    path file-name
                    lines clojure?
-                   cursor-line cursor-column])
+                   cursor-line cursor-column
+                   font])
 (defrecord Constants [base-rect-entity
                       base-rects-entity
                       font-width
@@ -184,7 +185,22 @@
     :tab-changed
     (let [game Game
           current-tab CurrentTab]
-      ((:paravim.core/send-input! game) [:new-tab]))})
+      ((:paravim.core/send-input! game) [:new-tab]))
+    :update-cursor-when-font-changes
+    (let [game Game
+          font Font
+          buffer Buffer
+          :when (and (not= font (:font buffer))
+                     ;; ignore ascii buffers
+                     (number? (:id buffer)))
+          state State
+          text-box TextBox
+          :when (= (:id text-box) (:tab-id buffer))
+          constants Constants]
+      (clarax/merge! buffer
+        (-> buffer
+            (buffers/update-cursor state font text-box constants game)
+            (assoc :font font))))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))

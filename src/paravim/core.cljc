@@ -124,17 +124,6 @@
 (defn get-mode []
   (:mode (get-state @session/*session)))
 
-(defn update-cursor-if-necessary [session constants game]
-  (if-let [current-buffer (:id (get-current-buffer session))]
-    (let [buffer (get-buffer session {:?id current-buffer})]
-      (upsert-buffer session (buffers/update-cursor buffer
-                                                    (get-state session)
-                                                    (get-font session)
-                                                    (get-text-box session {:?id (:tab-id buffer)})
-                                                    constants
-                                                    game)))
-    session))
-
 (defn assoc-command-text [state text completion]
   (assoc state :command-text text :command-completion (when (some-> text str/trim seq) completion)))
 

@@ -90,11 +90,7 @@
 (defn on-mouse-click! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window button action mods]
   (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
              (= action GLFW/GLFW_PRESS))
-    (swap! session/*session
-           (fn [session]
-             (-> session
-                 (c/click-mouse :left)
-                 (c/update-cursor-if-necessary (c/get-constants session) game))))))
+    (swap! session/*session c/click-mouse :left)))
 
 (defn on-key! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window keycode scancode action mods]
   (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
@@ -125,16 +121,8 @@
             (:tab :backtick)
             (swap! session/*session c/shift-current-tab (if shift? -1 1))
             :f (session/reload-file! (c/get-buffer session {:?id current-buffer}) pipes current-tab)
-            :- (swap! session/*session
-                      (fn [session]
-                        (-> session
-                            c/font-dec
-                            (c/update-cursor-if-necessary (c/get-constants session) game))))
-            := (swap! session/*session
-                      (fn [session]
-                        (-> session
-                            c/font-inc
-                            (c/update-cursor-if-necessary (c/get-constants session) game))))
+            :- (swap! session/*session c/font-dec)
+            := (swap! session/*session c/font-inc)
             ; else
             (when-let [key-name (if k
                                   (keyword->name k)
