@@ -164,35 +164,31 @@
 (defn- poll-input! [{:keys [::c/vim ::c/vim-chan ::c/append-repl-chan ::c/repl-output] :as game}]
   (loop [vim-input nil
          repl-output repl-output]
-    (cond
-      ;; process input from either chan
-      vim-input
+    (if vim-input ;; process one command
       (if (string? vim-input)
         (do
           (vim/on-input game vim vim-input)
-          (recur nil repl-output))
+          (assoc game ::c/repl-output repl-output))
         (case (first vim-input)
-          :append (recur nil (conj repl-output (second vim-input)))
+          :append (assoc game ::c/repl-output (conj repl-output (second vim-input)))
           :new-tab (do
                      (vim/open-buffer-for-tab! vim @session/*session)
                      (async/put! vim-chan [:resize])
-                     (recur nil repl-output))
+                     (assoc game ::c/repl-output repl-output))
           :resize (let [width (utils/get-width game)
                         height (utils/get-height game)]
                     (vim/set-window-size! vim @session/*session width height)
-                    (recur nil repl-output))))
-      ;; append to the repl
-      (vim/ready-to-append? vim repl-output)
-      (do
-        (binding [vim/*update-ui?* false]
-          (vim/append-to-buffer! game vim (first repl-output)))
-        (recur nil []))
-      ;; poll chans
-      :else
-      (if-let [input (or (async/poll! vim-chan)
-                         (async/poll! append-repl-chan))]
+                    (assoc game ::c/repl-output repl-output))))
+      (if-let [input (async/poll! vim-chan)] ;; poll for user input
         (recur input repl-output)
-        (assoc game ::c/repl-output repl-output)))))
+        (if (vim/ready-to-append? vim repl-output) ;; append one repl buffer
+          (do
+            (binding [vim/*update-ui?* false]
+              (vim/append-to-buffer! game vim (first repl-output)))
+            (assoc game ::c/repl-output (vec (rest repl-output))))
+          (if-let [input (async/poll! append-repl-chan)] ;; poll for more repl output
+            (recur input repl-output)
+            (assoc game ::c/repl-output repl-output)))))))
 
 (defn ->window []
   (when-not (GLFW/glfwInit)
