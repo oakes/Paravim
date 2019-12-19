@@ -84,7 +84,7 @@
                (-> session
                    (c/upsert-buffer {:id current-buffer
                                      :needs-parinfer? false})
-                   (c/update-buffers (session/get-constants session))))))))
+                   (c/insert-buffer-refresh current-buffer)))))))
 
 (defn read-text-resource [path]
   (-> path io/resource slurp str/split-lines))
@@ -152,24 +152,6 @@
           (v/input vim s))))
     (v/input vim s)))
 
-(defn update-selection [buffer constants visual-range]
-  (if visual-range
-    (c/update-selection buffer constants visual-range)
-    buffer))
-
-(defn update-search-highlights [buffer constants show-search? highlights]
-  (if show-search?
-    (c/update-search-highlights buffer constants highlights)
-    buffer))
-
-(defn update-buffer [buffer session constants window]
-  (let [{:keys [mode show-search? visual-range highlights]} (session/get-vim session)]
-    (-> buffer
-        (buffers/update-cursor mode (:size (session/get-font session)) (session/get-text-box session {:?id (:tab-id buffer)}) constants window)
-        (c/update-highlight constants)
-        (update-selection constants visual-range)
-        (update-search-highlights constants show-search? highlights))))
-
 (defn update-after-input [session vim s]
   (let [current-buffer (v/get-current-buffer vim)
         old-mode (:mode (session/get-vim session))
@@ -197,13 +179,11 @@
                                           (when (not= old-mode 'COMMAND_LINE)
                                             {:command-start s}))
                                         (c/assoc-command constants mode font-size (v/get-command-position vim)))
-                                    (c/command-text nil nil)))
-        window (session/get-window session)]
+                                    (c/command-text nil nil)))]
     (if-let [buffer (session/get-buffer session {:?id current-buffer})]
-      (as-> session $
-            (c/upsert-buffer $ (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
-            (c/update-buffers $ constants)
-            (c/upsert-buffer $ (update-buffer (session/get-buffer $ {:?id current-buffer}) $ constants window)))
+      (-> session
+          (c/upsert-buffer (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
+          (c/insert-buffer-refresh current-buffer))
       session)))
 
 (defn on-input [vim session s]

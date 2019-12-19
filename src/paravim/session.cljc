@@ -25,13 +25,14 @@
 (defrecord Tab [id buffer-id])
 (defrecord Buffer [id tab-id
                    text-entity parinfer-text-entity
-                   parsed-code needs-parinfer? needs-update?
+                   parsed-code needs-parinfer? needs-clojure-refresh?
                    camera camera-x camera-y
                    path file-name
                    lines clojure?
                    cursor-line cursor-column
                    font window])
 (defrecord BufferUpdate [buffer-id lines first-line line-count-change])
+(defrecord BufferRefresh [buffer-id])
 (defrecord Constants [base-rect-entity
                       base-rects-entity
                       font-width
@@ -121,11 +122,6 @@
     (fn [?id]
       (let [buffer Buffer
             :when (= (:id buffer) ?id)]
-        buffer))
-    :get-buffers-that-need-update
-    (fn []
-      (let [buffer [Buffer]
-            :when (:needs-update? buffer)]
         buffer))
     :get-constants
     (fn []
@@ -259,7 +255,30 @@
           constants Constants]
       (clara/retract! bu)
       (clarax/merge! buffer (assoc (buffers/update-text-buffer buffer constants (:lines bu) (:first-line bu) (:line-count-change bu))
-                                   :needs-update? (:clojure? buffer))))})
+                                   :needs-clojure-refresh? (:clojure? buffer))))
+    :buffer-refresh
+    (let [br BufferRefresh
+          buffer Buffer
+          :when (= (:id buffer) (:buffer-id br))
+          constants Constants
+          font Font
+          text-box TextBox
+          :when (= (:id text-box) (:tab-id buffer))
+          vim Vim
+          window Window]
+      (clara/retract! br)
+      (clarax/merge! buffer
+                     (-> buffer
+                         (cond-> (:needs-clojure-refresh? buffer)
+                                 (-> (buffers/parse-clojure-buffer (:mode vim) false)
+                                     (buffers/update-clojure-buffer constants)
+                                     (assoc :needs-clojure-refresh? false)))
+                         (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
+                         (buffers/update-highlight constants)
+                         (cond-> (:visual-range vim)
+                                 (buffers/update-selection constants (:visual-range vim)))
+                         (cond-> (:show-search? vim)
+                                 (buffers/update-search-highlights constants (:highlights vim))))))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))
@@ -296,7 +315,6 @@
   (def get-bounding-box (:get-bounding-box query-fns))
   (def get-text-box (:get-text-box query-fns))
   (def get-buffer (:get-buffer query-fns))
-  (def get-buffers-that-need-update (:get-buffers-that-need-update query-fns))
   (def get-constants (:get-constants query-fns))
   (def get-command (:get-command query-fns)))
 
