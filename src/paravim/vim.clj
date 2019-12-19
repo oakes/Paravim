@@ -332,15 +332,7 @@
   (v/set-on-stop-search-highlight vim (fn []
                                         (swap! session/*session c/update-vim {:show-search? false})))
   (v/set-on-unhandled-escape vim (fn []
-                                   (swap! session/*session
-                                     (fn [session]
-                                       (let [current-buffer (session/get-current-buffer session)
-                                             buffer (session/get-buffer session {:?id current-buffer})
-                                             window (session/get-window session)]
-                                         (-> session
-                                             (c/update-vim {:show-search? false})
-                                             (cond-> buffer
-                                                     (c/upsert-buffer (update-buffer buffer session (session/get-constants session) window)))))))))
+                                   (swap! session/*session c/update-vim {:show-search? false})))
   (v/set-on-yank vim (fn [yank-info]
                        (try
                          (when-let [lines (yank-lines yank-info)]
