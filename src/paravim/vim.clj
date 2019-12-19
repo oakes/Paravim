@@ -1,7 +1,6 @@
 (ns paravim.vim
   (:require [paravim.core :as c]
             [paravim.session :as session]
-            [paravim.buffers :as buffers]
             [paravim.constants :as constants]
             [paravim.repl :as repl]
             [libvim-clj.core :as v]
@@ -235,23 +234,14 @@
             buffer (or (session/get-buffer session {:?id buffer-ptr})
                        (assoc (c/->buffer buffer-ptr constants path file-name lines current-tab)
                          :cursor-line (dec (v/get-cursor-line vim))
-                         :cursor-column (v/get-cursor-column vim)))
-            vim-mode (:mode (session/get-vim session))
-            font-size (:size (session/get-font session))
-            buffer (if (:clojure? buffer)
-                      (-> buffer
-                          (buffers/parse-clojure-buffer vim-mode true)
-                          (buffers/update-clojure-buffer constants))
-                      buffer)
-            text-box (session/get-text-box session {:?id (:tab-id buffer)})
-            window (session/get-window session)
-            buffer (buffers/update-cursor buffer vim-mode font-size text-box constants window)]
+                         :cursor-column (v/get-cursor-column vim)))]
         (swap! session/*session
           (fn [session]
             (-> session
                 (c/update-tab current-tab buffer-ptr)
                 (c/update-current-tab current-tab)
-                (c/upsert-buffer buffer)))))
+                (c/upsert-buffer buffer)
+                (c/insert-buffer-refresh buffer-ptr)))))
       ;; clear the files tab
       (swap! session/*session
         (fn [session]

@@ -177,17 +177,19 @@
       (chars/update-uniforms font-height colors/text-alpha)))
 
 (defn ->buffer [id {:keys [base-font-entity base-text-entity font-height] :as constants} path file-name lines current-tab]
-  {:id id
-   :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
-   :camera (t/translate constants/orig-camera 0 0)
-   :camera-x 0
-   :camera-y 0
-   :path path
-   :file-name file-name
-   :lines lines
-   :tab-id current-tab
-   :clojure? (or (= current-tab :repl-in)
-                 (clojure-path? path))})
+  (let [clojure? (or (= current-tab :repl-in)
+                     (clojure-path? path))]
+    {:id id
+     :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
+     :camera (t/translate constants/orig-camera 0 0)
+     :camera-x 0
+     :camera-y 0
+     :path path
+     :file-name file-name
+     :lines lines
+     :tab-id current-tab
+     :clojure? clojure?
+     :needs-clojure-refresh? clojure?}))
 
 (defn ->ascii [id {:keys [base-font-entity base-text-entity font-height] :as constants} lines]
   {:id id
