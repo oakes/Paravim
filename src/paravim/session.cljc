@@ -16,7 +16,8 @@
 (defrecord TextBox [id left right top bottom])
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
-(defrecord Vim [mode buffer-updates ascii control? show-search? command])
+(defrecord Vim [mode buffer-updates ascii control? show-search? command
+                visual-range highlights])
 (defrecord Command [command-start command-text command-completion
                     command-text-entity command-cursor-entity])
 (defrecord CurrentTab [id])
