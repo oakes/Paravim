@@ -16,7 +16,7 @@
 (defrecord TextBox [id left right top bottom])
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
-(defrecord Vim [mode buffer-updates ascii control? show-search? command
+(defrecord Vim [mode ascii control? show-search? command
                 visual-range highlights])
 (defrecord Command [command-start command-text command-completion
                     command-text-entity command-cursor-entity])
@@ -25,12 +25,13 @@
 (defrecord Tab [id buffer-id])
 (defrecord Buffer [id tab-id
                    text-entity parinfer-text-entity
-                   parsed-code needs-parinfer?
+                   parsed-code needs-parinfer? needs-update?
                    camera camera-x camera-y
                    path file-name
                    lines clojure?
                    cursor-line cursor-column
                    font window])
+(defrecord BufferUpdate [buffer-id lines first-line line-count-change])
 (defrecord Constants [base-rect-entity
                       base-rects-entity
                       font-width
@@ -120,6 +121,11 @@
     (fn [?id]
       (let [buffer Buffer
             :when (= (:id buffer) ?id)]
+        buffer))
+    :get-buffers-that-need-update
+    (fn []
+      (let [buffer [Buffer]
+            :when (:needs-update? buffer)]
         buffer))
     :get-constants
     (fn []
@@ -245,7 +251,15 @@
           :when (and (not= command (:command vim))
                      (#{"/" "?"} (:command-start command)))]
       (clarax/merge! vim {:show-search? true
-                          :command command}))})
+                          :command command}))
+    :buffer-update
+    (let [bu BufferUpdate
+          buffer Buffer
+          :when (= (:id buffer) (:buffer-id bu))
+          constants Constants]
+      (clara/retract! bu)
+      (clarax/merge! buffer (assoc (buffers/update-text-buffer buffer constants (:lines bu) (:first-line bu) (:line-count-change bu))
+                                   :needs-update? (:clojure? buffer))))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))
@@ -263,8 +277,7 @@
           (->Tab :repl-in nil)
           (->Tab :repl-out nil)
           (->Font (/ 1 4))
-          (map->Vim {:mode 'NORMAL
-                     :buffer-updates []})
+          (map->Vim {:mode 'NORMAL})
           (map->Command {:show-search? false}))
         clara/fire-rules)))
 
@@ -283,6 +296,7 @@
   (def get-bounding-box (:get-bounding-box query-fns))
   (def get-text-box (:get-text-box query-fns))
   (def get-buffer (:get-buffer query-fns))
+  (def get-buffers-that-need-update (:get-buffers-that-need-update query-fns))
   (def get-constants (:get-constants query-fns))
   (def get-command (:get-command query-fns)))
 

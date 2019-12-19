@@ -66,6 +66,11 @@
       (clara/insert (session/->MouseClick button))
       clara/fire-rules))
 
+(defn insert-buffer-update [session m]
+  (-> session
+      (clara/insert (session/map->BufferUpdate m))
+      clara/fire-rules))
+
 (defn change-font-size [session diff]
   (let [font (session/get-font session)
         curr-val (:size font)
@@ -208,28 +213,19 @@
     (update buffer :rects-entity assoc-rects base-rect-entity colors/search-color rects)))
 
 (defn update-buffers [session constants]
-  (let [vim (session/get-vim session)]
-    (if-let [updates (not-empty (:buffer-updates vim))]
-      (let [buffer-ptrs (set (map :buffer-ptr updates))
-            vim-mode (:mode vim)]
-        (as-> session $
-              (reduce
-                (fn [session {:keys [buffer-ptr lines first-line line-count-change]}]
-                  (upsert-buffer session (-> (session/get-buffer session {:?id buffer-ptr})
-                                             (buffers/update-text-buffer constants lines first-line line-count-change))))
-                $
-                updates)
-              (update-vim $ {:buffer-updates []})
-              (reduce (fn [session buffer-ptr]
-                        (let [buffer (session/get-buffer session {:?id buffer-ptr})]
-                          (if (:clojure? buffer)
-                            (upsert-buffer session
-                                (-> buffer
-                                    (buffers/parse-clojure-buffer vim-mode false)
-                                    (buffers/update-clojure-buffer constants)))
-                            session)))
-                      $ buffer-ptrs)))
-      session)))
+  (let [vim-mode (:mode (session/get-vim session))
+        buffers (session/get-buffers-that-need-update session)]
+    (reduce
+      (fn [session buffer]
+        (if (:clojure? buffer)
+          (upsert-buffer session
+              (-> buffer
+                  (buffers/parse-clojure-buffer vim-mode false)
+                  (buffers/update-clojure-buffer constants)
+                  (assoc :needs-update? false)))
+          session))
+      session
+      buffers)))
 
 (defn get-extension
   [path]

@@ -282,14 +282,11 @@
         last-line (+ (dec end-line) line-count-change)
         lines (vec (for [i (range first-line last-line)]
                      (v/get-line vim buffer-ptr (inc i))))]
-    (swap! session/*session
-           (fn [session]
-             (c/update-vim session
-               (update (session/get-vim session) :buffer-updates conj
-                 {:buffer-ptr buffer-ptr
-                  :lines lines
-                  :first-line first-line
-                  :line-count-change line-count-change}))))))
+    (swap! session/*session c/insert-buffer-update
+           {:buffer-id buffer-ptr
+            :lines lines
+            :first-line first-line
+            :line-count-change line-count-change})))
 
 (defn ->vim []
   (doto (v/->vim)
