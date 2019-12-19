@@ -11,8 +11,7 @@
              GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWMouseButtonCallbackI
              GLFWCharCallbackI GLFWWindowSizeCallbackI]
             [org.lwjgl.opengl GL GL41]
-            [org.lwjgl.system MemoryUtil]
-            [javax.sound.sampled AudioSystem Clip])
+            [org.lwjgl.system MemoryUtil])
   (:gen-class))
 
 (defn- get-density-ratio [window]
