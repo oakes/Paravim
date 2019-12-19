@@ -294,8 +294,9 @@
         (->Tab :repl-in nil)
         (->Tab :repl-out nil)
         (->Font (/ 1 4))
-        (map->Vim {:mode 'NORMAL})
-        (map->Command {:show-search? false}))
+        (map->Vim {:mode 'NORMAL
+                   :show-search? false})
+        (map->Command {}))
       clara/fire-rules
       atom))
 
