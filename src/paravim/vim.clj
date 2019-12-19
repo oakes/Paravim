@@ -26,20 +26,7 @@
           (v/set-window-width (/ width font-width))
           (v/set-window-height (/ (max 0 text-height) font-height)))))))
 
-(defn repl-enter! [vim callback {:keys [out out-pipe]}]
-  (let [buffer-ptr (v/get-current-buffer vim)
-        lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
-                     (v/get-line vim buffer-ptr (inc i))))
-        text (str (str/join \newline lines) \newline)]
-    (run! callback ["g" "g" "d" "G"])
-    (doto out
-      (.write text)
-      .flush)
-    (doto out-pipe
-      (.write text)
-      .flush)))
-
-(defn ready-to-append? [vim session output]
+(defn ready-to-append? [session vim output]
   (and (seq output)
        (= 'NORMAL (v/get-mode vim))
        (not= :repl-out (:id (session/get-current-tab session)))))
@@ -85,6 +72,20 @@
                    (c/upsert-buffer {:id current-buffer
                                      :needs-parinfer? false})
                    (c/insert-buffer-refresh current-buffer)))))))
+
+(defn repl-enter! [session vim callback {:keys [out out-pipe]}]
+  (apply-parinfer! session vim)
+  (let [buffer-ptr (v/get-current-buffer vim)
+        lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
+                     (v/get-line vim buffer-ptr (inc i))))
+        text (str (str/join \newline lines) \newline)]
+    (run! callback ["g" "g" "d" "G"])
+    (doto out
+      (.write text)
+      .flush)
+    (doto out-pipe
+      (.write text)
+      .flush)))
 
 (defn read-text-resource [path]
   (-> path io/resource slurp str/split-lines))

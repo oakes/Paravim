@@ -114,7 +114,7 @@
           (and (= current-tab :repl-in)
                (= k :enter)
                (= mode 'NORMAL))
-          (vim/repl-enter! vim send-input! pipes)
+          (vim/repl-enter! session vim send-input! pipes)
           ;; all ctrl shortcuts
           control?
           (case k
@@ -182,7 +182,7 @@
                     game)))
       (if-let [input (async/poll! vim-chan)] ;; poll for user input
         (recur input repl-output)
-        (if (vim/ready-to-append? vim @session/*session repl-output) ;; append one repl buffer
+        (if (vim/ready-to-append? @session/*session vim repl-output) ;; append one repl buffer
           (do
             (binding [vim/*update-ui?* false]
               (vim/append-to-buffer! game @session/*session (first repl-output)))
