@@ -283,24 +283,20 @@
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))
 
-(def *session (atom nil))
-
-(defn restart! []
-  (reset! *session
-    (-> (->session-wrapper)
-        (clara/insert
-          (->Mouse 0 0)
-          (->MouseHover nil nil nil)
-          (->CurrentTab :files)
-          (->Tab :files nil)
-          (->Tab :repl-in nil)
-          (->Tab :repl-out nil)
-          (->Font (/ 1 4))
-          (map->Vim {:mode 'NORMAL})
-          (map->Command {:show-search? false}))
-        clara/fire-rules)))
-
-(restart!)
+(def *session
+  (-> (->session-wrapper)
+      (clara/insert
+        (->Mouse 0 0)
+        (->MouseHover nil nil nil)
+        (->CurrentTab :files)
+        (->Tab :files nil)
+        (->Tab :repl-in nil)
+        (->Tab :repl-out nil)
+        (->Font (/ 1 4))
+        (map->Vim {:mode 'NORMAL})
+        (map->Command {:show-search? false}))
+      clara/fire-rules
+      atom))
 
 (let [query-fns (clarax/query-fns @*session)]
   (def get-game (:get-game query-fns))
