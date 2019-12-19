@@ -100,9 +100,9 @@
         release? (= action GLFW/GLFW_RELEASE)
         control-key? (control-keycode? keycode)]
     (when (or press? release?)
-      (swap! session/*session c/update-state assoc :control?
-                       (or (and control? (not control-key?))
-                           (and press? control-key?))))
+      (swap! session/*session c/update-vim
+             {:control? (or (and control? (not control-key?))
+                            (and press? control-key?))}))
     (when press?
       (let [session @session/*session
             {:keys [mode]} (session/get-vim session)

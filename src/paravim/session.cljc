@@ -16,7 +16,10 @@
 (defrecord TextBox [id left right top bottom])
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
-(defrecord Vim [mode])
+(defrecord Vim [mode buffer-updates ascii control?])
+(defrecord Command [command-start command-text command-completion
+                    command-text-entity command-cursor-entity
+                    show-search?])
 (defrecord CurrentTab [id])
 (defrecord NewTab [id])
 (defrecord Tab [id buffer-id])
@@ -38,7 +41,6 @@
                       roboto-text-entity
                       toolbar-text-entities
                       highlight-text-entities])
-(defrecord State [])
 
 (defn change-font-size! [{:keys [size] :as font} diff]
   (let [new-val (+ size diff)]
@@ -119,14 +121,14 @@
       (let [buffer Buffer
             :when (= (:id buffer) ?id)]
         buffer))
-    :get-state
-    (fn []
-      (let [state State]
-        state))
     :get-constants
     (fn []
       (let [constants Constants]
-        constants))})
+        constants))
+    :get-command
+    (fn []
+      (let [command Command]
+        command))})
 
 (def rules
   '{:mouse-hovers-over-text
@@ -254,9 +256,9 @@
           (->Tab :repl-in nil)
           (->Tab :repl-out nil)
           (->Font (/ 1 4))
-          (->Vim 'NORMAL)
-          (map->State {:buffer-updates []
-                       :show-search? false}))
+          (map->Vim {:mode 'NORMAL
+                     :buffer-updates []})
+          (map->Command {:show-search? false}))
         clara/fire-rules)))
 
 (restart!)
@@ -274,6 +276,6 @@
   (def get-bounding-box (:get-bounding-box query-fns))
   (def get-text-box (:get-text-box query-fns))
   (def get-buffer (:get-buffer query-fns))
-  (def get-state (:get-state query-fns))
-  (def get-constants (:get-constants query-fns)))
+  (def get-constants (:get-constants query-fns))
+  (def get-command (:get-command query-fns)))
 

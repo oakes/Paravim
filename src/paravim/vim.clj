@@ -100,16 +100,16 @@
   (-> session
       (c/upsert-buffer (c/->ascii ascii-name constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
       (c/new-tab :files)
-      (c/update-state assoc :ascii ascii-name)))
+      (c/update-vim {:ascii ascii-name})))
 
 (defn dissoc-ascii [session ascii-name]
   (-> session
       (c/remove-buffer ascii-name)
-      (c/update-state assoc :ascii nil)))
+      (c/update-vim {:ascii nil})))
 
 (defn change-ascii [session constants s]
-  (let [{:keys [command-text command-start ascii] :as state} (session/get-state session)
-        {:keys [mode]} (session/get-vim session)]
+  (let [{:keys [command-text command-start]} (session/get-command session)
+        {:keys [mode ascii]} (session/get-vim session)]
     (cond
       (and ascii *update-ui?*)
       (dissoc-ascii session ascii)
@@ -132,7 +132,7 @@
              (fn [session]
                (assoc-ascii session (session/get-constants session) ascii))))))
 
-(defn input [{:keys [command-text command-start command-completion] :as state} vim s]
+(defn input [{:keys [command-text command-start command-completion] :as command} vim s]
   (if (= 'COMMAND_LINE (v/get-mode vim))
     (let [pos (v/get-command-position vim)]
       (case s
@@ -152,22 +152,22 @@
           (v/input vim s))))
     (v/input vim s)))
 
-(defn update-selection [buffer state vim]
+(defn update-selection [buffer constants vim]
   (if (v/visual-active? vim)
     (let [visual-range (-> (v/get-visual-range vim)
                            (update :start-line dec)
                            (update :end-line dec))]
-      (c/update-selection buffer state visual-range))
+      (c/update-selection buffer constants visual-range))
     buffer))
 
-(defn update-search-highlights [{:keys [visible-start-line visible-end-line] :as buffer} {:keys [show-search?] :as state} vim]
+(defn update-search-highlights [{:keys [visible-start-line visible-end-line] :as buffer} constants vim {:keys [show-search?] :as command}]
   (if (and show-search? visible-start-line visible-end-line)
     (let [highlights (mapv (fn [highlight]
                              (-> highlight
                                  (update :start-line dec)
                                  (update :end-line dec)))
                            (v/get-search-highlights vim (inc visible-start-line) (inc visible-end-line)))]
-      (c/update-search-highlights buffer state highlights))
+      (c/update-search-highlights buffer constants highlights))
     buffer))
 
 (defn update-buffer [buffer session constants window vim]
@@ -175,7 +175,7 @@
       (buffers/update-cursor (:mode (session/get-vim session)) (:size (session/get-font session)) (session/get-text-box session {:?id (:tab-id buffer)}) constants window)
       (c/update-highlight constants)
       (update-selection constants vim)
-      (update-search-highlights constants vim)))
+      (update-search-highlights constants vim (session/get-command session))))
 
 (defn update-after-input [session vim s]
   (let [current-buffer (v/get-current-buffer vim)
@@ -185,21 +185,19 @@
         cursor-column (v/get-cursor-column vim)
         constants (session/get-constants session)
         session (change-ascii session constants s)
-        session (c/update-vim session mode)
+        session (c/update-vim session {:mode mode})
         font-size (:size (session/get-font session))
-        session (c/update-state session
-                  (fn [state]
-                    (if (= mode 'COMMAND_LINE)
-                      (-> state
-                          (c/assoc-command-text (v/get-command-text vim) (v/get-command-completion vim))
-                          (cond-> (not= old-mode 'COMMAND_LINE)
-                                  (assoc :command-start s)
-                                  (#{"/" "?"} (:command-start state))
-                                  (assoc :show-search? true))
-                          (c/update-command constants mode font-size (v/get-command-position vim)))
-                      (c/assoc-command-text state nil nil))))
-        window (session/get-window session)
-        state (session/get-state session)]
+        session (c/update-command session
+                                  (if (= mode 'COMMAND_LINE)
+                                    (-> (merge
+                                          (session/get-command session)
+                                          (c/command-text (v/get-command-text vim) (v/get-command-completion vim))
+                                          (when (not= old-mode 'COMMAND_LINE)
+                                            {:command-start s}))
+                                        c/assoc-show-search
+                                        (c/assoc-command constants mode font-size (v/get-command-position vim)))
+                                    (c/command-text nil nil)))
+        window (session/get-window session)]
     (if-let [buffer (session/get-buffer session {:?id current-buffer})]
       (as-> session $
             (c/upsert-buffer $ (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
@@ -208,7 +206,7 @@
       session)))
 
 (defn on-input [vim session s]
-  (input (session/get-state session) vim s)
+  (input (session/get-command session) vim s)
   (let [session (swap! session/*session update-after-input vim s)
         mode (:mode (session/get-vim session))]
     (when (and (= 'NORMAL mode)
@@ -283,11 +281,14 @@
         last-line (+ (dec end-line) line-count-change)
         lines (vec (for [i (range first-line last-line)]
                      (v/get-line vim buffer-ptr (inc i))))]
-    (swap! session/*session c/update-state update :buffer-updates conj
-           {:buffer-ptr buffer-ptr
-            :lines lines
-            :first-line first-line
-            :line-count-change line-count-change})))
+    (swap! session/*session
+           (fn [session]
+             (c/update-vim session
+               (update (session/get-vim session) :buffer-updates conj
+                 {:buffer-ptr buffer-ptr
+                  :lines lines
+                  :first-line first-line
+                  :line-count-change line-count-change}))))))
 
 (defn ->vim []
   (doto (v/->vim)
@@ -328,7 +329,7 @@
                                  nil)))
   (v/set-on-buffer-update vim (partial on-buf-update game vim))
   (v/set-on-stop-search-highlight vim (fn []
-                                        (swap! session/*session c/update-state assoc :show-search? false)))
+                                        (swap! session/*session c/update-command {:show-search? false})))
   (v/set-on-unhandled-escape vim (fn []
                                    (swap! session/*session
                                      (fn [session]
@@ -336,7 +337,7 @@
                                              buffer (session/get-buffer session {:?id current-buffer})
                                              window (session/get-window session)]
                                          (-> session
-                                             (c/update-state assoc :show-search? false)
+                                             (c/update-command {:show-search? false})
                                              (cond-> buffer
                                                      (c/upsert-buffer (update-buffer buffer session (session/get-constants session) window vim)))))))))
   (v/set-on-yank vim (fn [yank-info]
