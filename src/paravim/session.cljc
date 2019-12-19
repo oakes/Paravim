@@ -16,10 +16,9 @@
 (defrecord TextBox [id left right top bottom])
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
-(defrecord Vim [mode buffer-updates ascii control?])
+(defrecord Vim [mode buffer-updates ascii control? show-search? command])
 (defrecord Command [command-start command-text command-completion
-                    command-text-entity command-cursor-entity
-                    show-search?])
+                    command-text-entity command-cursor-entity])
 (defrecord CurrentTab [id])
 (defrecord NewTab [id])
 (defrecord Tab [id buffer-id])
@@ -238,7 +237,14 @@
             (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
             (assoc :window window)))
       (when (= (:id buffer) (:buffer-id tab))
-        ((:paravim.core/send-input! game) [:resize])))})
+        ((:paravim.core/send-input! game) [:resize])))
+    :show-search-when-command-starts
+    (let [command Command
+          vim Vim
+          :when (and (not= command (:command vim))
+                     (#{"/" "?"} (:command-start command)))]
+      (clarax/merge! vim {:show-search? true
+                          :command command}))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))

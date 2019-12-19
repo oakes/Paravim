@@ -116,11 +116,6 @@
 (defn command-text [text completion]
   {:command-text text :command-completion (when (some-> text str/trim seq) completion)})
 
-(defn assoc-show-search [command]
-  (if (#{"/" "?"} (:command-start command))
-    (assoc command :show-search? true)
-    command))
-
 (defn assoc-command-entity [command text-entity cursor-entity]
   (assoc command :command-text-entity text-entity :command-cursor-entity cursor-entity))
 

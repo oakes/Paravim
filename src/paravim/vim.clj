@@ -160,7 +160,7 @@
       (c/update-selection buffer constants visual-range))
     buffer))
 
-(defn update-search-highlights [{:keys [visible-start-line visible-end-line] :as buffer} constants vim {:keys [show-search?] :as command}]
+(defn update-search-highlights [{:keys [visible-start-line visible-end-line] :as buffer} constants vim show-search?]
   (if (and show-search? visible-start-line visible-end-line)
     (let [highlights (mapv (fn [highlight]
                              (-> highlight
@@ -171,11 +171,12 @@
     buffer))
 
 (defn update-buffer [buffer session constants window vim]
-  (-> buffer
-      (buffers/update-cursor (:mode (session/get-vim session)) (:size (session/get-font session)) (session/get-text-box session {:?id (:tab-id buffer)}) constants window)
-      (c/update-highlight constants)
-      (update-selection constants vim)
-      (update-search-highlights constants vim (session/get-command session))))
+  (let [{:keys [mode show-search?]} (session/get-vim session)]
+    (-> buffer
+        (buffers/update-cursor mode (:size (session/get-font session)) (session/get-text-box session {:?id (:tab-id buffer)}) constants window)
+        (c/update-highlight constants)
+        (update-selection constants vim)
+        (update-search-highlights constants vim show-search?))))
 
 (defn update-after-input [session vim s]
   (let [current-buffer (v/get-current-buffer vim)
@@ -194,7 +195,6 @@
                                           (c/command-text (v/get-command-text vim) (v/get-command-completion vim))
                                           (when (not= old-mode 'COMMAND_LINE)
                                             {:command-start s}))
-                                        c/assoc-show-search
                                         (c/assoc-command constants mode font-size (v/get-command-position vim)))
                                     (c/command-text nil nil)))
         window (session/get-window session)]
@@ -329,7 +329,7 @@
                                  nil)))
   (v/set-on-buffer-update vim (partial on-buf-update game vim))
   (v/set-on-stop-search-highlight vim (fn []
-                                        (swap! session/*session c/update-command {:show-search? false})))
+                                        (swap! session/*session c/update-vim {:show-search? false})))
   (v/set-on-unhandled-escape vim (fn []
                                    (swap! session/*session
                                      (fn [session]
@@ -337,7 +337,7 @@
                                              buffer (session/get-buffer session {:?id current-buffer})
                                              window (session/get-window session)]
                                          (-> session
-                                             (c/update-command {:show-search? false})
+                                             (c/update-vim {:show-search? false})
                                              (cond-> buffer
                                                      (c/upsert-buffer (update-buffer buffer session (session/get-constants session) window vim)))))))))
   (v/set-on-yank vim (fn [yank-info]
