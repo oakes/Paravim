@@ -39,10 +39,10 @@
       (.write text)
       .flush)))
 
-(defn ready-to-append? [vim output]
+(defn ready-to-append? [vim session output]
   (and (seq output)
        (= 'NORMAL (v/get-mode vim))
-       (not= :repl-out (:id (session/get-current-tab @session/*session)))))
+       (not= :repl-out (:id (session/get-current-tab session)))))
 
 (defn apply-parinfer! [session vim]
   (let [current-buffer (session/get-current-buffer session)
