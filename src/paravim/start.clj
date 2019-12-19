@@ -168,7 +168,7 @@
     (if vim-input ;; process one command
       (if (string? vim-input)
         (do
-          (vim/on-input game @session/*session vim-input)
+          (vim/on-input vim @session/*session vim-input)
           game)
         (case (first vim-input)
           :append (assoc game ::c/repl-output (conj repl-output (second vim-input)))
@@ -218,7 +218,7 @@
                        ;; only used in tests
                        (fn [x]
                          (when (string? x)
-                           (vim/on-input game @session/*session x))))
+                           (vim/on-input vim @session/*session x))))
          poll-input! (if vim-chan
                        poll-input!
                        ;; only used in tests

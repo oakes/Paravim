@@ -197,7 +197,7 @@
       (clara/retract! new-tab)
       ((:paravim.core/send-input! game) [:new-buf (:buffer-id tab)]))
     :update-cursor-when-font-changes
-    (let [game Game
+    (let [window Window
           font Font
           buffer Buffer
           :when (and (not= font (:font buffer))
@@ -209,10 +209,11 @@
           constants Constants]
       (clarax/merge! buffer
         (-> buffer
-            (buffers/update-cursor (:mode vim) (:size font) text-box constants game)
+            (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
             (assoc :font font))))
     :update-cursor-when-window-resizes
     (let [game Game
+          window Window
           font Font
           window Window
           current-tab CurrentTab
@@ -232,7 +233,7 @@
           constants Constants]
       (clarax/merge! buffer
         (-> buffer
-            (buffers/update-cursor (:mode vim) (:size font) text-box constants game)
+            (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
             (assoc :window window)))
       (when (= (:id buffer) (:buffer-id tab))
         ((:paravim.core/send-input! game) [:resize])))})

@@ -1,7 +1,6 @@
 (ns paravim.buffers
   (:require [paravim.chars :as chars]
             [paravim.colors :as colors]
-            [paravim.utils :as utils]
             [paravim.constants :as constants]
             [parinferish.core :as ps]
             [play-cljc.transforms :as t]
@@ -211,7 +210,7 @@
                :width (* width font-size)
                :height (* height font-size)))))
 
-(defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} vim-mode font-size text-box {:keys [base-rects-entity] :as constants} game]
+(defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} vim-mode font-size text-box {:keys [base-rects-entity] :as constants} window]
   (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
         {:keys [left top width height] :as cursor-entity} (->cursor-entity vim-mode constants line-chars cursor-line cursor-column font-size)]
     (-> buffer
@@ -220,8 +219,7 @@
                                  (assoc :rect-count 1)))
         (as-> buffer
               (let [{:keys [camera camera-x camera-y]} buffer
-                    game-width (utils/get-width game)
-                    game-height (utils/get-height game)
+                    {game-width :width game-height :height} window
                     text-top ((:top text-box) game-height font-size)
                     text-bottom ((:bottom text-box) game-height font-size)
                     cursor-bottom (+ top height)

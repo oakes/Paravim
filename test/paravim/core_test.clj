@@ -14,13 +14,13 @@
 (def inited-game (start/init game vim nil))
 
 (defn get-characters [buffer-ptr entity-key]
-  (get-in (c/get-buffer @session/*session {:?id buffer-ptr}) [entity-key :characters]))
+  (get-in (session/get-buffer @session/*session {:?id buffer-ptr}) [entity-key :characters]))
 
 (defn count-lines [buffer-ptr]
   (count (get-characters buffer-ptr :text-entity)))
 
 (defn get-line [buffer-ptr line-num]
-  (get-in (c/get-buffer @session/*session {:?id buffer-ptr}) [:lines line-num]))
+  (get-in (session/get-buffer @session/*session {:?id buffer-ptr}) [:lines line-num]))
 
 (def core-buffer (v/open-buffer vim "test/resources/core.clj"))
 (def bad-indent-buffer (v/open-buffer vim "test/resources/bad_indent.clj"))
@@ -28,9 +28,9 @@
 (deftest delete-all-lines
   (v/set-current-buffer vim core-buffer)
   (is (= 5 (count-lines core-buffer)))
-  (run! (partial vim/on-input game vim) ["g" "g" "d" "G"])
+  (run! (partial vim/on-input vim @session/*session) ["g" "g" "d" "G"])
   (is (= 0 (count-lines core-buffer)))
-  (vim/on-input game vim "u")
+  (vim/on-input vim @session/*session "u")
   (is (= 5 (count-lines core-buffer))))
 
 (deftest dedent-function-body
@@ -39,7 +39,7 @@
   (is (= "  (println \"Hello, World!\"))" (get-line core-buffer 4)))
   ;; dedent
   (v/set-cursor-position vim 5 0)
-  (run! (partial vim/on-input game vim) ["i" "<Del>" "<Del>"])
+  (run! (partial vim/on-input vim @session/*session) ["i" "<Del>" "<Del>"])
   ;; make sure only the characters on those two lines changed
   (let [chars-before-parinfer (get-characters core-buffer :text-entity)
         chars-after-parinfer (get-characters core-buffer :parinfer-text-entity)]
@@ -50,11 +50,11 @@
             comparison ((if should-be-equal? = not=) line-before-parinfer line-after-parinfer)]
         (is comparison (str "Line " line-num " should be " (if should-be-equal? "equal" "different"))))))
   ;; execute parinfer
-  (vim/on-input game vim "<Esc>")
+  (vim/on-input vim @session/*session "<Esc>")
   (is (= "(defn -main [])" (get-line core-buffer 3)))
   (is (= "(println \"Hello, World!\")" (get-line core-buffer 4)))
   ;; undo
-  (run! (partial vim/on-input game vim) ["u" "u" "u"])
+  (run! (partial vim/on-input vim @session/*session) ["u" "u" "u"])
   (is (= "(defn -main []" (get-line core-buffer 3)))
   (is (= "  (println \"Hello, World!\"))" (get-line core-buffer 4))))
 
@@ -62,7 +62,7 @@
   (v/set-current-buffer vim bad-indent-buffer)
   (is (= "2 3)" (get-line bad-indent-buffer 3)))
   (is (= "    (println a b))" (get-line bad-indent-buffer 7)))
-  (vim/on-input game vim "<Down>") ;; any keystroke will trigger parinfer
+  (vim/on-input vim @session/*session "<Down>") ;; any keystroke will trigger parinfer
   (is (= " 2 3)" (get-line bad-indent-buffer 3)))
   (is (= "   (println a b))" (get-line bad-indent-buffer 7))))
 
@@ -84,7 +84,7 @@
 (deftest search-highlights-crash
   (v/set-current-buffer vim core-buffer)
   (dotimes [_ 50]
-    (run! (partial vim/on-input game vim)
+    (run! (partial vim/on-input vim @session/*session)
       ["/" "h" "e" "l" "l" "o"
        "<Esc>"
        ":" "%" "s" "/" "h" "e" "l" "l" "o" "/" "w" "o" "r" "l" "d"

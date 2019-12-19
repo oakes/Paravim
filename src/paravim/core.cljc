@@ -112,7 +112,7 @@
       clara/fire-rules))
 
 (defn get-mode []
-  (:mode (session/get-state @session/*session)))
+  (:mode (session/get-vim @session/*session)))
 
 (defn assoc-command-text [state text completion]
   (assoc state :command-text text :command-completion (when (some-> text str/trim seq) completion)))
