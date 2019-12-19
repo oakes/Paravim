@@ -51,6 +51,9 @@
   [_]
   (let [project (-> (read-project-clj)
                     (merge (read-deps-edn []))
+                    (assoc
+                      :aot '[paravim.start]
+                      :main 'paravim.start)
                     p/init-project)]
     (clean project)
     (uberjar project))
