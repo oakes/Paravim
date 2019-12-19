@@ -137,9 +137,9 @@
                           new-chars)]
         text-entity))))
 
-(defn parse-clojure-buffer [{:keys [lines cursor-line cursor-column] :as buffer} vim-mode init?]
+(defn parse-clojure-buffer [{:keys [lines cursor-line cursor-column] :as buffer} vim-mode inited?]
   (let [parse-opts (cond
-                     init? {:mode :paren} ;; see test: fix-bad-indentation
+                     (not inited?) {:mode :paren} ;; see test: fix-bad-indentation
                      (= 'INSERT vim-mode) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}
                      :else {:mode :indent})
         parsed-code (ps/parse (str/join "\n" lines) parse-opts)]

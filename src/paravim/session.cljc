@@ -28,7 +28,7 @@
                    parsed-code needs-parinfer? needs-clojure-refresh?
                    camera camera-x camera-y
                    path file-name
-                   lines clojure?
+                   lines clojure? inited?
                    cursor-line cursor-column
                    font window])
 (defrecord BufferUpdate [buffer-id lines first-line line-count-change])
@@ -270,7 +270,7 @@
       (clarax/merge! buffer
                      (-> buffer
                          (cond-> (:needs-clojure-refresh? buffer)
-                                 (-> (buffers/parse-clojure-buffer (:mode vim) false)
+                                 (-> (buffers/parse-clojure-buffer (:mode vim) (:inited? buffer))
                                      (buffers/update-clojure-buffer constants)
                                      (assoc :needs-clojure-refresh? false)))
                          (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
@@ -278,7 +278,8 @@
                          (cond-> (:visual-range vim)
                                  (buffers/update-selection constants (:visual-range vim)))
                          (cond-> (:show-search? vim)
-                                 (buffers/update-search-highlights constants (:highlights vim))))))})
+                                 (buffers/update-search-highlights constants (:highlights vim)))
+                         (assoc :inited? true))))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))

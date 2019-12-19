@@ -189,7 +189,8 @@
      :lines lines
      :tab-id current-tab
      :clojure? clojure?
-     :needs-clojure-refresh? clojure?}))
+     :needs-clojure-refresh? clojure?
+     :inited? false}))
 
 (defn ->ascii [id {:keys [base-font-entity base-text-entity font-height] :as constants} lines]
   {:id id
@@ -198,7 +199,8 @@
    :camera-x 0
    :camera-y 0
    :lines lines
-   :tab-id :files})
+   :tab-id :files
+   :inited? false})
 
 (defn assoc-attr-lengths [text-entity]
   (reduce
