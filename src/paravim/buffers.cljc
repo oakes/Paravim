@@ -138,10 +138,10 @@
                           new-chars)]
         text-entity))))
 
-(defn parse-clojure-buffer [{:keys [lines cursor-line cursor-column] :as buffer} {:keys [mode] :as vim} init?]
+(defn parse-clojure-buffer [{:keys [lines cursor-line cursor-column] :as buffer} vim-mode init?]
   (let [parse-opts (cond
                      init? {:mode :paren} ;; see test: fix-bad-indentation
-                     (= 'INSERT mode) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}
+                     (= 'INSERT vim-mode) {:mode :smart :cursor-line cursor-line :cursor-column cursor-column}
                      :else {:mode :indent})
         parsed-code (ps/parse (str/join "\n" lines) parse-opts)]
     (assoc buffer
@@ -169,10 +169,10 @@
                          {:keys [top bottom] :as text-box}
                          game-height
                          camera-y
-                         font-size-multiplier]
-  (let [text-height (- (bottom game-height font-size-multiplier)
-                       (top game-height font-size-multiplier))
-        char-height (* font-height font-size-multiplier)
+                         font-size]
+  (let [text-height (- (bottom game-height font-size)
+                       (top game-height font-size))
+        char-height (* font-height font-size)
         line-count (count characters)
         lines-to-skip-count (max 0 (min (int (/ camera-y char-height))
                                         line-count))
@@ -189,12 +189,12 @@
         chars-to-crop-count (+ chars-to-skip-count (reduce + 0 char-counts))]
     [chars-to-skip-count chars-to-crop-count char-counts]))
 
-(defn ->cursor-entity [{:keys [mode] :as vim} {:keys [font-width font-height base-rect-entity] :as constants} line-chars line column font-size-multiplier]
+(defn ->cursor-entity [vim-mode {:keys [font-width font-height base-rect-entity] :as constants} line-chars line column font-size]
   (let [left-char (get line-chars (dec column))
         curr-char (get line-chars column)
         {:keys [left width height]} curr-char
         width (cond-> (or width font-width)
-                      ('#{INSERT COMMAND_LINE} mode)
+                      ('#{INSERT COMMAND_LINE} vim-mode)
                       (/ 4))
         left (or left
                  (some-> (:left left-char)
@@ -206,15 +206,14 @@
         (t/color colors/cursor-color)
         (t/translate left top)
         (t/scale width height)
-        (assoc :left (* left font-size-multiplier)
-               :top (* top font-size-multiplier)
-               :width (* width font-size-multiplier)
-               :height (* height font-size-multiplier)))))
+        (assoc :left (* left font-size)
+               :top (* top font-size)
+               :width (* width font-size)
+               :height (* height font-size)))))
 
-(defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} vim font text-box {:keys [base-rects-entity] :as constants} game]
-  (let [font-size-multiplier (:size font)
-        line-chars (get-in buffer [:text-entity :characters cursor-line])
-        {:keys [left top width height] :as cursor-entity} (->cursor-entity vim constants line-chars cursor-line cursor-column font-size-multiplier)]
+(defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} vim-mode font-size text-box {:keys [base-rects-entity] :as constants} game]
+  (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
+        {:keys [left top width height] :as cursor-entity} (->cursor-entity vim-mode constants line-chars cursor-line cursor-column font-size)]
     (-> buffer
         (assoc :rects-entity (-> base-rects-entity
                                  (i/assoc 0 cursor-entity)
@@ -223,8 +222,8 @@
               (let [{:keys [camera camera-x camera-y]} buffer
                     game-width (utils/get-width game)
                     game-height (utils/get-height game)
-                    text-top ((:top text-box) game-height font-size-multiplier)
-                    text-bottom ((:bottom text-box) game-height font-size-multiplier)
+                    text-top ((:top text-box) game-height font-size)
+                    text-bottom ((:bottom text-box) game-height font-size)
                     cursor-bottom (+ top height)
                     cursor-right (+ left width)
                     text-height (- text-bottom text-top)
@@ -244,7 +243,7 @@
                                (- cursor-bottom text-height)
                                :else
                                camera-y)
-                    [lines-to-skip-count lines-to-crop-count] (get-visible-lines text-entity constants text-box game-height camera-y font-size-multiplier)]
+                    [lines-to-skip-count lines-to-crop-count] (get-visible-lines text-entity constants text-box game-height camera-y font-size)]
                 (assoc buffer
                   :camera (t/translate constants/orig-camera camera-x (- camera-y text-top))
                   :camera-x camera-x

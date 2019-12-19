@@ -209,7 +209,7 @@
           constants Constants]
       (clarax/merge! buffer
         (-> buffer
-            (buffers/update-cursor vim font text-box constants game)
+            (buffers/update-cursor (:mode vim) (:size font) text-box constants game)
             (assoc :font font))))
     :update-cursor-when-window-resizes
     (let [game Game
@@ -232,7 +232,7 @@
           constants Constants]
       (clarax/merge! buffer
         (-> buffer
-            (buffers/update-cursor vim font text-box constants game)
+            (buffers/update-cursor (:mode vim) (:size font) text-box constants game)
             (assoc :window window)))
       (when (= (:id buffer) (:buffer-id tab))
         ((:paravim.core/send-input! game) [:resize])))})

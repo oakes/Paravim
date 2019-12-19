@@ -172,7 +172,7 @@
 
 (defn update-buffer [buffer session constants {:keys [::c/vim] :as game}]
   (-> buffer
-      (buffers/update-cursor (session/get-vim session) (session/get-font session) (session/get-text-box session {:?id (:tab-id buffer)}) constants game)
+      (buffers/update-cursor (:mode (session/get-vim session)) (:size (session/get-font session)) (session/get-text-box session {:?id (:tab-id buffer)}) constants game)
       (c/update-highlight constants)
       (update-selection constants vim)
       (update-search-highlights constants vim)))
@@ -186,6 +186,7 @@
         constants (session/get-constants session)
         session (change-ascii session constants s)
         session (c/update-vim session mode)
+        font-size (:size (session/get-font session))
         session (c/update-state session
                   (fn [state]
                     (if (= mode 'COMMAND_LINE)
@@ -195,7 +196,7 @@
                                   (assoc :command-start s)
                                   (#{"/" "?"} (:command-start state))
                                   (assoc :show-search? true))
-                          (c/update-command constants (session/get-vim session) (session/get-font session) (v/get-command-position vim)))
+                          (c/update-command constants mode font-size (v/get-command-position vim)))
                       (c/assoc-command-text state nil nil))))
         state (session/get-state session)]
     (if-let [buffer (session/get-buffer session {:?id current-buffer})]
@@ -249,18 +250,20 @@
                               constants/tab->path)
                             :files)
             session @session/*session
-            state (session/get-state session)
             constants (session/get-constants session)
             buffer (or (session/get-buffer session {:?id buffer-ptr})
                        (assoc (c/->buffer buffer-ptr constants path file-name lines current-tab)
                          :cursor-line (dec (v/get-cursor-line vim))
                          :cursor-column (v/get-cursor-column vim)))
+            vim-mode (:mode (session/get-vim session))
+            font-size (:size (session/get-font session))
             buffer (if (:clojure? buffer)
                       (-> buffer
-                          (buffers/parse-clojure-buffer state true)
+                          (buffers/parse-clojure-buffer vim-mode true)
                           (buffers/update-clojure-buffer constants))
                       buffer)
-            buffer (buffers/update-cursor buffer (session/get-vim session) (session/get-font session) (session/get-text-box session {:?id (:tab-id buffer)}) constants game)]
+            text-box (session/get-text-box session {:?id (:tab-id buffer)})
+            buffer (buffers/update-cursor buffer vim-mode font-size text-box constants game)]
         (swap! session/*session
           (fn [session]
             (-> session

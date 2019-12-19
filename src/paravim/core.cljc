@@ -120,7 +120,9 @@
 (defn assoc-command-entity [state text-entity cursor-entity]
   (assoc state :command-text-entity text-entity :command-cursor-entity cursor-entity))
 
-(defn update-command [{:keys [command-start command-text command-completion] :as state} {:keys [base-text-entity base-font-entity base-rects-entity font-height] :as constants} vim font position]
+(defn update-command [{:keys [command-start command-text command-completion] :as state}
+                      {:keys [base-text-entity base-font-entity base-rects-entity font-height] :as constants}
+                      vim-mode font-size position]
   (if command-text
     (let [char-entities (mapv #(-> base-font-entity
                                    (chars/crop-char %)
@@ -141,7 +143,7 @@
           command-text-entity (-> (chars/assoc-line base-text-entity 0 char-entities)
                                   (chars/update-uniforms font-height colors/text-alpha))
           line-chars (get-in command-text-entity [:characters 0])
-          command-cursor-entity (i/assoc base-rects-entity 0 (buffers/->cursor-entity vim constants line-chars 0 (inc position) (:size font)))]
+          command-cursor-entity (i/assoc base-rects-entity 0 (buffers/->cursor-entity vim-mode constants line-chars 0 (inc position) font-size))]
       (assoc-command-entity state command-text-entity command-cursor-entity))
     (assoc-command-entity state nil nil)))
 
@@ -209,7 +211,7 @@
 (defn update-buffers [session constants]
   (if-let [updates (not-empty (:buffer-updates (session/get-state session)))]
     (let [buffer-ptrs (set (map :buffer-ptr updates))
-          vim (session/get-vim session)]
+          vim-mode (:mode (session/get-vim session))]
       (as-> session $
             (reduce
               (fn [session {:keys [buffer-ptr lines first-line line-count-change]}]
@@ -223,7 +225,7 @@
                         (if (:clojure? buffer)
                           (upsert-buffer session
                               (-> buffer
-                                  (buffers/parse-clojure-buffer vim false)
+                                  (buffers/parse-clojure-buffer vim-mode false)
                                   (buffers/update-clojure-buffer constants)))
                           session)))
                     $ buffer-ptrs)))
