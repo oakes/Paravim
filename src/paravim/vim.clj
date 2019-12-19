@@ -2,7 +2,6 @@
   (:require [paravim.core :as c]
             [paravim.session :as session]
             [paravim.constants :as constants]
-            [paravim.repl :as repl]
             [libvim-clj.core :as v]
             [clojure.string :as str]
             [clojure.java.io :as io]
@@ -194,6 +193,8 @@
                (not= s "u"))
       (apply-parinfer! session vim))))
 
+(def ^:const max-line-length 100)
+
 (defn append-to-buffer! [{:keys [::c/vim] :as game} session input]
   (when-let [buffer (:buffer-id (session/get-tab session {:?id :repl-out}))]
     (let [current-buffer (v/get-current-buffer vim)
@@ -206,7 +207,7 @@
       (v/set-cursor-position vim line-count (dec char-count))
       (on-input vim session "a")
       (doseq [ch input]
-        (when (>= (v/get-cursor-column vim) repl/repl-buffer-size)
+        (when (>= (v/get-cursor-column vim) max-line-length)
           (on-input vim session "<Enter>"))
         (on-input vim session (str ch)))
       (on-input vim session "<Esc>")
