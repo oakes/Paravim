@@ -25,10 +25,10 @@
 (defrecord Tab [id buffer-id])
 (defrecord Buffer [id tab-id
                    text-entity parinfer-text-entity
-                   parsed-code needs-parinfer? needs-clojure-refresh?
+                   parsed-code needs-parinfer? needs-parinfer-init? needs-clojure-refresh?
                    camera camera-x camera-y
                    path file-name
-                   lines clojure? inited?
+                   lines clojure?
                    cursor-line cursor-column
                    font window])
 (defrecord BufferUpdate [buffer-id lines first-line line-count-change])
@@ -270,7 +270,7 @@
       (clarax/merge! buffer
                      (-> buffer
                          (cond-> (:needs-clojure-refresh? buffer)
-                                 (-> (buffers/parse-clojure-buffer (:mode vim) (:inited? buffer))
+                                 (-> (buffers/parse-clojure-buffer (:mode vim))
                                      (buffers/update-clojure-buffer constants)
                                      (assoc :needs-clojure-refresh? false)))
                          (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
@@ -278,8 +278,7 @@
                          (cond-> (:visual-range vim)
                                  (buffers/update-selection constants (:visual-range vim)))
                          (cond-> (:show-search? vim)
-                                 (buffers/update-search-highlights constants (:highlights vim)))
-                         (assoc :inited? true))))})
+                                 (buffers/update-search-highlights constants (:highlights vim))))))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))
