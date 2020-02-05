@@ -9,7 +9,7 @@
             [clojure.core.async :as async])
   (:import  [org.lwjgl.glfw GLFW Callbacks
              GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWMouseButtonCallbackI
-             GLFWCharCallbackI GLFWWindowSizeCallbackI]
+             GLFWCharCallbackI GLFWFramebufferSizeCallbackI]
             [org.lwjgl.opengl GL GL41]
             [org.lwjgl.system MemoryUtil])
   (:gen-class))
@@ -156,8 +156,8 @@
       (reify GLFWCharCallbackI
         (invoke [this window codepoint]
           (on-char! game window codepoint))))
-    (GLFW/glfwSetWindowSizeCallback
-      (reify GLFWWindowSizeCallbackI
+    (GLFW/glfwSetFramebufferSizeCallback
+      (reify GLFWFramebufferSizeCallbackI
         (invoke [this window width height]
           (on-resize! game window width height))))))
 
