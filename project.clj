@@ -1,4 +1,4 @@
-(defproject paravim "0.5.3"
+(defproject paravim "0.5.4-SNAPSHOT"
   :description "A parasitic editor for Clojure"
   :url "https://github.com/oakes/Paravim"
   :license {:name "Public Domain"
