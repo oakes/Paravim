@@ -142,7 +142,7 @@
                                            (chars/crop-char %)
                                            (t/color (colors/set-alpha colors/bg-color colors/completion-alpha)))
                                     (str command-start
-                                         (some->> (str/last-index-of command-text " ") inc (subs command-text 0))
+                                         (some->> (str/index-of command-text " ") inc (subs command-text 0))
                                          command-completion)))
           char-count (count char-entities)
           comp-count (count completion-entities)

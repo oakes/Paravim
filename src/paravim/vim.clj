@@ -137,7 +137,7 @@
       (case s
         "<Tab>"
         (when (and (= (count command-text) pos) command-completion)
-          (let [first-part (or (some-> command-text (str/last-index-of " ") inc)
+          (let [first-part (or (some-> command-text (str/index-of " ") inc)
                                0)]
             (dotimes [_ (- (count command-text) first-part)]
               (v/input vim "<BS>"))
