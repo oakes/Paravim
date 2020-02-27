@@ -260,6 +260,9 @@
             :first-line first-line
             :line-count-change line-count-change})))
 
+(defn on-buf-delete [buffer-ptr]
+  (swap! session/*session c/remove-buffer buffer-ptr))
+
 (defn ->vim []
   (doto (v/->vim)
     v/init
@@ -296,6 +299,8 @@
                                  EVENT_BUFENTER
                                  (when *update-ui?*
                                    (on-buf-enter game vim buffer-ptr))
+                                 EVENT_BUFDELETE
+                                 (on-buf-delete buffer-ptr)
                                  nil)))
   (v/set-on-buffer-update vim (partial on-buf-update game vim))
   (v/set-on-stop-search-highlight vim (fn []

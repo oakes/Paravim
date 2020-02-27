@@ -106,9 +106,11 @@
         clara/fire-rules)))
 
 (defn remove-buffer [session buffer-id]
-  (-> session
-      (clara/retract (session/get-buffer session {:?id buffer-id}))
-      clara/fire-rules))
+  (if-let [buffer (session/get-buffer session {:?id buffer-id})]
+    (-> session
+        (clara/retract buffer)
+        clara/fire-rules)
+    session))
 
 (defn update-vim [session m]
   (-> session
