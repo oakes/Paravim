@@ -178,7 +178,10 @@
           :resize (let [width (utils/get-width game)
                         height (utils/get-height game)]
                     (vim/set-window-size! vim @session/*session width height)
-                    game)))
+                    ;; :resize events can happen in large clusters if the user drags the window.
+                    ;; if we don't recur right here, we would process them only once per frame,
+                    ;; which can potentially cause the input chan to fill up with a backlog
+                    (recur nil repl-output))))
       (if-let [input (async/poll! vim-chan)] ;; poll for user input
         (recur input repl-output)
         (if (vim/ready-to-append? @session/*session vim repl-output) ;; append one repl buffer
