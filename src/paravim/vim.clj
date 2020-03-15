@@ -232,10 +232,9 @@
                             :files)
             session @session/*session
             constants (session/get-constants session)
-            buffer (or (session/get-buffer session {:?id buffer-ptr})
-                       (assoc (c/->buffer buffer-ptr constants path file-name lines current-tab)
-                         :cursor-line (dec (v/get-cursor-line vim))
-                         :cursor-column (v/get-cursor-column vim)))]
+            buffer (assoc (c/->buffer buffer-ptr constants path file-name lines current-tab)
+                     :cursor-line (dec (v/get-cursor-line vim))
+                     :cursor-column (v/get-cursor-column vim))]
         (swap! session/*session
           (fn [session]
             (-> session
