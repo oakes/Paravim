@@ -277,6 +277,7 @@
     (v/execute "set shiftwidth=2")
     (v/execute "set expandtab")
     (v/execute "set hlsearch")
+    (v/execute "set fileformats=unix,dos")
     (v/execute "filetype plugin indent on")))
 
 (defn yank-lines [{:keys [start-line start-column end-line end-column]}]
