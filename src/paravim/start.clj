@@ -246,7 +246,11 @@
      game)))
 
 (defn- start [game window]
-  (let [game (assoc game :delta-time 0 :total-time 0 ::c/clear? true)
+  (let [game (assoc game
+               :delta-time 0
+               :total-time (GLFW/glfwGetTime)
+               ::c/clear? true
+               ::set-window-title #(GLFW/glfwSetWindowTitle window %))
         game (init game)]
     (GLFW/glfwShowWindow window)
     (listen-for-events game window)

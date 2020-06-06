@@ -218,7 +218,8 @@
 (defn on-buf-enter [game vim buffer-ptr]
   (let [path (v/get-file-name vim buffer-ptr)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
-                     (v/get-line vim buffer-ptr (inc i))))]
+                     (v/get-line vim buffer-ptr (inc i))))
+        set-window-title (:paravim.start/set-window-title game)]
     (if path
       ;; create or update the buffer
       (let [file (java.io.File. path)
@@ -238,6 +239,7 @@
                      (assoc (c/->buffer buffer-ptr constants path file-name lines current-tab)
                        :cursor-line (dec (v/get-cursor-line vim))
                        :cursor-column (v/get-cursor-column vim)))]
+        (set-window-title (str file-name " - Paravim"))
         (swap! session/*session
           (fn [session]
             (-> session
@@ -245,11 +247,10 @@
                 (c/update-current-tab current-tab)
                 (c/upsert-buffer buffer)
                 (c/insert-buffer-refresh buffer-ptr)))))
-      ;; clear the files tab
-      (swap! session/*session
-        (fn [session]
-          (-> session
-              (c/update-tab :files nil)))))))
+      (do
+        (set-window-title "Paravim")
+        ;; clear the files tab
+        (swap! session/*session c/update-tab :files nil)))))
 
 (defn on-buf-update [game vim buffer-ptr start-line end-line line-count-change]
   (let [first-line (dec start-line)
