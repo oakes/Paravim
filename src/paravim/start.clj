@@ -41,6 +41,7 @@
    GLFW/GLFW_KEY_PAGE_DOWN :page-down
    GLFW/GLFW_KEY_GRAVE_ACCENT :backtick
    GLFW/GLFW_KEY_F :f
+   GLFW/GLFW_KEY_C :c
    GLFW/GLFW_KEY_MINUS :-
    GLFW/GLFW_KEY_EQUAL :=})
 
@@ -122,6 +123,8 @@
             :f (session/reload-file! (session/get-buffer session {:?id current-buffer}) pipes current-tab)
             :- (swap! session/*session c/font-dec)
             := (swap! session/*session c/font-inc)
+            :c (when-let [text (:selected-text (session/get-buffer session {:?id current-buffer}))]
+                 (GLFW/glfwSetClipboardString window text))
             ; else
             (when-let [key-name (if k
                                   (keyword->name k)

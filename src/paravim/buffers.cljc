@@ -264,6 +264,13 @@
             ;; :width (->> (subvec line-chars start-column end-column) (map :width) (reduce +))
             :height font-height}))))
 
+(defn range->text [buffer {:keys [start-line start-column end-line end-column] :as rect-range}]
+  (vec (for [line-num (range start-line (inc end-line))]
+         (let [line (-> buffer :lines (nth line-num))
+               start-column (if (= line-num start-line) start-column 0)
+               end-column (if (= line-num end-line) end-column (count line))]
+           (subs line start-column (min end-column (count line)))))))
+
 (defn assoc-rects [{:keys [rect-count] :as rects-entity} rect-entity color rects]
   (reduce-kv
     (fn [rects-entity i {:keys [left top width height]}]
@@ -291,21 +298,25 @@
     buffer))
 
 (defn update-selection [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as constants} visual-range]
-  (let [{:keys [start-line start-column end-line end-column]} visual-range
-        ;; make sure the range is always going the same direction
-        visual-range (if (or (> start-line end-line)
-                             (and (= start-line end-line)
-                                  (> start-column end-column)))
-                       {:start-line end-line
-                        :start-column end-column
-                        :end-line start-line
-                        :end-column start-column}
-                       visual-range)
-        ;; the column the cursor is in doesn't seem to be included in the range
-        ;; add it manually so it is included in the selection
-        visual-range (update visual-range :end-column inc)
-        rects (range->rects text-entity font-width font-height visual-range)]
-    (update buffer :rects-entity assoc-rects base-rect-entity colors/select-color rects)))
+  (if visual-range
+    (let [{:keys [start-line start-column end-line end-column]} visual-range
+          ;; make sure the range is always going the same direction
+          visual-range (if (or (> start-line end-line)
+                               (and (= start-line end-line)
+                                    (> start-column end-column)))
+                         {:start-line end-line
+                          :start-column end-column
+                          :end-line start-line
+                          :end-column start-column}
+                         visual-range)
+          ;; the column the cursor is in doesn't seem to be included in the range
+          ;; add it manually so it is included in the selection
+          visual-range (update visual-range :end-column inc)
+          rects (range->rects text-entity font-width font-height visual-range)]
+      (-> buffer
+          (update :rects-entity assoc-rects base-rect-entity colors/select-color rects)
+          (assoc :selected-text (not-empty (str/join \newline (range->text buffer visual-range))))))
+    (assoc buffer :selected-text nil)))
 
 (defn update-search-highlights [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as constants} highlights]
   (let [rects (vec (mapcat (partial range->rects text-entity font-width font-height) highlights))]

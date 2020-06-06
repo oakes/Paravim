@@ -30,7 +30,8 @@
                    path file-name
                    lines clojure?
                    cursor-line cursor-column
-                   font window])
+                   font window
+                   selected-text])
 (defrecord BufferUpdate [buffer-id lines first-line line-count-change])
 (defrecord BufferRefresh [buffer-id])
 (defrecord Constants [base-rect-entity
@@ -275,8 +276,7 @@
                                      (assoc :needs-clojure-refresh? false)))
                          (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
                          (buffers/update-highlight constants)
-                         (cond-> (:visual-range vim)
-                                 (buffers/update-selection constants (:visual-range vim)))
+                         (buffers/update-selection constants (:visual-range vim))
                          (cond-> (:show-search? vim)
                                  (buffers/update-search-highlights constants (:highlights vim))))))})
 
