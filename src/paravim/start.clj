@@ -251,7 +251,9 @@
                 ::c/vim vim
                 ::c/vim-chan vim-chan
                 ::c/append-repl-chan append-repl-chan
-                ::c/repl-output [])]
+                ::c/repl-output []
+                ::set-window-title #(GLFW/glfwSetWindowTitle (:context game) %)
+                ::set-clipboard-string #(GLFW/glfwSetClipboardString (:context game) %))]
      (when (pos-int? density-ratio)
        (swap! session/*session c/font-multiply density-ratio))
      (c/init game)
@@ -265,9 +267,7 @@
   (let [game (assoc game
                :delta-time 0
                :total-time (GLFW/glfwGetTime)
-               ::c/clear? true
-               ::set-window-title #(GLFW/glfwSetWindowTitle window %)
-               ::set-clipboard-string #(GLFW/glfwSetClipboardString window %))
+               ::c/clear? true)
         game (init game)]
     (GLFW/glfwShowWindow window)
     (listen-for-events game window)
