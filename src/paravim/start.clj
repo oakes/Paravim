@@ -88,12 +88,12 @@
                             :hand GLFW/GLFW_HAND_CURSOR
                             GLFW/GLFW_ARROW_CURSOR)))))
 
-(defn on-mouse-click! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window button action mods]
+(defn on-mouse-click! [game window button action mods]
   (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
              (= action GLFW/GLFW_PRESS))
     (swap! session/*session c/click-mouse :left)))
 
-(defn on-key! [{:keys [::c/vim ::c/pipes ::c/send-input!] :as game} window keycode scancode action mods]
+(defn on-key! [{:keys [::c/vim ::c/pipes] :as game} window keycode scancode action mods]
   (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
         ;alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
         shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))
@@ -115,7 +115,7 @@
           (and (= current-tab :repl-in)
                (= k :enter)
                (= mode 'NORMAL))
-          (vim/repl-enter! session vim send-input! pipes)
+          (vim/repl-enter! vim session pipes)
           ;; all ctrl shortcuts
           control?
           (case k
@@ -136,16 +136,16 @@
             (when-let [key-name (if k
                                   (keyword->name k)
                                   (keycode->char keycode))]
-              (send-input! (str "<C-" (when shift? "S-") key-name ">"))))
+              (vim/on-input vim session (str "<C-" (when shift? "S-") key-name ">"))))
           ;; all other input
           :else
           (when-let [key-name (keyword->name k)]
-            (send-input! (str "<" key-name ">"))))))))
+            (vim/on-input vim session (str "<" key-name ">"))))))))
 
-(defn on-char! [{:keys [::c/send-input!] :as game} window codepoint]
-  (send-input! (str (char codepoint))))
+(defn on-char! [{:keys [::c/vim] :as game} window codepoint]
+  (vim/on-input vim @session/*session (str (char codepoint))))
 
-(defn on-resize! [{:keys [::c/send-input!] :as game} window width height]
+(defn on-resize! [game window width height]
   (swap! session/*session c/update-window-size width height))
 
 (defn- listen-for-events [game window]

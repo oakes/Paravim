@@ -70,20 +70,6 @@
                                      :needs-parinfer? false})
                    (c/insert-buffer-refresh current-buffer)))))))
 
-(defn repl-enter! [session vim callback {:keys [out out-pipe]}]
-  (apply-parinfer! session vim)
-  (let [buffer-ptr (v/get-current-buffer vim)
-        lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
-                     (v/get-line vim buffer-ptr (inc i))))
-        text (str (str/join \newline lines) \newline)]
-    (run! callback ["g" "g" "d" "G"])
-    (doto out
-      (.write text)
-      .flush)
-    (doto out-pipe
-      (.write text)
-      .flush)))
-
 (defn read-text-resource [path]
   (-> path io/resource slurp str/split-lines))
 
@@ -191,6 +177,21 @@
     (when (and (= 'NORMAL mode)
                (not= s "u"))
       (apply-parinfer! session vim))))
+
+(defn repl-enter! [vim session {:keys [out out-pipe]}]
+  (apply-parinfer! session vim)
+  (let [buffer-ptr (v/get-current-buffer vim)
+        lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
+                     (v/get-line vim buffer-ptr (inc i))))
+        text (str (str/join \newline lines) \newline)]
+    (doseq [s ["g" "g" "d" "G"]]
+      (on-input vim session s))
+    (doto out
+      (.write text)
+      .flush)
+    (doto out-pipe
+      (.write text)
+      .flush)))
 
 (def ^:const max-line-length 100)
 
