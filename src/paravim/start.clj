@@ -9,7 +9,7 @@
             [clojure.core.async :as async])
   (:import  [org.lwjgl.glfw GLFW Callbacks
              GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWMouseButtonCallbackI
-             GLFWCharCallbackI GLFWFramebufferSizeCallbackI]
+             GLFWCharCallbackI GLFWFramebufferSizeCallbackI GLFWWindowCloseCallbackI]
             [org.lwjgl.opengl GL GL33]
             [org.lwjgl.system MemoryUtil])
   (:gen-class))
@@ -159,7 +159,11 @@
     (GLFW/glfwSetFramebufferSizeCallback
       (reify GLFWFramebufferSizeCallbackI
         (invoke [this window width height]
-          (on-resize! game window width height))))))
+          (on-resize! game window width height))))
+    (GLFW/glfwSetWindowCloseCallback
+      (reify GLFWWindowCloseCallbackI
+        (invoke [this window]
+          (System/exit 0))))))
 
 (defn- poll-input! [{:keys [::c/vim ::c/vim-chan ::c/append-repl-chan ::c/repl-output] :as game}]
   (loop [vim-input nil
