@@ -42,6 +42,7 @@
    GLFW/GLFW_KEY_GRAVE_ACCENT :backtick
    GLFW/GLFW_KEY_F :f
    GLFW/GLFW_KEY_C :c
+   GLFW/GLFW_KEY_V :v
    GLFW/GLFW_KEY_MINUS :-
    GLFW/GLFW_KEY_EQUAL :=})
 
@@ -125,6 +126,12 @@
             := (swap! session/*session c/font-inc)
             :c (when-let [text (:selected-text (session/get-buffer session {:?id current-buffer}))]
                  (GLFW/glfwSetClipboardString window text))
+            :v (when (= mode 'INSERT)
+                 (let [text (GLFW/glfwGetClipboardString window)]
+                   (v/execute vim "set paste") ;; prevents auto indent
+                   (doseq [ch text]
+                     (vim/on-input vim session (str ch)))
+                   (v/execute vim "set nopaste")))
             ; else
             (when-let [key-name (if k
                                   (keyword->name k)
