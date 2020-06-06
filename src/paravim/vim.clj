@@ -6,8 +6,7 @@
             [clojure.string :as str]
             [clojure.java.io :as io]
             [parinferish.core :as par])
-  (:import [java.time LocalDate]
-           [org.lwjgl.glfw GLFW]))
+  (:import [java.time LocalDate]))
 
 (def ^:dynamic *update-ui?* true)
 
@@ -215,11 +214,10 @@
       (v/set-cursor-position vim cursor-line cursor-column)
       (v/execute vim "set nopaste"))))
 
-(defn on-buf-enter [game vim buffer-ptr]
+(defn on-buf-enter [{:keys [:paravim.start/set-window-title] :as game} vim buffer-ptr]
   (let [path (v/get-file-name vim buffer-ptr)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
-                     (v/get-line vim buffer-ptr (inc i))))
-        set-window-title (:paravim.start/set-window-title game)]
+                     (v/get-line vim buffer-ptr (inc i))))]
     (if path
       ;; create or update the buffer
       (let [file (java.io.File. path)
@@ -295,7 +293,7 @@
             (update end-line subs 0 end-column)
             (update 0 subs start-column))))))
 
-(defn init [vim game]
+(defn init [vim {:keys [:paravim.start/set-clipboard-string] :as game}]
   (v/set-on-quit vim (fn [buffer-ptr force?]
                        (System/exit 0)))
   (v/set-on-auto-command vim (fn [buffer-ptr event]
@@ -314,8 +312,7 @@
   (v/set-on-yank vim (fn [yank-info]
                        (try
                          (when-let [lines (yank-lines yank-info)]
-                           (GLFW/glfwSetClipboardString (:context game)
-                             (str/join \newline lines)))
+                           (set-clipboard-string (str/join \newline lines)))
                          (catch Exception e (.printStackTrace e)))))
   (run! #(v/open-buffer vim (constants/tab->path %)) [:repl-in :repl-out :files])
   (init-ascii!))

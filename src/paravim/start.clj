@@ -254,7 +254,8 @@
                :delta-time 0
                :total-time (GLFW/glfwGetTime)
                ::c/clear? true
-               ::set-window-title #(GLFW/glfwSetWindowTitle window %))
+               ::set-window-title #(GLFW/glfwSetWindowTitle window %)
+               ::set-clipboard-string #(GLFW/glfwSetClipboardString window %))
         game (init game)]
     (GLFW/glfwShowWindow window)
     (listen-for-events game window)
