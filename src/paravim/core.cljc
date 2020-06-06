@@ -381,7 +381,7 @@
                                           (t/scale game-width game-height))))))
       (if (and ascii (= current-tab :files))
         (render-buffer game session constants font-size-multiplier game-width game-height current-tab ascii false)
-        (render-buffer game session constants font-size-multiplier game-width game-height current-tab current-buffer true))
+        (render-buffer game session constants font-size-multiplier game-width game-height current-tab current-buffer (not= mode 'COMMAND_LINE)))
       (case current-tab
         :repl-in (when-let [buffer-ptr (:buffer-id (session/get-tab session {:?id :repl-out}))]
                    (render-buffer game session constants font-size-multiplier game-width game-height :repl-out buffer-ptr false))
