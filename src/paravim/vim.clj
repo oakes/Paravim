@@ -9,6 +9,7 @@
   (:import [java.time LocalDate]))
 
 (def ^:dynamic *update-ui?* true)
+(def ^:dynamic *update-window-title?* true)
 
 (defn set-window-size! [vim session width height]
   (let [{:keys [font-height font-width] :as constants} (session/get-constants session)
@@ -238,7 +239,7 @@
                      (assoc (c/->buffer buffer-ptr constants path file-name lines current-tab)
                        :cursor-line (dec (v/get-cursor-line vim))
                        :cursor-column (v/get-cursor-column vim)))]
-        (set-window-title (str file-name " - Paravim"))
+        (when *update-window-title?* (set-window-title (str file-name " - Paravim")))
         (swap! session/*session
           (fn [session]
             (-> session
@@ -247,7 +248,7 @@
                 (c/upsert-buffer buffer)
                 (c/insert-buffer-refresh buffer-ptr)))))
       (do
-        (set-window-title "Paravim")
+        (when *update-window-title?* (set-window-title "Paravim"))
         ;; clear the files tab
         (swap! session/*session c/update-tab :files nil)))))
 
@@ -315,6 +316,7 @@
                          (when-let [lines (yank-lines yank-info)]
                            (set-clipboard-string (str/join \newline lines)))
                          (catch Exception e (.printStackTrace e)))))
-  (run! #(v/open-buffer vim (constants/tab->path %)) [:repl-in :repl-out :files])
+  (binding [*update-window-title?* false]
+    (run! #(v/open-buffer vim (constants/tab->path %)) [:repl-in :repl-out :files]))
   (init-ascii!))
 
