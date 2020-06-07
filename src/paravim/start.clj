@@ -177,20 +177,21 @@
         (invoke [this window]
           (System/exit 0))))))
 
-(defn- poll-input! [{:keys [::c/vim ::c/command-chan ::c/repl-output] :as game}]
+(defn- poll-input! [{:keys [context ::c/vim ::c/command-chan ::c/repl-output] :as game}]
   (if-let [input (async/poll! command-chan)]
     (case (first input)
       :append (assoc game ::c/repl-output (conj repl-output (second input)))
       :new-buf (do
                  (some->> (second input) (v/set-current-buffer vim))
                  (vim/update-window-size! game)
-                 game))
-    (if (vim/ready-to-append? @session/*session vim repl-output)
+                 nil)
+      :set-window-title (GLFW/glfwSetWindowTitle context (second input))
+      :set-clipboard-string (GLFW/glfwSetClipboardString context (second input)))
+    (when (vim/ready-to-append? @session/*session vim repl-output)
       (do
         (binding [vim/*update-ui?* false]
           (vim/append-to-buffer! game @session/*session (first repl-output)))
-        (assoc game ::c/repl-output (vec (rest repl-output))))
-      game)))
+        (assoc game ::c/repl-output (vec (rest repl-output)))))))
 
 (defn ->window []
   (when-not (GLFW/glfwInit)
@@ -225,9 +226,7 @@
                 ::c/poll-input! poll-input!
                 ::c/vim vim
                 ::c/command-chan command-chan
-                ::c/repl-output []
-                ::set-window-title! #(GLFW/glfwSetWindowTitle (:context game) %)
-                ::set-clipboard-string! #(GLFW/glfwSetClipboardString (:context game) %))]
+                ::c/repl-output [])]
      (when (pos-int? density-ratio)
        (swap! session/*session c/font-multiply density-ratio))
      (c/init game)

@@ -433,14 +433,7 @@
     (if-let [game' (session/get-game session)]
       (let [game (merge game' game)
             poll-input! (:paravim.core/poll-input! game)]
-        ;; no need to update the game record every frame
-        ;; unless we want to add animations later
-        #_
-        (swap! session/*session
-          (fn [session]
-            (-> session
-                (clarax/merge game' game)
-                clara/fire-rules)))
-        (poll-input! game))
+        (or (poll-input! game)
+            game))
       (init game))))
 

@@ -6,6 +6,7 @@
             [libvim-clj.core :as v]
             [clojure.string :as str]
             [clojure.java.io :as io]
+            [clojure.core.async :as async]
             [parinferish.core :as par])
   (:import [java.time LocalDate]))
 
@@ -222,7 +223,7 @@
       (v/set-cursor-position vim cursor-line cursor-column)
       (v/execute vim "set nopaste"))))
 
-(defn on-buf-enter [{:keys [:paravim.start/set-window-title!] :as game} vim buffer-ptr]
+(defn on-buf-enter [game vim buffer-ptr]
   (let [path (v/get-file-name vim buffer-ptr)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
                      (v/get-line vim buffer-ptr (inc i))))]
@@ -245,7 +246,8 @@
                      (assoc (c/->buffer buffer-ptr constants path file-name lines current-tab)
                        :cursor-line (dec (v/get-cursor-line vim))
                        :cursor-column (v/get-cursor-column vim)))]
-        (when *update-window-title?* (set-window-title! (str file-name " - Paravim")))
+        (when *update-window-title?*
+          (async/put! (::c/command-chan game) [:set-window-title (str file-name " - Paravim")]))
         (swap! session/*session
           (fn [session]
             (-> session
@@ -254,7 +256,8 @@
                 (c/upsert-buffer buffer)
                 (c/insert-buffer-refresh buffer-ptr)))))
       (do
-        (when *update-window-title?* (set-window-title! "Paravim"))
+        (when *update-window-title?*
+          (async/put! (::c/command-chan game) [:set-window-title "Paravim"]))
         ;; clear the files tab
         (swap! session/*session c/update-tab :files nil)))))
 
@@ -301,7 +304,7 @@
             (update end-line subs 0 end-column)
             (update 0 subs start-column))))))
 
-(defn init [{:keys [::c/vim :paravim.start/set-clipboard-string!] :as game}]
+(defn init [{:keys [::c/vim] :as game}]
   (v/set-on-quit vim (fn [buffer-ptr force?]
                        (System/exit 0)))
   (v/set-on-auto-command vim (fn [buffer-ptr event]
@@ -320,7 +323,7 @@
   (v/set-on-yank vim (fn [yank-info]
                        (try
                          (when-let [lines (yank-lines yank-info)]
-                           (set-clipboard-string! (str/join \newline lines)))
+                           (async/put! (::c/command-chan game) [:set-clipboard-string (str/join \newline lines)]))
                          (catch Exception e (.printStackTrace e)))))
   (binding [*update-window-title?* false]
     (run! #(v/open-buffer vim (constants/tab->path %)) [:repl-in :repl-out :files]))
