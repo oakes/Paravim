@@ -186,6 +186,12 @@
                (not= s "u"))
       (apply-parinfer! session vim))))
 
+(defn on-bulk-input [vim s]
+  (doseq [ch s
+          :when (not= ch \return)]
+    (v/input vim (str ch)))
+  (swap! session/*session update-after-input vim s))
+
 (defn repl-enter! [vim session {:keys [out out-pipe]}]
   (apply-parinfer! session vim)
   (let [buffer-ptr (v/get-current-buffer vim)

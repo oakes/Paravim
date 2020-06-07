@@ -129,9 +129,7 @@
             :v (when (= mode 'INSERT)
                  (let [text (GLFW/glfwGetClipboardString window)]
                    (v/execute vim "set paste") ;; prevents auto indent
-                   (doseq [ch text
-                           :when (not= ch \return)]
-                     (vim/on-input vim session (str ch)))
+                   (vim/on-bulk-input vim text)
                    (v/execute vim "set nopaste")))
             ; else
             (when-let [key-name (if k
