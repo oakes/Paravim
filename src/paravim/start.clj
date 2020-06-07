@@ -245,8 +245,8 @@
                 ::c/vim-chan vim-chan
                 ::c/append-repl-chan append-repl-chan
                 ::c/repl-output []
-                ::set-window-title #(GLFW/glfwSetWindowTitle (:context game) %)
-                ::set-clipboard-string #(GLFW/glfwSetClipboardString (:context game) %))]
+                ::set-window-title! #(GLFW/glfwSetWindowTitle (:context game) %)
+                ::set-clipboard-string! #(GLFW/glfwSetClipboardString (:context game) %))]
      (when (pos-int? density-ratio)
        (swap! session/*session c/font-multiply density-ratio))
      (c/init game)
