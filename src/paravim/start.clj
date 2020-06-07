@@ -177,9 +177,8 @@
         (invoke [this window]
           (System/exit 0))))))
 
-(defn- poll-input! [{:keys [::c/vim ::c/vim-chan ::c/append-repl-chan ::c/repl-output] :as game}]
-  (if-let [input (or (async/poll! vim-chan)
-                     (async/poll! append-repl-chan))]
+(defn- poll-input! [{:keys [::c/vim ::c/command-chan ::c/repl-output] :as game}]
+  (if-let [input (async/poll! command-chan)]
     (case (first input)
       :append (assoc game ::c/repl-output (conj repl-output (second input)))
       :new-buf (do
@@ -214,20 +213,18 @@
 (defn init
   ([game]
    (init game (vim/->vim) (async/chan)))
-  ([game vim vim-chan]
-   (let [poll-input! (if vim-chan
+  ([game vim command-chan]
+   (let [poll-input! (if command-chan
                        poll-input!
                        ;; only used in tests
                        identity)
-         append-repl-chan (when vim-chan (async/chan))
          pipes (repl/create-pipes)
          density-ratio (get-density-ratio (:context game))
          game (assoc game
                 ::c/pipes pipes
                 ::c/poll-input! poll-input!
                 ::c/vim vim
-                ::c/vim-chan vim-chan
-                ::c/append-repl-chan append-repl-chan
+                ::c/command-chan command-chan
                 ::c/repl-output []
                 ::set-window-title! #(GLFW/glfwSetWindowTitle (:context game) %)
                 ::set-clipboard-string! #(GLFW/glfwSetClipboardString (:context game) %))]
@@ -235,8 +232,8 @@
        (swap! session/*session c/font-multiply density-ratio))
      (c/init game)
      (vim/init game)
-     (when vim-chan
-       (repl/start-repl-thread! nil pipes #(async/put! append-repl-chan [:append %])))
+     (when command-chan
+       (repl/start-repl-thread! nil pipes #(async/put! command-chan [:append %])))
      game)))
 
 (defn- start [game window]

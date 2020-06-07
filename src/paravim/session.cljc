@@ -201,8 +201,8 @@
           tab Tab
           :when (= (:id new-tab) (:id tab))]
       (clara/retract! new-tab)
-      ;; vim-chan will be nil during tests
-      (some-> (:paravim.core/vim-chan game) (async/put! [:new-buf (:buffer-id tab)])))
+      ;; command-chan will be nil during tests
+      (some-> (:paravim.core/command-chan game) (async/put! [:new-buf (:buffer-id tab)])))
     :update-cursor-when-font-changes
     (let [window Window
           font Font
