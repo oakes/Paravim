@@ -215,13 +215,7 @@
   ([game]
    (init game (vim/->vim) (async/chan)))
   ([game vim vim-chan]
-   (let [send-input! (if vim-chan
-                       #(async/put! vim-chan %)
-                       ;; only used in tests
-                       (fn [x]
-                         (when (string? x)
-                           (vim/on-input vim @session/*session x))))
-         poll-input! (if vim-chan
+   (let [poll-input! (if vim-chan
                        poll-input!
                        ;; only used in tests
                        identity)
@@ -230,7 +224,6 @@
          density-ratio (get-density-ratio (:context game))
          game (assoc game
                 ::c/pipes pipes
-                ::c/send-input! send-input!
                 ::c/poll-input! poll-input!
                 ::c/vim vim
                 ::c/vim-chan vim-chan

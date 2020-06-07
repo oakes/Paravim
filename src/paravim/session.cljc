@@ -4,6 +4,7 @@
             [clara.rules :as clara]
             [clarax.rules :as clarax]
             [clojure.string :as str]
+            [clojure.core.async :as async]
             #?(:clj  [clarax.macros-java :refer [->session]]
                :cljs [clarax.macros-js :refer-macros [->session]]))
   #?(:cljs (:require-macros [paravim.session :refer [->session-wrapper]])))
@@ -200,7 +201,8 @@
           tab Tab
           :when (= (:id new-tab) (:id tab))]
       (clara/retract! new-tab)
-      ((:paravim.core/send-input! game) [:new-buf (:buffer-id tab)]))
+      ;; vim-chan will be nil during tests
+      (some-> (:paravim.core/vim-chan game) (async/put! [:new-buf (:buffer-id tab)])))
     :update-cursor-when-font-changes
     (let [window Window
           font Font
