@@ -2,6 +2,7 @@
   (:require [paravim.core :as c]
             [paravim.session :as session]
             [paravim.constants :as constants]
+            [paravim.utils :as utils]
             [libvim-clj.core :as v]
             [clojure.string :as str]
             [clojure.java.io :as io]
@@ -23,6 +24,11 @@
         (doto vim
           (v/set-window-width (/ width font-width))
           (v/set-window-height (/ (max 0 text-height) font-height)))))))
+
+(defn update-window-size! [{:keys [::c/vim] :as game}]
+  (let [width (utils/get-width game)
+        height (utils/get-height game)]
+    (set-window-size! vim @session/*session width height)))
 
 (defn ready-to-append? [session vim output]
   (and (seq output)
@@ -295,7 +301,7 @@
             (update end-line subs 0 end-column)
             (update 0 subs start-column))))))
 
-(defn init [vim {:keys [:paravim.start/set-clipboard-string] :as game}]
+(defn init [{:keys [::c/vim :paravim.start/set-clipboard-string] :as game}]
   (v/set-on-quit vim (fn [buffer-ptr force?]
                        (System/exit 0)))
   (v/set-on-auto-command vim (fn [buffer-ptr event]
@@ -318,5 +324,6 @@
                          (catch Exception e (.printStackTrace e)))))
   (binding [*update-window-title?* false]
     (run! #(v/open-buffer vim (constants/tab->path %)) [:repl-in :repl-out :files]))
-  (init-ascii!))
+  (init-ascii!)
+  (update-window-size! game))
 

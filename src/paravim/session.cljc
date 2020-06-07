@@ -239,9 +239,7 @@
       (clarax/merge! buffer
         (-> buffer
             (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
-            (assoc :window window)))
-      (when (= (:id buffer) (:buffer-id tab))
-        ((:paravim.core/send-input! game) [:resize])))
+            (assoc :window window))))
     :show-search-when-command-starts
     (let [command Command
           vim Vim

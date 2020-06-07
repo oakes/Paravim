@@ -2,7 +2,6 @@
   (:require [paravim.core :as c]
             [paravim.repl :as repl]
             [paravim.vim :as vim]
-            [paravim.utils :as utils]
             [paravim.session :as session]
             [libvim-clj.core :as v]
             [play-cljc.gl.core :as pc]
@@ -148,7 +147,8 @@
   (vim/on-input vim @session/*session (str (char codepoint))))
 
 (defn on-resize! [game window width height]
-  (swap! session/*session c/update-window-size width height))
+  (swap! session/*session c/update-window-size width height)
+  (vim/update-window-size! game))
 
 (defn- listen-for-events [game window]
   (doto window
@@ -189,15 +189,8 @@
           :append (assoc game ::c/repl-output (conj repl-output (second vim-input)))
           :new-buf (do
                      (some->> (second vim-input) (v/set-current-buffer vim))
-                     (async/put! vim-chan [:resize])
-                     game)
-          :resize (let [width (utils/get-width game)
-                        height (utils/get-height game)]
-                    (vim/set-window-size! vim @session/*session width height)
-                    ;; :resize events can happen in large clusters if the user drags the window.
-                    ;; if we don't recur right here, we would process them only once per frame,
-                    ;; which can potentially cause the input chan to fill up with a backlog
-                    (recur nil repl-output))))
+                     (vim/update-window-size! game)
+                     game)))
       (if-let [input (async/poll! vim-chan)] ;; poll for user input
         (recur input repl-output)
         (if (vim/ready-to-append? @session/*session vim repl-output) ;; append one repl buffer
@@ -232,7 +225,7 @@
    (init game (vim/->vim) (async/chan)))
   ([game vim vim-chan]
    (let [send-input! (if vim-chan
-                       (partial async/put! vim-chan)
+                       #(async/put! vim-chan %)
                        ;; only used in tests
                        (fn [x]
                          (when (string? x)
@@ -257,9 +250,8 @@
      (when (pos-int? density-ratio)
        (swap! session/*session c/font-multiply density-ratio))
      (c/init game)
-     (vim/init vim game)
+     (vim/init game)
      (when vim-chan
-       (async/put! vim-chan [:resize])
        (repl/start-repl-thread! nil pipes #(async/put! append-repl-chan [:append %])))
      game)))
 
