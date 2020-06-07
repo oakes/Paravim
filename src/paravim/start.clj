@@ -178,29 +178,20 @@
           (System/exit 0))))))
 
 (defn- poll-input! [{:keys [::c/vim ::c/vim-chan ::c/append-repl-chan ::c/repl-output] :as game}]
-  (loop [vim-input nil
-         repl-output repl-output]
-    (if vim-input ;; process one command
-      (if (string? vim-input)
-        (do
-          (vim/on-input vim @session/*session vim-input)
-          game)
-        (case (first vim-input)
-          :append (assoc game ::c/repl-output (conj repl-output (second vim-input)))
-          :new-buf (do
-                     (some->> (second vim-input) (v/set-current-buffer vim))
-                     (vim/update-window-size! game)
-                     game)))
-      (if-let [input (async/poll! vim-chan)] ;; poll for user input
-        (recur input repl-output)
-        (if (vim/ready-to-append? @session/*session vim repl-output) ;; append one repl buffer
-          (do
-            (binding [vim/*update-ui?* false]
-              (vim/append-to-buffer! game @session/*session (first repl-output)))
-            (assoc game ::c/repl-output (vec (rest repl-output))))
-          (if-let [input (async/poll! append-repl-chan)] ;; poll for more repl output
-            (recur input repl-output)
-            game))))))
+  (if-let [input (or (async/poll! vim-chan)
+                     (async/poll! append-repl-chan))]
+    (case (first input)
+      :append (assoc game ::c/repl-output (conj repl-output (second input)))
+      :new-buf (do
+                 (some->> (second input) (v/set-current-buffer vim))
+                 (vim/update-window-size! game)
+                 game))
+    (if (vim/ready-to-append? @session/*session vim repl-output)
+      (do
+        (binding [vim/*update-ui?* false]
+          (vim/append-to-buffer! game @session/*session (first repl-output)))
+        (assoc game ::c/repl-output (vec (rest repl-output))))
+      game)))
 
 (defn ->window []
   (when-not (GLFW/glfwInit)
