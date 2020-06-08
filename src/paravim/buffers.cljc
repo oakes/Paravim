@@ -251,9 +251,10 @@
                   :visible-end-line lines-to-crop-count))))))
 
 (defn range->rects [text-entity font-width font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
-  (vec (for [line-num (range start-line (inc end-line))]
-         (let [line-chars (-> text-entity :characters (nth line-num))
-               start-column (if (= line-num start-line) start-column 0)
+  (vec (for [line-num (range start-line (inc end-line))
+             :let [line-chars (-> text-entity :characters (get line-num))]
+             :when line-chars]
+         (let [start-column (if (= line-num start-line) start-column 0)
                end-column (if (= line-num end-line) end-column (count line-chars))]
            {:left (* font-width start-column)
             ;; to support variable width fonts, we would need...
