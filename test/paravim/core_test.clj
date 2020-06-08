@@ -5,13 +5,15 @@
             [paravim.session :as session]
             [libvim-clj.core :as v]
             [paravim.core :as c]
-            [play-cljc.gl.core :as pc])
+            [play-cljc.gl.core :as pc]
+            [clojure.core.async :as async])
   (:import [org.lwjgl.glfw GLFW]))
 
 (def window (start/->window))
+(def game (assoc (pc/->game window) ::start/disable-repl? true))
 (def vim (vim/->vim))
-(def game (pc/->game window))
-(def inited-game (start/init game vim nil))
+(def chan (async/chan))
+(def inited-game (start/init game vim chan))
 
 (defn get-characters [buffer-ptr entity-key]
   (get-in (session/get-buffer @session/*session {:?id buffer-ptr}) [entity-key :characters]))

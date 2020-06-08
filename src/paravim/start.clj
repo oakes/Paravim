@@ -211,11 +211,7 @@
   ([game]
    (init game (vim/->vim) (async/chan)))
   ([game vim command-chan]
-   (let [poll-input! (if command-chan
-                       poll-input!
-                       ;; only used in tests
-                       identity)
-         pipes (repl/create-pipes)
+   (let [pipes (repl/create-pipes)
          density-ratio (get-density-ratio (:context game))
          game (assoc game
                 ::c/pipes pipes
@@ -227,7 +223,7 @@
        (swap! session/*session c/font-multiply density-ratio))
      (c/init game)
      (vim/init game)
-     (when command-chan
+     (when-not (::disable-repl? game)
        (repl/start-repl-thread! nil pipes (fn [output]
                                             (async/put! command-chan [:append output])
                                             ;; since we're using glfwWaitEvents, we need to post an empty event
