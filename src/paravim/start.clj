@@ -128,9 +128,7 @@
                    (GLFW/glfwSetClipboardString window text)))
             :v (when (= mode 'INSERT)
                  (let [text (GLFW/glfwGetClipboardString window)]
-                   (v/execute vim "set paste") ;; prevents auto indent
-                   (vim/on-bulk-input vim text)
-                   (v/execute vim "set nopaste")))
+                   (vim/on-bulk-input vim text false)))
             ; else
             (when-let [key-name (if k
                                   (keyword->name k)

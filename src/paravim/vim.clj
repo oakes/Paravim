@@ -186,10 +186,17 @@
                (not= s "u"))
       (apply-parinfer! session vim))))
 
-(defn on-bulk-input [vim s]
+(def ^:const max-line-length 100)
+
+(defn on-bulk-input [vim s limit-line-length?]
+  (v/execute vim "set paste") ;; prevents auto indent
   (doseq [ch s
           :when (not= ch \return)]
+    (when (and limit-line-length?
+               (>= (v/get-cursor-column vim) max-line-length))
+      (v/input vim "<Enter>"))
     (v/input vim (str ch)))
+  (v/execute vim "set nopaste")
   (swap! session/*session update-after-input vim s))
 
 (defn repl-enter! [vim session {:keys [out out-pipe]}]
@@ -207,8 +214,6 @@
       (.write text)
       .flush)))
 
-(def ^:const max-line-length 100)
-
 (defn append-to-buffer! [{:keys [::c/vim] :as game} session input]
   (when-let [buffer (:buffer-id (session/get-tab session {:?id :repl-out}))]
     (let [current-buffer (v/get-current-buffer vim)
@@ -217,17 +222,12 @@
           _ (v/set-current-buffer vim buffer)
           line-count (v/get-line-count vim buffer)
           char-count (count (v/get-line vim buffer line-count))]
-      (v/execute vim "set paste") ;; prevents auto indent
       (v/set-cursor-position vim line-count (dec char-count))
       (on-input vim session "a")
-      (doseq [ch input]
-        (when (>= (v/get-cursor-column vim) max-line-length)
-          (on-input vim session "<Enter>"))
-        (on-input vim session (str ch)))
+      (on-bulk-input vim input true)
       (on-input vim session "<Esc>")
       (v/set-current-buffer vim current-buffer)
-      (v/set-cursor-position vim cursor-line cursor-column)
-      (v/execute vim "set nopaste"))))
+      (v/set-cursor-position vim cursor-line cursor-column))))
 
 (defn on-buf-enter [game vim buffer-ptr]
   (let [path (v/get-file-name vim buffer-ptr)
