@@ -211,7 +211,7 @@
                :width (* width font-size)
                :height (* height font-size)))))
 
-(defn adjust-camera [{:keys [camera-x camera-y] :as buffer} font-size text-box {:keys [font-width font-height] :as constants} window]
+(defn adjust-camera [buffer camera-x camera-y font-size text-box {:keys [font-width font-height] :as constants} window]
   (let [{game-width :width game-height :height} window
         text-top ((:top text-box) game-height font-size)
         text-bottom ((:bottom text-box) game-height font-size)

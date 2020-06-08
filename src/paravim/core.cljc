@@ -194,6 +194,8 @@
      :camera-target-x 0
      :camera-target-y 0
      :camera-animation-time 0
+     :scroll-speed-x 0
+     :scroll-speed-y 0
      :path path
      :file-name file-name
      :lines lines

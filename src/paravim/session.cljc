@@ -30,6 +30,7 @@
                    text-entity parinfer-text-entity
                    parsed-code needs-parinfer? needs-parinfer-init? needs-clojure-refresh?
                    camera camera-x camera-y camera-target-x camera-target-y camera-animation-time
+                   scroll-speed-x scroll-speed-y
                    path file-name
                    lines clojure?
                    cursor-line cursor-column
@@ -49,7 +50,17 @@
                       highlight-text-entities])
 (defrecord Scroll [xoffset yoffset])
 
-(def ^:const scroll-speed 20)
+(def ^:const damping 0.1)
+(def ^:const scroll-speed 30)
+(def ^:const min-scroll-speed 5)
+(def ^:const deceleration 0.8)
+
+(defn decelerate
+  [speed]
+  (let [speed (* speed deceleration)]
+    (if (< speed damping)
+      0
+      speed)))
 
 (defn change-font-size! [{:keys [size] :as font} diff]
   (let [new-val (+ size diff)]
@@ -252,33 +263,41 @@
     (let [current-tab CurrentTab
           tab Tab
           :when (= (:id tab) (:id current-tab))
-          {:keys [camera-target-x camera-target-y] :as buffer} Buffer
+          {:keys [camera-target-x camera-target-y scroll-speed-x scroll-speed-y] :as buffer} Buffer
           :when (= (:id buffer) (:buffer-id tab))
           {:keys [xoffset yoffset] :as scroll} Scroll]
       (clara/retract! scroll)
       (let [limit 5
             xoffset (-> xoffset (min limit) (max (- limit)))
-            yoffset (-> yoffset (min limit) (max (- limit)))]
-        (clarax/merge! buffer {:camera-target-x (+ camera-target-x (* -1 scroll-speed xoffset))
-                               :camera-target-y (+ camera-target-y (* -1 scroll-speed yoffset))})))
+            yoffset (-> yoffset (min limit) (max (- limit)))
+            xdiff (* -1 scroll-speed xoffset)
+            ydiff (* -1 scroll-speed yoffset)]
+        (clarax/merge! buffer {:camera-target-x (+ camera-target-x xdiff)
+                               :camera-target-y (+ camera-target-y ydiff)
+                               :scroll-speed-x (+ scroll-speed-x (math abs (long xdiff)))
+                               :scroll-speed-y (+ scroll-speed-y (math abs (long ydiff)))})))
     :rubber-band-effect
     (let [window Window
           font Font
           current-tab CurrentTab
           tab Tab
           :when (= (:id tab) (:id current-tab))
-          {:keys [camera-x camera-y camera-target-x camera-target-y] :as buffer} Buffer
-          :when (and (= (:id buffer) (:buffer-id tab))
-                     (and (== camera-x camera-target-x)
-                          (== camera-y camera-target-y)))
+          {:keys [camera-x camera-y camera-target-x camera-target-y scroll-speed-x scroll-speed-y] :as buffer} Buffer
+          :when (= (:id buffer) (:buffer-id tab))
           text-box TextBox
           :when (= (:id text-box) (:tab-id buffer))
           constants Constants]
-      (let [[new-x new-y] (buffers/adjust-camera buffer (:size font) text-box constants window)]
-        (when (or (not (== camera-x new-x))
-                  (not (== camera-y new-y)))
+      (let [[new-x new-y] (buffers/adjust-camera buffer camera-target-x camera-target-y (:size font) text-box constants window)]
+        (when (or (not (== camera-target-x new-x))
+                  (not (== camera-target-y new-y)))
           (clarax/merge! buffer {:camera-target-x new-x
-                                 :camera-target-y new-y}))))
+                                 :camera-target-y new-y
+                                 :scroll-speed-x (if (not (== camera-target-x new-x))
+                                                   min-scroll-speed
+                                                   scroll-speed-x)
+                                 :scroll-speed-y (if (not (== camera-target-y new-y))
+                                                   min-scroll-speed
+                                                   scroll-speed-y)}))))
     :move-camera-to-target
     (let [{:keys [delta-time total-time] :as game} Game
           window Window
@@ -286,7 +305,7 @@
           current-tab CurrentTab
           tab Tab
           :when (= (:id tab) (:id current-tab))
-          {:keys [camera-x camera-y camera-target-x camera-target-y] :as buffer} Buffer
+          {:keys [camera-x camera-y camera-target-x camera-target-y scroll-speed-x scroll-speed-y] :as buffer} Buffer
           :when (and (= (:id buffer) (:buffer-id tab))
                      (not= total-time (:camera-animation-time buffer))
                      (or (not (== camera-x camera-target-x))
@@ -298,13 +317,21 @@
             y-diff (long (- camera-target-y camera-y))
             new-x (if (< (math abs x-diff) min-diff)
                     camera-target-x
-                    (+ camera-x (* x-diff delta-time scroll-speed)))
+                    (+ camera-x (* x-diff (min 1 (* delta-time scroll-speed-x)))))
             new-y (if (< (math abs y-diff) min-diff)
                     camera-target-y
-                    (+ camera-y (* y-diff delta-time scroll-speed)))]
+                    (+ camera-y (* y-diff (min 1 (* delta-time scroll-speed-y)))))
+            new-speed-x (if (== new-x camera-target-x)
+                          0
+                          (decelerate scroll-speed-x))
+            new-speed-y (if (== new-y camera-target-y)
+                          0
+                          (decelerate scroll-speed-y))]
         (clarax/merge! buffer
           (assoc (buffers/update-camera buffer new-x new-y (:size font) text-box window)
-            :camera-animation-time total-time))))
+            :camera-animation-time total-time
+            :scroll-speed-x new-speed-x
+            :scroll-speed-y new-speed-y))))
     :show-search-when-command-starts
     (let [command Command
           vim Vim
