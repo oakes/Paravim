@@ -228,7 +228,11 @@
      (c/init game)
      (vim/init game)
      (when command-chan
-       (repl/start-repl-thread! nil pipes #(async/put! command-chan [:append %])))
+       (repl/start-repl-thread! nil pipes (fn [output]
+                                            (async/put! command-chan [:append output])
+                                            ;; since we're using glfwWaitEvents, we need to post an empty event
+                                            ;; from the repl thread to make sure the render loop stops idling
+                                            (GLFW/glfwPostEmptyEvent))))
      game)))
 
 (defn- start [game window]
@@ -247,7 +251,12 @@
                           :total-time ts)
               game (c/tick game)]
           (GLFW/glfwSwapBuffers window)
-          (GLFW/glfwPollEvents)
+          ;; if there is repl output, call the non-blocking glfwPollEvents function.
+          ;; that way, it will continue the loop immediately so the repl can be populated quickly.
+          ;; if there is no repl output, call glfwWaitEvents so we don't use a lot of CPU while idling.
+          (if (seq (::c/repl-output game))
+            (GLFW/glfwPollEvents)
+            (GLFW/glfwWaitEvents))
           (recur game))))
     (Callbacks/glfwFreeCallbacks window)
     (GLFW/glfwDestroyWindow window)
