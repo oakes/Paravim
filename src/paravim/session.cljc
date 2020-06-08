@@ -218,12 +218,11 @@
         (-> buffer
             (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
             (assoc :font font)))
-      (async/put! (:paravim.core/command-chan game) [:resize-window]))
+      (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     :update-cursor-when-window-resizes
     (let [game Game
           window Window
           font Font
-          window Window
           current-tab CurrentTab
           tab Tab
           :when (= (:id tab) (:id current-tab))
@@ -243,7 +242,7 @@
         (-> buffer
             (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
             (assoc :window window)))
-      (async/put! (:paravim.core/command-chan game) [:resize-window]))
+      (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     :show-search-when-command-starts
     (let [command Command
           vim Vim

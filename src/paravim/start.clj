@@ -172,8 +172,9 @@
         (invoke [this window]
           (System/exit 0))))))
 
-(defn- poll-input! [{:keys [context ::c/vim ::c/command-chan ::c/repl-output] :as game}]
-  (if-let [input (async/poll! command-chan)]
+(defn- poll-input! [{:keys [context ::c/vim ::c/command-chan ::c/single-command-chan ::c/repl-output] :as game}]
+  (if-let [input (or (async/poll! command-chan)
+                     (async/poll! single-command-chan))]
     (case (first input)
       :append (assoc game ::c/repl-output (conj repl-output (second input)))
       :new-buf (some->> (second input) (v/set-current-buffer vim))
@@ -214,6 +215,8 @@
                 ::c/poll-input! poll-input!
                 ::c/vim vim
                 ::c/command-chan command-chan
+                ;; single-command-chan is like command-chan but can only contain one command
+                ::c/single-command-chan (async/chan (async/sliding-buffer 1))
                 ::c/repl-output [])]
      (when (pos-int? density-ratio)
        (swap! session/*session c/font-multiply density-ratio))
