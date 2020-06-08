@@ -203,7 +203,8 @@
       (clara/retract! new-tab)
       (async/put! (:paravim.core/command-chan game) [:new-buf (:buffer-id tab)]))
     :update-cursor-when-font-changes
-    (let [window Window
+    (let [game Game
+          window Window
           font Font
           buffer Buffer
           :when (and (not= font (:font buffer))
@@ -216,7 +217,8 @@
       (clarax/merge! buffer
         (-> buffer
             (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
-            (assoc :font font))))
+            (assoc :font font)))
+      (async/put! (:paravim.core/command-chan game) [:resize-window]))
     :update-cursor-when-window-resizes
     (let [game Game
           window Window
@@ -240,7 +242,8 @@
       (clarax/merge! buffer
         (-> buffer
             (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
-            (assoc :window window))))
+            (assoc :window window)))
+      (async/put! (:paravim.core/command-chan game) [:resize-window]))
     :show-search-when-command-starts
     (let [command Command
           vim Vim

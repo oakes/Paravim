@@ -11,7 +11,7 @@
   (:import [java.time LocalDate]))
 
 (def ^:dynamic *update-ui?* true)
-(def ^:dynamic *update-window-title?* true)
+(def ^:dynamic *update-window?* true)
 
 (defn set-window-size! [vim session width height]
   (let [{:keys [font-height font-width] :as constants} (session/get-constants session)
@@ -29,7 +29,8 @@
 (defn update-window-size! [{:keys [::c/vim] :as game}]
   (let [width (utils/get-width game)
         height (utils/get-height game)]
-    (set-window-size! vim @session/*session width height)))
+    (set-window-size! vim @session/*session width height))
+  nil)
 
 (defn ready-to-append? [session vim output]
   (and (seq output)
@@ -230,6 +231,8 @@
       (v/set-cursor-position vim cursor-line cursor-column))))
 
 (defn on-buf-enter [game vim buffer-ptr]
+  (when *update-window?*
+    (async/put! (::c/command-chan game) [:resize-window]))
   (let [path (v/get-file-name vim buffer-ptr)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
                      (v/get-line vim buffer-ptr (inc i))))]
@@ -252,7 +255,7 @@
                      (assoc (c/->buffer buffer-ptr constants path file-name lines current-tab)
                        :cursor-line (dec (v/get-cursor-line vim))
                        :cursor-column (v/get-cursor-column vim)))]
-        (when *update-window-title?*
+        (when *update-window?*
           (async/put! (::c/command-chan game) [:set-window-title (str file-name " - Paravim")]))
         (swap! session/*session
           (fn [session]
@@ -262,7 +265,7 @@
                 (c/upsert-buffer buffer)
                 (c/insert-buffer-refresh buffer-ptr)))))
       (do
-        (when *update-window-title?*
+        (when *update-window?*
           (async/put! (::c/command-chan game) [:set-window-title "Paravim"]))
         ;; clear the files tab
         (swap! session/*session c/update-tab :files nil)))))
@@ -331,7 +334,7 @@
                          (when-let [lines (yank-lines yank-info)]
                            (async/put! (::c/command-chan game) [:set-clipboard-string (str/join \newline lines)]))
                          (catch Exception e (.printStackTrace e)))))
-  (binding [*update-window-title?* false]
+  (binding [*update-window?* false]
     (run! #(v/open-buffer vim (constants/tab->path %)) [:repl-in :repl-out :files]))
   (init-ascii!)
   (update-window-size! game))

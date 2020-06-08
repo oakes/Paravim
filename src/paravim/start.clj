@@ -143,8 +143,7 @@
   (vim/on-input vim @session/*session (str (char codepoint))))
 
 (defn on-resize! [game window width height]
-  (swap! session/*session c/update-window-size width height)
-  (vim/update-window-size! game))
+  (swap! session/*session c/update-window-size width height))
 
 (defn- listen-for-events [game window]
   (doto window
@@ -177,17 +176,14 @@
   (if-let [input (async/poll! command-chan)]
     (case (first input)
       :append (assoc game ::c/repl-output (conj repl-output (second input)))
-      :new-buf (do
-                 (some->> (second input) (v/set-current-buffer vim))
-                 (vim/update-window-size! game)
-                 nil)
+      :new-buf (some->> (second input) (v/set-current-buffer vim))
       :set-window-title (GLFW/glfwSetWindowTitle context (second input))
-      :set-clipboard-string (GLFW/glfwSetClipboardString context (second input)))
+      :set-clipboard-string (GLFW/glfwSetClipboardString context (second input))
+      :resize-window (vim/update-window-size! game))
     (when (vim/ready-to-append? @session/*session vim repl-output)
-      (do
-        (binding [vim/*update-ui?* false]
-          (vim/append-to-buffer! game @session/*session (first repl-output)))
-        (assoc game ::c/repl-output (vec (rest repl-output)))))))
+      (binding [vim/*update-ui?* false]
+        (vim/append-to-buffer! game @session/*session (first repl-output)))
+      (assoc game ::c/repl-output (vec (rest repl-output))))))
 
 (defn ->window []
   (when-not (GLFW/glfwInit)
