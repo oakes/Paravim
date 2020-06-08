@@ -264,16 +264,13 @@
                                (> cursor-bottom camera-bottom 0)
                                (- cursor-bottom text-height)
                                :else
-                               camera-y)
-                    [lines-to-skip-count lines-to-crop-count] (get-visible-lines text-entity constants text-box game-height camera-y font-size)]
+                               camera-y)]
                 (assoc buffer
                   :camera (t/translate constants/orig-camera camera-x (- camera-y text-top))
                   :camera-x camera-x
                   :camera-y camera-y
                   :camera-target-x camera-x
-                  :camera-target-y camera-y
-                  :visible-start-line lines-to-skip-count
-                  :visible-end-line lines-to-crop-count))))))
+                  :camera-target-y camera-y))))))
 
 (defn range->rects [text-entity font-width font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
   (vec (for [line-num (range start-line (inc end-line))
