@@ -49,7 +49,7 @@
                       highlight-text-entities])
 (defrecord Scroll [xoffset yoffset])
 
-(def ^:const scroll-speed 15)
+(def ^:const scroll-speed 20)
 
 (defn change-font-size! [{:keys [size] :as font} diff]
   (let [new-val (+ size diff)]
@@ -249,35 +249,31 @@
             (assoc :window window)))
       (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     :scroll
-    (let [window Window
-          font Font
-          current-tab CurrentTab
-          tab Tab
-          :when (= (:id tab) (:id current-tab))
-          {:keys [camera-x camera-y] :as buffer} Buffer
-          :when (= (:id buffer) (:buffer-id tab))
-          text-box TextBox
-          :when (= (:id text-box) (:tab-id buffer))
-          {:keys [xoffset yoffset] :as scroll} Scroll]
-      (clara/retract! scroll)
-      (clarax/merge! buffer
-        (buffers/update-camera buffer
-                               (+ camera-x (* -1 scroll-speed xoffset))
-                               (+ camera-y (* -1 scroll-speed yoffset))
-                               (:size font)
-                               text-box
-                               window)))
-    :prevent-scroll-past-edge
     (let [current-tab CurrentTab
           tab Tab
           :when (= (:id tab) (:id current-tab))
-          buffer Buffer
-          :when (= (:id buffer) (:buffer-id tab))]
+          {:keys [camera-target-x camera-target-y] :as buffer} Buffer
+          :when (= (:id buffer) (:buffer-id tab))
+          {:keys [xoffset yoffset] :as scroll} Scroll]
+      (clara/retract! scroll)
+      (let [limit 5
+            xoffset (-> xoffset (min limit) (max (- limit)))
+            yoffset (-> yoffset (min limit) (max (- limit)))]
+        (clarax/merge! buffer {:camera-target-x (+ camera-target-x (* -1 scroll-speed xoffset))
+                               :camera-target-y (+ camera-target-y (* -1 scroll-speed yoffset))})))
+    :rubber-band-effect
+    (let [current-tab CurrentTab
+          tab Tab
+          :when (= (:id tab) (:id current-tab))
+          {:keys [camera-x camera-y camera-target-x camera-target-y] :as buffer} Buffer
+          :when (and (= (:id buffer) (:buffer-id tab))
+                     (and (== camera-x camera-target-x)
+                          (== camera-y camera-target-y)))]
       (when-let [new-args (cond-> nil
-                                  (neg? (:camera-target-x buffer))
-                                  (assoc :camera-target-x 0.0)
-                                  (neg? (:camera-target-y buffer))
-                                  (assoc :camera-target-y 0.0))]
+                                  (neg? camera-target-x)
+                                  (assoc :camera-target-x 0)
+                                  (neg? camera-target-y)
+                                  (assoc :camera-target-y 0))]
         (clarax/merge! buffer new-args)))
     :move-camera-to-target
     (let [{:keys [delta-time total-time] :as game} Game
@@ -289,8 +285,8 @@
           {:keys [camera-x camera-y camera-target-x camera-target-y] :as buffer} Buffer
           :when (and (= (:id buffer) (:buffer-id tab))
                      (not= total-time (:camera-animation-time buffer))
-                     (or (not= camera-x camera-target-x)
-                         (not= camera-y camera-target-y)))
+                     (or (not (== camera-x camera-target-x))
+                         (not (== camera-y camera-target-y))))
           text-box TextBox
           :when (= (:id text-box) (:tab-id buffer))]
       (let [min-diff 0.01
