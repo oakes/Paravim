@@ -226,6 +226,7 @@
       (v/set-cursor-position vim line-count (dec char-count))
       (on-input vim session "a")
       (on-bulk-input vim input true)
+      (v/set-cursor-position vim (v/get-cursor-line vim) 0) ;; fix the repl's horiz scroll position after printing output
       (on-input vim session "<Esc>")
       (v/set-current-buffer vim current-buffer)
       (v/set-cursor-position vim cursor-line cursor-column))))
