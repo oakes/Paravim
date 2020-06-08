@@ -6,7 +6,9 @@
             [clojure.string :as str]
             [clojure.core.async :as async]
             #?(:clj  [clarax.macros-java :refer [->session]]
-               :cljs [clarax.macros-js :refer-macros [->session]]))
+               :cljs [clarax.macros-js :refer-macros [->session]])
+            #?(:clj  [play-cljc.macros-java :refer [math]]
+               :cljs [play-cljc.macros-js :refer-macros [math]]))
   #?(:cljs (:require-macros [paravim.session :refer [->session-wrapper]])))
 
 (defrecord Game [total-time delta-time context])
@@ -27,7 +29,7 @@
 (defrecord Buffer [id tab-id
                    text-entity parinfer-text-entity
                    parsed-code needs-parinfer? needs-parinfer-init? needs-clojure-refresh?
-                   camera camera-x camera-y
+                   camera camera-x camera-y camera-target-x camera-target-y camera-animation-time
                    path file-name
                    lines clojure?
                    cursor-line cursor-column
@@ -46,6 +48,8 @@
                       toolbar-text-entities
                       highlight-text-entities])
 (defrecord Scroll [xoffset yoffset])
+
+(def ^:const scroll-speed 15)
 
 (defn change-font-size! [{:keys [size] :as font} diff]
   (let [new-val (+ size diff)]
@@ -250,14 +254,57 @@
           current-tab CurrentTab
           tab Tab
           :when (= (:id tab) (:id current-tab))
-          buffer Buffer
+          {:keys [camera-x camera-y] :as buffer} Buffer
           :when (= (:id buffer) (:buffer-id tab))
           text-box TextBox
           :when (= (:id text-box) (:tab-id buffer))
           {:keys [xoffset yoffset] :as scroll} Scroll]
       (clara/retract! scroll)
       (clarax/merge! buffer
-        (buffers/update-camera buffer xoffset yoffset (:size font) text-box window)))
+        (buffers/update-camera buffer
+                               (+ camera-x (* -1 scroll-speed xoffset))
+                               (+ camera-y (* -1 scroll-speed yoffset))
+                               (:size font)
+                               text-box
+                               window)))
+    :prevent-scroll-past-edge
+    (let [current-tab CurrentTab
+          tab Tab
+          :when (= (:id tab) (:id current-tab))
+          buffer Buffer
+          :when (= (:id buffer) (:buffer-id tab))]
+      (when-let [new-args (cond-> nil
+                                  (neg? (:camera-target-x buffer))
+                                  (assoc :camera-target-x 0.0)
+                                  (neg? (:camera-target-y buffer))
+                                  (assoc :camera-target-y 0.0))]
+        (clarax/merge! buffer new-args)))
+    :move-camera-to-target
+    (let [{:keys [delta-time total-time] :as game} Game
+          window Window
+          font Font
+          current-tab CurrentTab
+          tab Tab
+          :when (= (:id tab) (:id current-tab))
+          {:keys [camera-x camera-y camera-target-x camera-target-y] :as buffer} Buffer
+          :when (and (= (:id buffer) (:buffer-id tab))
+                     (not= total-time (:camera-animation-time buffer))
+                     (or (not= camera-x camera-target-x)
+                         (not= camera-y camera-target-y)))
+          text-box TextBox
+          :when (= (:id text-box) (:tab-id buffer))]
+      (let [min-diff 0.01
+            x-diff (- camera-target-x camera-x)
+            y-diff (- camera-target-y camera-y)
+            new-x (if (< (math abs x-diff) min-diff)
+                    camera-target-x
+                    (+ camera-x (* x-diff delta-time scroll-speed)))
+            new-y (if (< (math abs y-diff) min-diff)
+                    camera-target-y
+                    (+ camera-y (* y-diff delta-time scroll-speed)))]
+        (clarax/merge! buffer
+          (assoc (buffers/update-camera buffer new-x new-y (:size font) text-box window)
+            :camera-animation-time total-time))))
     :show-search-when-command-starts
     (let [command Command
           vim Vim

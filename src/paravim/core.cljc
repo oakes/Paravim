@@ -191,6 +191,9 @@
      :camera (t/translate constants/orig-camera 0 0)
      :camera-x 0
      :camera-y 0
+     :camera-target-x 0
+     :camera-target-y 0
+     :camera-animation-time 0
      :path path
      :file-name file-name
      :lines lines
@@ -436,9 +439,13 @@
                            (t/scale font-size-multiplier font-size-multiplier)))))
     ;; insert/update the game record
     (if-let [game' (session/get-game session)]
-      (let [game (merge game' game)
-            poll-input! (:paravim.core/poll-input! game)]
-        (or (poll-input! game)
-            game))
+      (let [poll-input! (:paravim.core/poll-input! game)
+            game (or (poll-input! game) game)]
+				(swap! session/*session
+          (fn [session]
+            (-> session
+                (clarax/merge game' game)
+                clara/fire-rules)))
+        game)
       (init game))))
 
