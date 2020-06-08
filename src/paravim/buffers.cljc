@@ -211,6 +211,18 @@
                :width (* width font-size)
                :height (* height font-size)))))
 
+(def ^:const scroll-speed 15)
+
+(defn update-camera [buffer x y font-size text-box window]
+  (let [{game-height :height} window
+        text-top ((:top text-box) game-height font-size)
+        camera-x (+ (:camera-x buffer) (* -1 x scroll-speed))
+        camera-y (+ (:camera-y buffer) (* -1 y scroll-speed))]
+    (assoc buffer
+      :camera (t/translate constants/orig-camera camera-x (- camera-y text-top))
+      :camera-x camera-x
+      :camera-y camera-y)))
+
 (defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} vim-mode font-size text-box {:keys [base-rects-entity] :as constants} window]
   (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
         {:keys [left top width height] :as cursor-entity} (->cursor-entity vim-mode constants line-chars cursor-line cursor-column font-size)]

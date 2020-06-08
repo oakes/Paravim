@@ -45,6 +45,7 @@
                       roboto-text-entity
                       toolbar-text-entities
                       highlight-text-entities])
+(defrecord Scroll [xoffset yoffset])
 
 (defn change-font-size! [{:keys [size] :as font} diff]
   (let [new-val (+ size diff)]
@@ -243,6 +244,20 @@
             (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
             (assoc :window window)))
       (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
+    :scroll
+    (let [window Window
+          font Font
+          current-tab CurrentTab
+          tab Tab
+          :when (= (:id tab) (:id current-tab))
+          buffer Buffer
+          :when (= (:id buffer) (:buffer-id tab))
+          text-box TextBox
+          :when (= (:id text-box) (:tab-id buffer))
+          {:keys [xoffset yoffset] :as scroll} Scroll]
+      (clara/retract! scroll)
+      (clarax/merge! buffer
+        (buffers/update-camera buffer xoffset yoffset (:size font) text-box window)))
     :show-search-when-command-starts
     (let [command Command
           vim Vim

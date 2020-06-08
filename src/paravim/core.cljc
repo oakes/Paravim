@@ -66,6 +66,11 @@
       (clara/insert (session/->MouseClick button))
       clara/fire-rules))
 
+(defn scroll [session xoffset yoffset]
+  (-> session
+      (clara/insert (session/->Scroll xoffset yoffset))
+      clara/fire-rules))
+
 (defn insert-buffer-update [session m]
   (-> session
       (clara/insert (session/map->BufferUpdate m))

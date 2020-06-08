@@ -8,7 +8,8 @@
             [clojure.core.async :as async])
   (:import  [org.lwjgl.glfw GLFW Callbacks
              GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWMouseButtonCallbackI
-             GLFWCharCallbackI GLFWFramebufferSizeCallbackI GLFWWindowCloseCallbackI]
+             GLFWCharCallbackI GLFWFramebufferSizeCallbackI GLFWWindowCloseCallbackI
+             GLFWScrollCallbackI]
             [org.lwjgl.opengl GL GL33]
             [org.lwjgl.system MemoryUtil])
   (:gen-class))
@@ -145,6 +146,9 @@
 (defn on-resize! [game window width height]
   (swap! session/*session c/update-window-size width height))
 
+(defn on-scroll! [game window xoffset yoffset]
+  (swap! session/*session c/scroll xoffset yoffset))
+
 (defn- listen-for-events [game window]
   (doto window
     (GLFW/glfwSetCursorPosCallback
@@ -167,6 +171,10 @@
       (reify GLFWFramebufferSizeCallbackI
         (invoke [this window width height]
           (on-resize! game window width height))))
+    (GLFW/glfwSetScrollCallback
+      (reify GLFWScrollCallbackI
+        (invoke [this window xoffset yoffset]
+          (on-scroll! game window xoffset yoffset))))
     (GLFW/glfwSetWindowCloseCallback
       (reify GLFWWindowCloseCallbackI
         (invoke [this window]
