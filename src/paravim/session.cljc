@@ -50,16 +50,16 @@
                       highlight-text-entities])
 (defrecord Scroll [xoffset yoffset])
 
-(def ^:const damping 0.1)
-(def ^:const scroll-speed 30)
+(def ^:const scroll-speed 25)
+(def ^:const scroll-limit 25) ;; per scroll, not cumulative limit
 (def ^:const min-scroll-speed 5)
 (def ^:const deceleration 0.8)
 
 (defn decelerate
   [speed]
   (let [speed (* speed deceleration)]
-    (if (< speed damping)
-      0
+    (if (< speed min-scroll-speed)
+      min-scroll-speed
       speed)))
 
 (defn change-font-size! [{:keys [size] :as font} diff]
@@ -263,13 +263,19 @@
     (let [current-tab CurrentTab
           tab Tab
           :when (= (:id tab) (:id current-tab))
-          {:keys [camera-target-x camera-target-y scroll-speed-x scroll-speed-y] :as buffer} Buffer
+          {:keys [camera-x camera-target-x camera-target-y scroll-speed-x scroll-speed-y] :as buffer} Buffer
           :when (= (:id buffer) (:buffer-id tab))
           {:keys [xoffset yoffset] :as scroll} Scroll]
       (clara/retract! scroll)
-      (let [limit 5
-            xoffset (-> xoffset (min limit) (max (- limit)))
-            yoffset (-> yoffset (min limit) (max (- limit)))
+      (let [;; make the left edge "sticky" so it doesn't move unintentionally
+            xoffset (if (and (== camera-x 0)
+                             (< (math abs (long xoffset)) scroll-limit))
+                      0
+                      xoffset)
+            ;; restrict the offsets to discard excessive values
+            xoffset (-> xoffset (min scroll-limit) (max (- scroll-limit)))
+            yoffset (-> yoffset (min scroll-limit) (max (- scroll-limit)))
+            ;; flip the sign because the camera must go the opposite direction
             xdiff (* -1 scroll-speed xoffset)
             ydiff (* -1 scroll-speed yoffset)]
         (clarax/merge! buffer {:camera-target-x (+ camera-target-x xdiff)
