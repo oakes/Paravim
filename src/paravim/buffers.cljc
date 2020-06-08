@@ -221,8 +221,8 @@
         text-height (* (count char-counts) font-size font-height)
         max-x (- text-width game-width)
         max-y (- text-height (- text-bottom text-top))]
-    [(-> camera-x (max 0) (min max-x) long)
-     (-> camera-y (max 0) (min max-y) long)]))
+    [(-> camera-x (max 0) (min max-x))
+     (-> camera-y (max 0) (min max-y))]))
 
 (defn update-camera [buffer camera-x camera-y font-size text-box window]
   (let [{game-height :height} window

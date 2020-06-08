@@ -294,8 +294,8 @@
           text-box TextBox
           :when (= (:id text-box) (:tab-id buffer))]
       (let [min-diff 0.01
-            x-diff (- camera-target-x camera-x)
-            y-diff (- camera-target-y camera-y)
+            x-diff (long (- camera-target-x camera-x))
+            y-diff (long (- camera-target-y camera-y))
             new-x (if (< (math abs x-diff) min-diff)
                     camera-target-x
                     (+ camera-x (* x-diff delta-time scroll-speed)))
