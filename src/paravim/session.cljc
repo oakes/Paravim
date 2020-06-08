@@ -262,19 +262,23 @@
         (clarax/merge! buffer {:camera-target-x (+ camera-target-x (* -1 scroll-speed xoffset))
                                :camera-target-y (+ camera-target-y (* -1 scroll-speed yoffset))})))
     :rubber-band-effect
-    (let [current-tab CurrentTab
+    (let [window Window
+          font Font
+          current-tab CurrentTab
           tab Tab
           :when (= (:id tab) (:id current-tab))
           {:keys [camera-x camera-y camera-target-x camera-target-y] :as buffer} Buffer
           :when (and (= (:id buffer) (:buffer-id tab))
                      (and (== camera-x camera-target-x)
-                          (== camera-y camera-target-y)))]
-      (when-let [new-args (cond-> nil
-                                  (neg? camera-target-x)
-                                  (assoc :camera-target-x 0)
-                                  (neg? camera-target-y)
-                                  (assoc :camera-target-y 0))]
-        (clarax/merge! buffer new-args)))
+                          (== camera-y camera-target-y)))
+          text-box TextBox
+          :when (= (:id text-box) (:tab-id buffer))
+          constants Constants]
+      (let [[new-x new-y] (buffers/adjust-camera buffer (:size font) text-box constants window)]
+        (when (or (not (== camera-x new-x))
+                  (not (== camera-y new-y)))
+          (clarax/merge! buffer {:camera-target-x new-x
+                                 :camera-target-y new-y}))))
     :move-camera-to-target
     (let [{:keys [delta-time total-time] :as game} Game
           window Window

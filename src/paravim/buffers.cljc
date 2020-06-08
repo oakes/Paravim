@@ -211,6 +211,19 @@
                :width (* width font-size)
                :height (* height font-size)))))
 
+(defn adjust-camera [{:keys [camera-x camera-y] :as buffer} font-size text-box {:keys [font-width font-height] :as constants} window]
+  (let [{game-width :width game-height :height} window
+        text-top ((:top text-box) game-height font-size)
+        text-bottom ((:bottom text-box) game-height font-size)
+        char-counts (get-in buffer [:text-entity :uniforms 'u_char_counts])
+        max-line-count (apply max char-counts)
+        text-width (* max-line-count font-size font-width)
+        text-height (* (count char-counts) font-size font-height)
+        max-x (- text-width game-width)
+        max-y (- text-height (- text-bottom text-top))]
+    [(-> camera-x (max 0) (min max-x) long)
+     (-> camera-y (max 0) (min max-y) long)]))
+
 (defn update-camera [buffer camera-x camera-y font-size text-box window]
   (let [{game-height :height} window
         text-top ((:top text-box) game-height font-size)]
