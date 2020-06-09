@@ -188,7 +188,8 @@
       :new-buf (some->> (second input) (v/set-current-buffer vim))
       :set-window-title (GLFW/glfwSetWindowTitle context (second input))
       :set-clipboard-string (GLFW/glfwSetClipboardString context (second input))
-      :resize-window (vim/update-window-size! game))
+      :resize-window (vim/update-window-size! game)
+      :move-cursor (apply vim/update-cursor-position! vim (second input)))
     (when (vim/ready-to-append? @session/*session vim repl-output)
       (binding [vim/*update-ui?* false]
         (vim/append-to-buffer! game @session/*session (first repl-output)))

@@ -145,6 +145,18 @@
           (v/input vim s))))
     (v/input vim s)))
 
+(defn update-buffer [session buffer-ptr cursor-line cursor-column]
+  (if-let [buffer (session/get-buffer session {:?id buffer-ptr})]
+    (-> session
+        (c/upsert-buffer (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
+        (c/insert-buffer-refresh buffer-ptr))
+    session))
+
+(defn update-cursor-position! [vim cursor-line cursor-column]
+  (v/set-cursor-position vim (inc cursor-line) cursor-column)
+  (swap! session/*session update-buffer (v/get-current-buffer vim) cursor-line cursor-column)
+  nil)
+
 (defn update-after-input [session vim s]
   (let [current-buffer (v/get-current-buffer vim)
         old-mode (:mode (session/get-vim session))
@@ -173,11 +185,7 @@
                                             {:command-start s}))
                                         (c/assoc-command constants mode font-size (v/get-command-position vim)))
                                     (c/command-text nil nil)))]
-    (if-let [buffer (session/get-buffer session {:?id current-buffer})]
-      (-> session
-          (c/upsert-buffer (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
-          (c/insert-buffer-refresh current-buffer))
-      session)))
+    (update-buffer session current-buffer cursor-line cursor-column)))
 
 (defn on-input [vim session s]
   (input (session/get-command session) vim s)
