@@ -211,31 +211,6 @@
                :width (* width font-size)
                :height (* height font-size)))))
 
-(defn adjust-camera [buffer camera-x camera-y font-size text-box {:keys [font-width font-height] :as constants} window]
-  (let [{game-width :width game-height :height} window
-        text-top ((:top text-box) game-height font-size)
-        text-bottom ((:bottom text-box) game-height font-size)
-        char-counts (get-in buffer [:text-entity :uniforms 'u_char_counts])
-        max-line-count (if (seq char-counts)
-                         (apply max char-counts)
-                         0)
-        text-width (* max-line-count font-size font-width)
-        text-height (* (count char-counts) font-size font-height)
-        max-x (- text-width game-width)
-        max-y (- text-height (- text-bottom text-top))]
-    [(-> camera-x (min max-x) (max 0))
-     (-> camera-y (min max-y) (max 0))]))
-
-(defn update-camera [buffer camera-x camera-y font-size text-box window]
-  (let [{game-height :height} window
-        text-top ((:top text-box) game-height font-size)]
-    (assoc buffer
-      :camera (t/translate constants/orig-camera camera-x (- camera-y text-top))
-      :camera-x camera-x
-      :camera-y camera-y
-      :camera-target-x camera-x
-      :camera-target-y camera-y)))
-
 (defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} vim-mode font-size text-box {:keys [base-rects-entity] :as constants} window]
   (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
         {:keys [left top width height] :as cursor-entity} (->cursor-entity vim-mode constants line-chars cursor-line cursor-column font-size)]

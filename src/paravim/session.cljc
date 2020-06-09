@@ -1,14 +1,13 @@
 (ns paravim.session
   (:require [paravim.buffers :as buffers]
+            [paravim.scroll :as scroll]
             [paravim.constants :as constants]
             [clara.rules :as clara]
             [clarax.rules :as clarax]
             [clojure.string :as str]
             [clojure.core.async :as async]
             #?(:clj  [clarax.macros-java :refer [->session]]
-               :cljs [clarax.macros-js :refer-macros [->session]])
-            #?(:clj  [play-cljc.macros-java :refer [math]]
-               :cljs [play-cljc.macros-js :refer-macros [math]]))
+               :cljs [clarax.macros-js :refer-macros [->session]]))
   #?(:cljs (:require-macros [paravim.session :refer [->session-wrapper]])))
 
 (defrecord Game [total-time delta-time context])
@@ -49,18 +48,6 @@
                       toolbar-text-entities
                       highlight-text-entities])
 (defrecord Scroll [xoffset yoffset])
-
-(def ^:const scroll-speed 40)
-(def ^:const scroll-limit 10) ;; per scroll, not cumulative limit
-(def ^:const min-scroll-speed 5)
-(def ^:const deceleration 0.8)
-
-(defn decelerate
-  [speed]
-  (let [speed (* speed deceleration)]
-    (if (< speed min-scroll-speed)
-      min-scroll-speed
-      speed)))
 
 (defn change-font-size! [{:keys [size] :as font} diff]
   (let [new-val (+ size diff)]
@@ -267,21 +254,7 @@
           :when (= (:id buffer) (:buffer-id tab))
           {:keys [xoffset yoffset] :as scroll} Scroll]
       (clara/retract! scroll)
-      (let [;; make the left edge "sticky" so it doesn't move unintentionally
-            xoffset (if (and (== camera-x 0)
-                             (< (math abs (long xoffset)) 2.5))
-                      0
-                      xoffset)
-            ;; restrict the offsets to discard excessive values
-            xoffset (-> xoffset (min scroll-limit) (max (- scroll-limit)))
-            yoffset (-> yoffset (min scroll-limit) (max (- scroll-limit)))
-            ;; flip the sign because the camera must go the opposite direction
-            xdiff (* -1 scroll-speed xoffset)
-            ydiff (* -1 scroll-speed yoffset)]
-        (clarax/merge! buffer {:camera-target-x (+ camera-target-x xdiff)
-                               :camera-target-y (+ camera-target-y ydiff)
-                               :scroll-speed-x (+ scroll-speed-x (math abs (long xdiff)))
-                               :scroll-speed-y (+ scroll-speed-y (math abs (long ydiff)))})))
+      (clarax/merge! buffer (scroll/start-scrolling-camera buffer xoffset yoffset)))
     :rubber-band-effect
     (let [window Window
           font Font
@@ -289,47 +262,21 @@
           text-box TextBox
           :when (= (:id text-box) (:tab-id buffer))
           constants Constants]
-      (let [[new-x new-y] (buffers/adjust-camera buffer camera-target-x camera-target-y (:size font) text-box constants window)]
-        (when (or (not (== camera-target-x new-x))
-                  (not (== camera-target-y new-y)))
-          (clarax/merge! buffer {:camera-target-x new-x
-                                 :camera-target-y new-y
-                                 :scroll-speed-x (if (not (== camera-target-x new-x))
-                                                   min-scroll-speed
-                                                   scroll-speed-x)
-                                 :scroll-speed-y (if (not (== camera-target-y new-y))
-                                                   min-scroll-speed
-                                                   scroll-speed-y)}))))
+      (some->> (scroll/rubber-band-camera buffer (:size font) text-box constants window)
+               (clarax/merge! buffer)))
     :move-camera-to-target
     (let [{:keys [delta-time total-time] :as game} Game
           window Window
           font Font
-          {:keys [camera-x camera-y camera-target-x camera-target-y scroll-speed-x scroll-speed-y] :as buffer} Buffer
-          :when (and (not= total-time (:camera-animation-time buffer))
+          {:keys [camera-x camera-y camera-target-x camera-target-y camera-animation-time] :as buffer} Buffer
+          :when (and (not= total-time camera-animation-time)
                      (or (not (== camera-x camera-target-x))
                          (not (== camera-y camera-target-y))))
           text-box TextBox
           :when (= (:id text-box) (:tab-id buffer))]
-      (let [min-diff 0.01
-            x-diff (long (- camera-target-x camera-x))
-            y-diff (long (- camera-target-y camera-y))
-            new-x (if (< (math abs x-diff) min-diff)
-                    camera-target-x
-                    (+ camera-x (* x-diff (min 1 (* delta-time scroll-speed-x)))))
-            new-y (if (< (math abs y-diff) min-diff)
-                    camera-target-y
-                    (+ camera-y (* y-diff (min 1 (* delta-time scroll-speed-y)))))
-            new-speed-x (if (== new-x camera-target-x)
-                          0
-                          (decelerate scroll-speed-x))
-            new-speed-y (if (== new-y camera-target-y)
-                          0
-                          (decelerate scroll-speed-y))]
-        (clarax/merge! buffer
-          (assoc (buffers/update-camera buffer new-x new-y (:size font) text-box window)
-            :camera-animation-time total-time
-            :scroll-speed-x new-speed-x
-            :scroll-speed-y new-speed-y))))
+      (clarax/merge! buffer
+        (assoc (scroll/animate-camera buffer (:size font) text-box window delta-time)
+          :camera-animation-time total-time)))
     :show-search-when-command-starts
     (let [command Command
           vim Vim
