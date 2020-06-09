@@ -17,6 +17,7 @@
             [play-cljc.gl.entities-2d :as e]
             [play-cljc.primitives-2d :as primitives]
             [clojure.core.rrb-vector :as rrb]
+            [clojure.core.async :as async]
             #?(:clj  [play-cljc.macros-java :refer [gl math]]
                :cljs [play-cljc.macros-js :refer-macros [gl math]])
             #?(:clj [paravim.text :refer [load-font-clj]]))
@@ -59,11 +60,6 @@
 (defn update-tab [session id buffer-id]
   (-> session
       (clarax/merge (session/get-tab session {:?id id}) {:buffer-id buffer-id})
-      clara/fire-rules))
-
-(defn click-mouse [session button]
-  (-> session
-      (clara/insert (session/->MouseClick button))
       clara/fire-rules))
 
 (defn scroll [session xoffset yoffset]
@@ -126,6 +122,57 @@
   (-> session
       (clarax/merge (session/get-command session) m)
       clara/fire-rules))
+
+(defn reload-file! [buffer pipes current-tab]
+  (let [{:keys [out-pipe]} pipes
+        {:keys [lines file-name clojure?]} buffer]
+    (when (and clojure? (= current-tab :files))
+      (doto out-pipe
+        (.write (str "(do "
+                     (pr-str '(println))
+                     (pr-str (list 'println "Reloading" file-name))
+                     (str/join \newline lines)
+                     ")\n"))
+        .flush)
+      true)))
+
+(defn- mouse->cursor-position [buffer mouse font-size text-box constants window]
+  (let [text-top ((:top text-box) (:height window) font-size)
+        {:keys [x y]} mouse
+        {:keys [camera-x camera-y]} buffer
+        column (-> (+ x camera-x)
+                   (/ (* font-size (:font-width constants)))
+                   long)
+        line (-> (+ y camera-y)
+                 (- text-top)
+                 (/ (* font-size (:font-height constants)))
+                 long)]
+    [line column]))
+
+(defn click-mouse! [button]
+  (let [session @session/*session
+        game (session/get-game session)
+        mouse-hover (session/get-mouse-hover session)
+        current-tab (session/get-current-tab session)
+        buffer-id (session/get-current-buffer session)
+        buffer (session/get-buffer session {:?id buffer-id})]
+    (when (= :left button)
+      (let [{:keys [target]} mouse-hover]
+        (if (constants/tab? target)
+          (swap! session/*session new-tab target)
+          (case target
+            :font-dec (swap! session/*session font-dec)
+            :font-inc (swap! session/*session font-inc)
+            :reload-file (when (and buffer (reload-file! buffer (::pipes game) (:id current-tab)))
+                           (swap! session/*session new-tab :repl-in))
+            :text (when buffer
+                    (let [text-box (session/get-text-box session {:?id (:id current-tab)})
+                          window (session/get-window session)
+                          constants (session/get-constants session)
+                          font (session/get-font session)]
+                      (async/put! (:paravim.core/command-chan game)
+                                  [:move-cursor (mouse->cursor-position buffer (:mouse mouse-hover) (:size font) text-box constants window)])))
+            nil))))))
 
 (defn get-mode []
   (:mode (session/get-vim @session/*session)))

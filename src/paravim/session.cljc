@@ -14,7 +14,6 @@
 (defrecord Window [width height])
 (defrecord Mouse [x y])
 (defrecord MouseHover [target cursor mouse])
-(defrecord MouseClick [button])
 (defrecord TextBox [id left right top bottom])
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
@@ -48,43 +47,6 @@
                       toolbar-text-entities
                       highlight-text-entities])
 (defrecord Scroll [xoffset yoffset])
-
-(defn change-font-size! [{:keys [size] :as font} diff]
-  (let [new-val (+ size diff)]
-    (when (<= constants/min-font-size new-val constants/max-font-size)
-      (clarax/merge! font {:size new-val}))))
-
-(defn font-dec! [font]
-  (change-font-size! font (- constants/font-size-step)))
-
-(defn font-inc! [font]
-  (change-font-size! font constants/font-size-step))
-
-(defn reload-file! [buffer pipes current-tab]
-  (let [{:keys [out-pipe]} pipes
-        {:keys [lines file-name clojure?]} buffer]
-    (when (and clojure? (= current-tab :files))
-      (doto out-pipe
-        (.write (str "(do "
-                     (pr-str '(println))
-                     (pr-str (list 'println "Reloading" file-name))
-                     (str/join \newline lines)
-                     ")\n"))
-        .flush)
-      true)))
-
-(defn mouse->cursor-position [buffer mouse font-size text-box constants window]
-  (let [text-top ((:top text-box) (:height window) font-size)
-        {:keys [x y]} mouse
-        {:keys [camera-x camera-y]} buffer
-        column (-> (+ x camera-x)
-                   (/ (* font-size (:font-width constants)))
-                   long)
-        line (-> (+ y camera-y)
-                 (- text-top)
-                 (/ (* font-size (:font-height constants)))
-                 long)]
-    [line column]))
 
 (def queries
   '{:get-game
@@ -190,33 +152,6 @@
       (clarax/merge! mouse-hover {:target (:id bounding-box)
                                   :cursor :hand
                                   :mouse mouse}))
-    :mouse-clicked
-    (let [game Game
-          window Window
-          mouse-click MouseClick
-          mouse-hover MouseHover
-          current-tab CurrentTab
-          tab Tab
-          :when (= (:id tab) (:id current-tab))
-          buffer Buffer
-          :when (= (:id buffer) (:buffer-id tab))
-          font Font
-          text-box TextBox
-          :when (= (:id text-box) (:tab-id buffer))
-          constants Constants]
-      (clara/retract! mouse-click)
-      (when (= :left (:button mouse-click))
-        (let [{:keys [target]} mouse-hover]
-          (if (constants/tab? target)
-            (clara/insert-unconditional! (->NewTab target))
-            (case target
-              :font-dec (font-dec! font)
-              :font-inc (font-inc! font)
-              :reload-file (when (reload-file! buffer (:paravim.core/pipes game) (:id current-tab))
-                             (clara/insert-unconditional! (->NewTab :repl-in)))
-              :text (async/put! (:paravim.core/command-chan game)
-                                [:move-cursor (mouse->cursor-position buffer (:mouse mouse-hover) (:size font) text-box constants window)])
-              nil)))))
     :tab-changed
     (let [game Game
           new-tab NewTab
