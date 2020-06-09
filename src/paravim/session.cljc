@@ -46,7 +46,6 @@
                       roboto-text-entity
                       toolbar-text-entities
                       highlight-text-entities])
-(defrecord Scroll [xoffset yoffset])
 
 (def queries
   '{:get-game
@@ -200,15 +199,6 @@
             (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
             (assoc :window window)))
       (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
-    :scroll
-    (let [current-tab CurrentTab
-          tab Tab
-          :when (= (:id tab) (:id current-tab))
-          {:keys [camera-x camera-target-x camera-target-y scroll-speed-x scroll-speed-y] :as buffer} Buffer
-          :when (= (:id buffer) (:buffer-id tab))
-          {:keys [xoffset yoffset] :as scroll} Scroll]
-      (clara/retract! scroll)
-      (clarax/merge! buffer (scroll/start-scrolling-camera buffer xoffset yoffset)))
     :rubber-band-effect
     (let [window Window
           font Font

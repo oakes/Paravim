@@ -5,6 +5,7 @@
             [paravim.colors :as colors]
             [paravim.buffers :as buffers]
             [paravim.constants :as constants]
+            [paravim.scroll :as scroll]
             [clara.rules :as clara]
             [clarax.rules :as clarax]
             [clojure.string :as str]
@@ -60,11 +61,6 @@
 (defn update-tab [session id buffer-id]
   (-> session
       (clarax/merge (session/get-tab session {:?id id}) {:buffer-id buffer-id})
-      clara/fire-rules))
-
-(defn scroll [session xoffset yoffset]
-  (-> session
-      (clara/insert (session/->Scroll xoffset yoffset))
       clara/fire-rules))
 
 (defn insert-buffer-update [session m]
@@ -173,6 +169,15 @@
                       (async/put! (:paravim.core/command-chan game)
                                   [:move-cursor (mouse->cursor-position buffer (:mouse mouse-hover) (:size font) text-box constants window)])))
             nil))))))
+
+(defn scroll! [xoffset yoffset]
+  (let [session @session/*session
+        current-tab (session/get-current-tab session)
+        tab (session/get-tab session {:?id (:id current-tab)})
+        buffer-id (session/get-current-buffer session)
+        buffer (session/get-buffer session {:?id buffer-id})]
+    (when buffer
+      (swap! session/*session upsert-buffer (merge buffer (scroll/start-scrolling-camera buffer xoffset yoffset))))))
 
 (defn get-mode []
   (:mode (session/get-vim @session/*session)))

@@ -147,7 +147,7 @@
   (swap! session/*session c/update-window-size width height))
 
 (defn on-scroll! [{:keys [::c/density-ratio] :as game} window xoffset yoffset]
-  (swap! session/*session c/scroll (/ xoffset density-ratio) (/ yoffset density-ratio)))
+  (c/scroll! (/ xoffset density-ratio) (/ yoffset density-ratio)))
 
 (defn- listen-for-events [game window]
   (doto window
