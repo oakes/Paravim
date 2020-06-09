@@ -50,7 +50,7 @@
                       highlight-text-entities])
 (defrecord Scroll [xoffset yoffset])
 
-(def ^:const scroll-speed 25)
+(def ^:const scroll-speed 40)
 (def ^:const scroll-limit 10) ;; per scroll, not cumulative limit
 (def ^:const min-scroll-speed 5)
 (def ^:const deceleration 0.8)
