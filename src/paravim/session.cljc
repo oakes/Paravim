@@ -285,11 +285,7 @@
     :rubber-band-effect
     (let [window Window
           font Font
-          current-tab CurrentTab
-          tab Tab
-          :when (= (:id tab) (:id current-tab))
           {:keys [camera-target-x camera-target-y scroll-speed-x scroll-speed-y] :as buffer} Buffer
-          :when (= (:id buffer) (:buffer-id tab))
           text-box TextBox
           :when (= (:id text-box) (:tab-id buffer))
           constants Constants]
@@ -308,12 +304,8 @@
     (let [{:keys [delta-time total-time] :as game} Game
           window Window
           font Font
-          current-tab CurrentTab
-          tab Tab
-          :when (= (:id tab) (:id current-tab))
           {:keys [camera-x camera-y camera-target-x camera-target-y scroll-speed-x scroll-speed-y] :as buffer} Buffer
-          :when (and (= (:id buffer) (:buffer-id tab))
-                     (not= total-time (:camera-animation-time buffer))
+          :when (and (not= total-time (:camera-animation-time buffer))
                      (or (not (== camera-x camera-target-x))
                          (not (== camera-y camera-target-y))))
           text-box TextBox

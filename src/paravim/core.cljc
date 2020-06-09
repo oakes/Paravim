@@ -210,6 +210,11 @@
    :camera (t/translate constants/orig-camera 0 0)
    :camera-x 0
    :camera-y 0
+   :camera-target-x 0
+   :camera-target-y 0
+   :camera-animation-time 0
+   :scroll-speed-x 0
+   :scroll-speed-y 0
    :lines lines
    :tab-id :files})
 
