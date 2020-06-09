@@ -448,7 +448,7 @@
     (if-let [game' (session/get-game session)]
       (let [poll-input! (:paravim.core/poll-input! game)
             game (or (poll-input! game) game)]
-				(swap! session/*session
+        (swap! session/*session
           (fn [session]
             (-> session
                 (clarax/merge game' game)
