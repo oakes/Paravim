@@ -498,13 +498,21 @@
                            (t/scale font-size-multiplier font-size-multiplier)))))
     ;; insert/update the game record
     (if-let [game' (session/get-game session)]
-      (let [poll-input! (:paravim.core/poll-input! game)
+      (let [;; update the total/delta time in the game record
+            game (merge game' game)
+            ;; read from command chan and update game record if necessary
+            poll-input! (:paravim.core/poll-input! game)
             game (or (poll-input! game) game)]
+        ;; put new game record in the session
         (swap! session/*session
           (fn [session]
             (-> session
                 (clarax/merge game' game)
                 clara/fire-rules)))
+        ;; return new game record
         game)
+      ;; if game record doesn't exist, re-init
+      ;; currently this should never happen,
+      ;; but it should make code reloading easier in the future
       (init game))))
 
