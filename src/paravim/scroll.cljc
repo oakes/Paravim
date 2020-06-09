@@ -93,3 +93,35 @@
     (assoc (update-camera buffer new-x new-y font-size text-box window)
       :scroll-speed-x new-speed-x
       :scroll-speed-y new-speed-y)))
+
+(defn move-camera-to-cursor [buffer font-size text-box window {:keys [left top width height] :as cursor-entity}]
+  (let [{:keys [camera camera-x camera-y]} buffer
+        {game-width :width game-height :height} window
+        text-top ((:top text-box) game-height font-size)
+        text-bottom ((:bottom text-box) game-height font-size)
+        cursor-bottom (+ top height)
+        cursor-right (+ left width)
+        text-height (- text-bottom text-top)
+        camera-bottom (+ camera-y text-height)
+        camera-right (+ camera-x game-width)
+        camera-x (cond
+                   (< left camera-x)
+                   left
+                   (> cursor-right camera-right)
+                   (- cursor-right game-width)
+                   :else
+                   camera-x)
+        camera-y (cond
+                   (< top camera-y)
+                   top
+                   (> cursor-bottom camera-bottom 0)
+                   (- cursor-bottom text-height)
+                   :else
+                   camera-y)]
+    (assoc buffer
+      :camera (t/translate constants/orig-camera camera-x (- camera-y text-top))
+      :camera-x camera-x
+      :camera-y camera-y
+      :camera-target-x camera-x
+      :camera-target-y camera-y)))
+

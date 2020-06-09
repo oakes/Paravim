@@ -1,7 +1,7 @@
 (ns paravim.buffers
   (:require [paravim.chars :as chars]
             [paravim.colors :as colors]
-            [paravim.constants :as constants]
+            [paravim.scroll :as scroll]
             [parinferish.core :as ps]
             [play-cljc.transforms :as t]
             [play-cljc.instances :as i]
@@ -213,41 +213,12 @@
 
 (defn update-cursor [{:keys [text-entity cursor-line cursor-column tab-id] :as buffer} vim-mode font-size text-box {:keys [base-rects-entity] :as constants} window]
   (let [line-chars (get-in buffer [:text-entity :characters cursor-line])
-        {:keys [left top width height] :as cursor-entity} (->cursor-entity vim-mode constants line-chars cursor-line cursor-column font-size)]
+        cursor-entity (->cursor-entity vim-mode constants line-chars cursor-line cursor-column font-size)]
     (-> buffer
         (assoc :rects-entity (-> base-rects-entity
                                  (i/assoc 0 cursor-entity)
                                  (assoc :rect-count 1)))
-        (as-> buffer
-              (let [{:keys [camera camera-x camera-y]} buffer
-                    {game-width :width game-height :height} window
-                    text-top ((:top text-box) game-height font-size)
-                    text-bottom ((:bottom text-box) game-height font-size)
-                    cursor-bottom (+ top height)
-                    cursor-right (+ left width)
-                    text-height (- text-bottom text-top)
-                    camera-bottom (+ camera-y text-height)
-                    camera-right (+ camera-x game-width)
-                    camera-x (cond
-                               (< left camera-x)
-                               left
-                               (> cursor-right camera-right)
-                               (- cursor-right game-width)
-                               :else
-                               camera-x)
-                    camera-y (cond
-                               (< top camera-y)
-                               top
-                               (> cursor-bottom camera-bottom 0)
-                               (- cursor-bottom text-height)
-                               :else
-                               camera-y)]
-                (assoc buffer
-                  :camera (t/translate constants/orig-camera camera-x (- camera-y text-top))
-                  :camera-x camera-x
-                  :camera-y camera-y
-                  :camera-target-x camera-x
-                  :camera-target-y camera-y))))))
+        (scroll/move-camera-to-cursor font-size text-box window cursor-entity))))
 
 (defn range->rects [text-entity font-width font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
   (vec (for [line-num (range start-line (inc end-line))
