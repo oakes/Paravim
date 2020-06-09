@@ -146,8 +146,8 @@
 (defn on-resize! [game window width height]
   (swap! session/*session c/update-window-size width height))
 
-(defn on-scroll! [game window xoffset yoffset]
-  (swap! session/*session c/scroll xoffset yoffset))
+(defn on-scroll! [{:keys [::c/density-ratio] :as game} window xoffset yoffset]
+  (swap! session/*session c/scroll (/ xoffset density-ratio) (/ yoffset density-ratio)))
 
 (defn- listen-for-events [game window]
   (doto window
@@ -219,6 +219,7 @@
    (let [pipes (repl/create-pipes)
          density-ratio (get-density-ratio (:context game))
          game (assoc game
+                ::c/density-ratio density-ratio
                 ::c/pipes pipes
                 ::c/poll-input! poll-input!
                 ::c/vim vim

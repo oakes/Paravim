@@ -51,7 +51,7 @@
 (defrecord Scroll [xoffset yoffset])
 
 (def ^:const scroll-speed 25)
-(def ^:const scroll-limit 25) ;; per scroll, not cumulative limit
+(def ^:const scroll-limit 10) ;; per scroll, not cumulative limit
 (def ^:const min-scroll-speed 5)
 (def ^:const deceleration 0.8)
 
@@ -269,7 +269,7 @@
       (clara/retract! scroll)
       (let [;; make the left edge "sticky" so it doesn't move unintentionally
             xoffset (if (and (== camera-x 0)
-                             (< (math abs (long xoffset)) scroll-limit))
+                             (< (math abs (long xoffset)) 2.5))
                       0
                       xoffset)
             ;; restrict the offsets to discard excessive values
