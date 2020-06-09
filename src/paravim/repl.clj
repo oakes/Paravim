@@ -54,3 +54,16 @@
               (finally (println "=== Finished ==="))))))))
   pipes)
 
+(defn reload-file! [buffer pipes current-tab]
+  (let [{:keys [out-pipe]} pipes
+        {:keys [lines file-name clojure?]} buffer]
+    (when (and clojure? (= current-tab :files))
+      (doto out-pipe
+        (.write (str "(do "
+                     (pr-str '(println))
+                     (pr-str (list 'println "Reloading" file-name))
+                     (str/join \newline lines)
+                     ")\n"))
+        .flush)
+      true)))
+

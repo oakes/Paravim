@@ -6,6 +6,7 @@
             [paravim.buffers :as buffers]
             [paravim.constants :as constants]
             [paravim.scroll :as scroll]
+            #?(:clj [paravim.repl :refer [reload-file!]])
             [clara.rules :as clara]
             [clarax.rules :as clarax]
             [clojure.string :as str]
@@ -118,19 +119,6 @@
   (-> session
       (clarax/merge (session/get-command session) m)
       clara/fire-rules))
-
-(defn reload-file! [buffer pipes current-tab]
-  (let [{:keys [out-pipe]} pipes
-        {:keys [lines file-name clojure?]} buffer]
-    (when (and clojure? (= current-tab :files))
-      (doto out-pipe
-        (.write (str "(do "
-                     (pr-str '(println))
-                     (pr-str (list 'println "Reloading" file-name))
-                     (str/join \newline lines)
-                     ")\n"))
-        .flush)
-      true)))
 
 (defn- mouse->cursor-position [buffer mouse font-size text-box constants window]
   (let [text-top ((:top text-box) (:height window) font-size)

@@ -121,7 +121,7 @@
           (case k
             (:tab :backtick)
             (swap! session/*session c/shift-current-tab (if shift? -1 1))
-            :f (c/reload-file! (session/get-buffer session {:?id current-buffer}) pipes current-tab)
+            :f (repl/reload-file! (session/get-buffer session {:?id current-buffer}) pipes current-tab)
             :- (swap! session/*session c/font-dec)
             := (swap! session/*session c/font-inc)
             :c (when (= mode 'VISUAL)
