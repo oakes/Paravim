@@ -437,7 +437,7 @@
          :as constants} (session/get-constants session)
         {:keys [command-text-entity command-cursor-entity]} (session/get-command session)
         {:keys [mode ascii control?]} (session/get-vim session)]
-    (when (and (pos? game-width) (pos? game-height))
+    (when (and window (pos? game-width) (pos? game-height))
       (if (:paravim.core/clear? game)
         (c/render game (update screen-entity :viewport assoc :width game-width :height game-height))
         (c/render game (-> base-rects-entity
@@ -511,8 +511,7 @@
                 clara/fire-rules)))
         ;; return new game record
         game)
-      ;; if game record doesn't exist, re-init
-      ;; currently this should never happen,
-      ;; but it should make code reloading easier in the future
+      ;; if game record doesn't exist, call `init` again.
+      ;; this is only useful during development for code reloading.
       (init game))))
 
