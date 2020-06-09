@@ -288,7 +288,7 @@
           current-tab CurrentTab
           tab Tab
           :when (= (:id tab) (:id current-tab))
-          {:keys [camera-x camera-y camera-target-x camera-target-y scroll-speed-x scroll-speed-y] :as buffer} Buffer
+          {:keys [camera-target-x camera-target-y scroll-speed-x scroll-speed-y] :as buffer} Buffer
           :when (= (:id buffer) (:buffer-id tab))
           text-box TextBox
           :when (= (:id text-box) (:tab-id buffer))
