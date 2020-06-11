@@ -91,7 +91,7 @@
 (defn on-mouse-click! [game window button action mods]
   (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
              (= action GLFW/GLFW_PRESS))
-    (c/click-mouse! game :left)))
+    (c/click-mouse! game @session/*session :left)))
 
 (defn on-key! [{:keys [::c/vim ::c/pipes] :as game} window keycode scancode action mods]
   (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
@@ -147,7 +147,7 @@
   (swap! session/*session c/update-window-size width height))
 
 (defn on-scroll! [{:keys [::c/density-ratio] :as game} window xoffset yoffset]
-  (c/scroll! (/ xoffset density-ratio) (/ yoffset density-ratio)))
+  (c/scroll! @session/*session (/ xoffset density-ratio) (/ yoffset density-ratio)))
 
 (defn- listen-for-events [game window]
   (doto window

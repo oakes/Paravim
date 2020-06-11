@@ -132,9 +132,8 @@
                  long)]
     [line column]))
 
-(defn click-mouse! [game button]
-  (let [session @session/*session
-        mouse-hover (session/get-mouse-hover session)
+(defn click-mouse! [game session button]
+  (let [mouse-hover (session/get-mouse-hover session)
         current-tab (session/get-current-tab session)
         buffer-id (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id buffer-id})]
@@ -156,9 +155,8 @@
                                   [:move-cursor (mouse->cursor-position buffer (:mouse mouse-hover) (:size font) text-box constants window)])))
             nil))))))
 
-(defn scroll! [xoffset yoffset]
-  (let [session @session/*session
-        current-tab (session/get-current-tab session)
+(defn scroll! [session xoffset yoffset]
+  (let [current-tab (session/get-current-tab session)
         tab (session/get-tab session {:?id (:id current-tab)})
         buffer-id (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id buffer-id})]
