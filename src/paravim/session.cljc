@@ -33,8 +33,6 @@
                    cursor-line cursor-column
                    font window
                    selected-text])
-(defrecord BufferUpdate [buffer-id lines first-line line-count-change])
-(defrecord BufferRefresh [buffer-id])
 (defrecord Constants [base-rect-entity
                       base-rects-entity
                       font-width
@@ -219,37 +217,7 @@
           :when (and (not= command (:command vim))
                      (#{"/" "?"} (:command-start command)))]
       (clarax/merge! vim {:show-search? true
-                          :command command}))
-    :buffer-update
-    (let [bu BufferUpdate
-          buffer Buffer
-          :when (= (:id buffer) (:buffer-id bu))
-          constants Constants]
-      (clara/retract! bu)
-      (clarax/merge! buffer (assoc (buffers/update-text-buffer buffer constants (:lines bu) (:first-line bu) (:line-count-change bu))
-                                   :needs-clojure-refresh? (:clojure? buffer))))
-    :buffer-refresh
-    (let [br BufferRefresh
-          buffer Buffer
-          :when (= (:id buffer) (:buffer-id br))
-          constants Constants
-          font Font
-          text-box TextBox
-          :when (= (:id text-box) (:tab-id buffer))
-          vim Vim
-          window Window]
-      (clara/retract! br)
-      (clarax/merge! buffer
-                     (-> buffer
-                         (cond-> (:needs-clojure-refresh? buffer)
-                                 (-> (buffers/parse-clojure-buffer (:mode vim))
-                                     (buffers/update-clojure-buffer constants)
-                                     (assoc :needs-clojure-refresh? false)))
-                         (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
-                         (buffers/update-highlight constants)
-                         (buffers/update-selection constants (:visual-range vim))
-                         (cond-> (:show-search? vim)
-                                 (buffers/update-search-highlights constants (:highlights vim))))))})
+                          :command command}))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))

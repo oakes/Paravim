@@ -63,15 +63,36 @@
       (clarax/merge (session/get-tab session {:?id id}) {:buffer-id buffer-id})
       clara/fire-rules))
 
-(defn insert-buffer-update [session m]
-  (-> session
-      (clara/insert (session/map->BufferUpdate m))
-      clara/fire-rules))
+(defn insert-buffer-update [session bu]
+  (if-let [buffer (session/get-buffer session {:?id (:buffer-id bu)})]
+    (let [constants (session/get-constants session)]
+      (-> buffer
+          (buffers/update-text-buffer constants (:lines bu) (:first-line bu) (:line-count-change bu))
+          (assoc :needs-clojure-refresh? (:clojure? buffer))
+          (->> (clarax/merge session buffer)
+               clara/fire-rules)))
+    session))
 
 (defn insert-buffer-refresh [session buffer-id]
-  (-> session
-      (clara/insert (session/->BufferRefresh buffer-id))
-      clara/fire-rules))
+  (if-let [buffer (session/get-buffer session {:?id buffer-id})]
+    (let [constants (session/get-constants session)
+          vim (session/get-vim session)
+          font (session/get-font session)
+          text-box (session/get-text-box session {:?id (:tab-id buffer)})
+          window (session/get-window session)]
+      (-> buffer
+          (cond-> (:needs-clojure-refresh? buffer)
+                  (-> (buffers/parse-clojure-buffer (:mode vim))
+                      (buffers/update-clojure-buffer constants)
+                      (assoc :needs-clojure-refresh? false)))
+          (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
+          (buffers/update-highlight constants)
+          (buffers/update-selection constants (:visual-range vim))
+          (cond-> (:show-search? vim)
+                  (buffers/update-search-highlights constants (:highlights vim)))
+          (->> (clarax/merge session buffer)
+               clara/fire-rules)))
+    session))
 
 (defn change-font-size [session diff]
   (let [font (session/get-font session)
