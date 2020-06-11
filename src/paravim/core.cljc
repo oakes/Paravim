@@ -66,11 +66,11 @@
 (defn insert-buffer-update [session bu]
   (if-let [buffer (session/get-buffer session {:?id (:buffer-id bu)})]
     (let [constants (session/get-constants session)]
-      (-> buffer
-          (buffers/update-text-buffer constants (:lines bu) (:first-line bu) (:line-count-change bu))
-          (assoc :needs-clojure-refresh? (:clojure? buffer))
-          (->> (clarax/merge session buffer)
-               clara/fire-rules)))
+      (as-> buffer $
+            (buffers/update-text-buffer $ constants (:lines bu) (:first-line bu) (:line-count-change bu))
+            (assoc $ :needs-clojure-refresh? (:clojure? buffer))
+            (clarax/merge session buffer $)
+            (clara/fire-rules $)))
     session))
 
 (defn insert-buffer-refresh [session buffer-id]
@@ -80,18 +80,22 @@
           font (session/get-font session)
           text-box (session/get-text-box session {:?id (:tab-id buffer)})
           window (session/get-window session)]
-      (-> buffer
-          (cond-> (:needs-clojure-refresh? buffer)
-                  (-> (buffers/parse-clojure-buffer (:mode vim))
-                      (buffers/update-clojure-buffer constants)
-                      (assoc :needs-clojure-refresh? false)))
-          (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
-          (buffers/update-highlight constants)
-          (buffers/update-selection constants (:visual-range vim))
-          (cond-> (:show-search? vim)
-                  (buffers/update-search-highlights constants (:highlights vim)))
-          (->> (clarax/merge session buffer)
-               clara/fire-rules)))
+      (as-> buffer $
+            (if (:needs-clojure-refresh? buffer)
+              (-> $
+                  (buffers/parse-clojure-buffer (:mode vim))
+                  (buffers/update-clojure-buffer constants)
+                  (assoc :needs-clojure-refresh? false))
+              $)
+            (buffers/update-cursor $ (:mode vim) (:size font) text-box constants window)
+            (buffers/update-highlight $ constants)
+            (buffers/update-selection $ constants (:visual-range vim))
+            (if (:show-search? vim)
+              (buffers/update-search-highlights $ constants (:highlights vim))
+              $)
+            (clarax/merge session buffer $)
+            (clarax/merge $ vim {:message nil}) ;; clear any pre-existing message
+            (clara/fire-rules $)))
     session))
 
 (defn change-font-size [session diff]
@@ -437,11 +441,12 @@
         buffer (session/get-buffer session {:?id current-buffer})
         {game-width :width game-height :height :as window} (session/get-window session)
         {:keys [base-rect-entity base-rects-entity
+                base-text-entity base-font-entity
                 font-height
                 toolbar-text-entities highlight-text-entities]
          :as constants} (session/get-constants session)
         {:keys [command-text-entity command-cursor-entity]} (session/get-command session)
-        {:keys [mode ascii control?]} (session/get-vim session)]
+        {:keys [mode ascii control?] :as vim} (session/get-vim session)]
     (when (and window (pos? game-width) (pos? game-height))
       (if (:paravim.core/clear? game)
         (c/render game (update screen-entity :viewport assoc :width game-width :height game-height))
@@ -468,7 +473,10 @@
                                           (t/translate 0 0)
                                           (t/scale game-width (* font-size-multiplier font-height))))
                            (i/assoc 1 (-> base-rect-entity
-                                          (t/color (if (= 'COMMAND_LINE mode) colors/tan-color colors/bg-color))
+                                          (t/color (cond
+                                                     (= 'COMMAND_LINE mode) colors/tan-color
+                                                     (:message vim) colors/red-color
+                                                     :else colors/bg-color))
                                           (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                                           (t/scale game-width (* font-size-multiplier font-height)))))))
       (doseq [[k entity] toolbar-text-entities
@@ -490,14 +498,26 @@
                                                      (- game-width)))
                                         (:y1 bounding-box))
                            (t/scale font-size-multiplier font-size-multiplier))))
-      (when (and (= mode 'COMMAND_LINE)
-                 command-text-entity
-                 command-cursor-entity)
-        (c/render game (-> command-cursor-entity
-                           (t/project game-width game-height)
-                           (t/translate 0 (- game-height (* font-size-multiplier font-height)))
-                           (t/scale font-size-multiplier font-size-multiplier)))
-        (c/render game (-> command-text-entity
+      (cond
+        (and (= mode 'COMMAND_LINE)
+             command-text-entity
+             command-cursor-entity)
+        (do
+          (c/render game (-> command-cursor-entity
+                             (t/project game-width game-height)
+                             (t/translate 0 (- game-height (* font-size-multiplier font-height)))
+                             (t/scale font-size-multiplier font-size-multiplier)))
+          (c/render game (-> command-text-entity
+                             (t/project game-width game-height)
+                             (t/translate 0 (- game-height (* font-size-multiplier font-height)))
+                             (t/scale font-size-multiplier font-size-multiplier))))
+        (:message vim)
+        (c/render game (-> (chars/assoc-line base-text-entity 0
+                             (mapv #(-> base-font-entity
+                                        (chars/crop-char %)
+                                        (t/color colors/text-color))
+                               (:message vim)))
+                           (chars/update-uniforms font-height colors/text-alpha)
                            (t/project game-width game-height)
                            (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                            (t/scale font-size-multiplier font-size-multiplier)))))

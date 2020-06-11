@@ -18,7 +18,7 @@
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
 (defrecord Vim [mode ascii control? show-search? command
-                visual-range highlights])
+                visual-range highlights message])
 (defrecord Command [command-start command-text command-completion
                     command-text-entity command-cursor-entity])
 (defrecord CurrentTab [id])

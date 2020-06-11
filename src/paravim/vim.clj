@@ -335,14 +335,16 @@
                                  nil)))
   (v/set-on-buffer-update vim (partial on-buf-update game vim))
   (v/set-on-stop-search-highlight vim (fn []
-                                        (swap! session/*session c/update-vim {:show-search? false})))
+                                        (async/put! (::c/command-chan game) [:update-vim {:show-search? false}])))
   (v/set-on-unhandled-escape vim (fn []
-                                   (swap! session/*session c/update-vim {:show-search? false})))
+                                   (async/put! (::c/command-chan game) [:update-vim {:show-search? false :message nil}])))
   (v/set-on-yank vim (fn [yank-info]
                        (try
                          (when-let [lines (yank-lines yank-info)]
                            (async/put! (::c/command-chan game) [:set-clipboard-string (str/join \newline lines)]))
                          (catch Exception e (.printStackTrace e)))))
+  (v/set-on-message vim (fn [{:keys [message]}]
+                          (async/put! (::c/command-chan game) [:update-vim {:message message}])))
   (binding [*update-window?* false]
     (run! #(v/open-buffer vim (constants/tab->path %)) [:repl-in :repl-out :files]))
   (init-ascii!)
