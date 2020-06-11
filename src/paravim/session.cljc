@@ -22,7 +22,6 @@
 (defrecord Command [command-start command-text command-completion
                     command-text-entity command-cursor-entity])
 (defrecord CurrentTab [id])
-(defrecord NewTab [id])
 (defrecord Tab [id buffer-id])
 (defrecord Buffer [id tab-id
                    text-entity parinfer-text-entity
@@ -151,13 +150,6 @@
       (clarax/merge! mouse-hover {:target (:id bounding-box)
                                   :cursor :hand
                                   :mouse mouse}))
-    :tab-changed
-    (let [game Game
-          new-tab NewTab
-          tab Tab
-          :when (= (:id new-tab) (:id tab))]
-      (clara/retract! new-tab)
-      (async/put! (:paravim.core/command-chan game) [:new-buf (:buffer-id tab)]))
     :update-cursor-when-font-changes
     (let [game Game
           window Window

@@ -91,7 +91,7 @@
 (defn on-mouse-click! [game window button action mods]
   (when (and (= button GLFW/GLFW_MOUSE_BUTTON_LEFT)
              (= action GLFW/GLFW_PRESS))
-    (c/click-mouse! :left)))
+    (c/click-mouse! game :left)))
 
 (defn on-key! [{:keys [::c/vim ::c/pipes] :as game} window keycode scancode action mods]
   (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
@@ -120,7 +120,7 @@
           control?
           (case k
             (:tab :backtick)
-            (swap! session/*session c/shift-current-tab (if shift? -1 1))
+            (c/shift-current-tab! game session (if shift? -1 1))
             :f (repl/reload-file! (session/get-buffer session {:?id current-buffer}) pipes current-tab)
             :- (swap! session/*session c/font-dec)
             := (swap! session/*session c/font-inc)
@@ -181,19 +181,27 @@
           (System/exit 0))))))
 
 (defn- poll-input! [{:keys [context ::c/vim ::c/command-chan ::c/single-command-chan ::c/repl-output] :as game}]
-  (if-let [input (or (async/poll! command-chan)
-                     (async/poll! single-command-chan))]
-    (case (first input)
-      :append (assoc game ::c/repl-output (conj repl-output (second input)))
-      :new-buf (some->> (second input) (v/set-current-buffer vim))
-      :set-window-title (GLFW/glfwSetWindowTitle context (second input))
-      :set-clipboard-string (GLFW/glfwSetClipboardString context (second input))
-      :resize-window (vim/update-window-size! game)
-      :move-cursor (apply vim/update-cursor-position! vim (second input)))
-    (when (vim/ready-to-append? @session/*session vim repl-output)
-      (binding [vim/*update-ui?* false]
-        (vim/append-to-buffer! game @session/*session (first repl-output)))
-      (assoc game ::c/repl-output (vec (rest repl-output))))))
+  (or
+    (if-let [input (or (async/poll! command-chan)
+                       (async/poll! single-command-chan))]
+      (case (first input)
+        :append (assoc game ::c/repl-output (conj repl-output (second input)))
+        :new-buf (let [id-or-path (second input)]
+                   (cond
+                     (integer? id-or-path)
+                     (v/set-current-buffer vim id-or-path)
+                     (string? id-or-path)
+                     (v/open-buffer vim id-or-path))
+                   nil)
+        :set-window-title (GLFW/glfwSetWindowTitle context (second input))
+        :set-clipboard-string (GLFW/glfwSetClipboardString context (second input))
+        :resize-window (vim/update-window-size! game)
+        :move-cursor (apply vim/update-cursor-position! vim (second input)))
+      (when (vim/ready-to-append? @session/*session vim repl-output)
+        (binding [vim/*update-ui?* false]
+          (vim/append-to-buffer! game @session/*session (first repl-output)))
+        (assoc game ::c/repl-output (vec (rest repl-output)))))
+    game))
 
 (defn ->window []
   (when-not (GLFW/glfwInit)

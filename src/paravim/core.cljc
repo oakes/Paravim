@@ -41,7 +41,13 @@
       (clarax/merge (session/get-current-tab session) {:id id})
       clara/fire-rules))
 
-(defn shift-current-tab [session direction]
+(defn new-tab! [game session tab-id]
+  (let [buffer-id-or-path (or (:buffer-id (session/get-tab session {:?id tab-id}))
+                              ;; if no buffer exists, open a new one
+                              (get constants/tab->path tab-id))]
+    (async/put! (:paravim.core/command-chan game) [:new-buf buffer-id-or-path])))
+
+(defn shift-current-tab! [game session direction]
   (let [current-tab (session/get-current-tab session)
         id (:id current-tab)
         index (+ (.indexOf constants/tab-ids id)
@@ -50,14 +56,7 @@
                 (neg? index) (dec (count constants/tab-ids))
                 (= index (count constants/tab-ids)) 0
                 :else index)]
-    (-> session
-        (clara/insert (session/->NewTab (nth constants/tab-ids index)))
-        clara/fire-rules)))
-
-(defn new-tab [session id]
-  (-> session
-      (clara/insert (session/->NewTab id))
-      clara/fire-rules))
+    (new-tab! game session (nth constants/tab-ids index))))
 
 (defn update-tab [session id buffer-id]
   (-> session
@@ -133,9 +132,8 @@
                  long)]
     [line column]))
 
-(defn click-mouse! [button]
+(defn click-mouse! [game button]
   (let [session @session/*session
-        game (session/get-game session)
         mouse-hover (session/get-mouse-hover session)
         current-tab (session/get-current-tab session)
         buffer-id (session/get-current-buffer session)
@@ -143,12 +141,12 @@
     (when (= :left button)
       (let [{:keys [target]} mouse-hover]
         (if (constants/tab? target)
-          (swap! session/*session new-tab target)
+          (new-tab! game session target)
           (case target
             :font-dec (swap! session/*session font-dec)
             :font-inc (swap! session/*session font-inc)
             :reload-file (when (and buffer (reload-file! buffer (::pipes game) (:id current-tab)))
-                           (swap! session/*session new-tab :repl-in))
+                           (new-tab! game session :repl-in))
             :text (when buffer
                     (let [text-box (session/get-text-box session {:?id (:id current-tab)})
                           window (session/get-window session)
@@ -490,7 +488,7 @@
             game (merge game' game)
             ;; read from command chan and update game record if necessary
             poll-input! (:paravim.core/poll-input! game)
-            game (or (poll-input! game) game)]
+            game (poll-input! game)]
         ;; put new game record in the session
         (swap! session/*session
           (fn [session]

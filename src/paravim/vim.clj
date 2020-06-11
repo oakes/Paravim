@@ -90,9 +90,9 @@
                 "christmas" (LocalDate/of current-year 12 25)})
 
 (defn assoc-ascii [session constants ascii-name]
+  (c/new-tab! (session/get-game session) session :files)
   (-> session
       (c/upsert-buffer (c/->ascii ascii-name constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
-      (c/new-tab :files)
       (c/update-vim {:ascii ascii-name})))
 
 (defn dissoc-ascii [session ascii-name]
