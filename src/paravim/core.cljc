@@ -94,7 +94,6 @@
               (buffers/update-search-highlights $ constants (:highlights vim))
               $)
             (clarax/merge session buffer $)
-            (clarax/merge $ vim {:message nil}) ;; clear any pre-existing message
             (clara/fire-rules $)))
     session))
 

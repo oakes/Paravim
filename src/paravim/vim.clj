@@ -166,6 +166,7 @@
         constants (session/get-constants session)
         session (change-ascii session constants s)
         session (c/update-vim session {:mode mode
+                                       :message nil ;; clear any pre-existing message
                                        :visual-range (when (v/visual-active? vim)
                                                        (-> (v/get-visual-range vim)
                                                            (update :start-line dec)
@@ -337,7 +338,7 @@
   (v/set-on-stop-search-highlight vim (fn []
                                         (async/put! (::c/command-chan game) [:update-vim {:show-search? false}])))
   (v/set-on-unhandled-escape vim (fn []
-                                   (async/put! (::c/command-chan game) [:update-vim {:show-search? false :message nil}])))
+                                   (async/put! (::c/command-chan game) [:update-vim {:show-search? false}])))
   (v/set-on-yank vim (fn [yank-info]
                        (try
                          (when-let [lines (yank-lines yank-info)]
