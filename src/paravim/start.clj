@@ -198,7 +198,11 @@
         :resize-window (vim/update-window-size! game)
         :move-cursor (apply vim/update-cursor-position! vim (second input))
         :update-vim (do
-                      (swap! session/*session c/update-vim (second input))
+                      (swap! session/*session
+                        (fn [session]
+                          (-> session
+                              (c/update-vim (second input))
+                              (c/insert-buffer-refresh (session/get-current-buffer session)))))
                       nil))
       (when (vim/ready-to-append? @session/*session vim repl-output)
         (binding [vim/*update-ui?* false]
