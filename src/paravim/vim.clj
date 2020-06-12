@@ -170,7 +170,8 @@
                                        :visual-range (when (v/visual-active? vim)
                                                        (-> (v/get-visual-range vim)
                                                            (update :start-line dec)
-                                                           (update :end-line dec)))
+                                                           (update :end-line dec)
+                                                           (assoc :type (v/get-visual-type vim))))
                                        :highlights (mapv (fn [highlight]
                                                            (-> highlight
                                                                (update :start-line dec)

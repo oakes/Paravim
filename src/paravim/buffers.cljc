@@ -235,6 +235,12 @@
             ;; :width (->> (subvec line-chars start-column end-column) (map :width) (reduce +))
             :height font-height}))))
 
+(defn range->rect [font-width font-height {:keys [start-line start-column end-line end-column] :as rect-range}]
+  {:left (* font-width start-column)
+   :top (* start-line font-height)
+   :width (* font-width (- end-column start-column))
+   :height (* font-height (inc (- end-line start-line)))})
+
 (defn range->text [buffer {:keys [start-line start-column end-line end-column] :as rect-range}]
   (vec (for [line-num (range start-line (inc end-line))]
          (let [line (-> buffer :lines (nth line-num))
@@ -268,9 +274,11 @@
       (update buffer :rects-entity assoc-rects base-rect-entity color rects))
     buffer))
 
+(def ^:const visual-block-mode (char 22))
+
 (defn update-selection [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as constants} visual-range]
   (if visual-range
-    (let [{:keys [start-line start-column end-line end-column]} visual-range
+    (let [{:keys [start-line start-column end-line end-column], visual-type :type} visual-range
           ;; make sure the range is always going the same direction
           visual-range (if (or (> start-line end-line)
                                (and (= start-line end-line)
@@ -283,7 +291,9 @@
           ;; the column the cursor is in doesn't seem to be included in the range
           ;; add it manually so it is included in the selection
           visual-range (update visual-range :end-column inc)
-          rects (range->rects text-entity font-width font-height visual-range)]
+          rects (if (= visual-type visual-block-mode)
+                  [(range->rect font-width font-height visual-range)]
+                  (range->rects text-entity font-width font-height visual-range))]
       (-> buffer
           (update :rects-entity assoc-rects base-rect-entity colors/select-color rects)
           (assoc :selected-text (not-empty (str/join \newline (range->text buffer visual-range))))))
