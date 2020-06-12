@@ -127,9 +127,10 @@
             :c (when (= mode 'VISUAL)
                  (when-let [text (:selected-text (session/get-buffer session {:?id current-buffer}))]
                    (GLFW/glfwSetClipboardString window text)))
-            :v (when (= mode 'INSERT)
+            :v (if (= mode 'INSERT)
                  (let [text (GLFW/glfwGetClipboardString window)]
-                   (vim/on-bulk-input vim text false)))
+                   (vim/on-bulk-input vim text false))
+                 (vim/on-input vim session "<C-V>"))
             ; else
             (when-let [key-name (if k
                                   (keyword->name k)
