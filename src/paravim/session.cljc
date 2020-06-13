@@ -164,8 +164,7 @@
             (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
             (buffers/update-highlight constants)
             (buffers/update-selection constants (:visual-range vim))
-            (cond-> (:show-search? vim)
-                    (buffers/update-search-highlights constants (:highlights vim)))
+            (buffers/update-search-highlights constants vim)
             (assoc :font font)))
       (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     :update-buffer-when-window-resizes
@@ -192,8 +191,7 @@
             (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
             (buffers/update-highlight constants)
             (buffers/update-selection constants (:visual-range vim))
-            (cond-> (:show-search? vim)
-                    (buffers/update-search-highlights constants (:highlights vim)))
+            (buffers/update-search-highlights constants vim)
             (assoc :window window)))
       (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     :rubber-band-effect
