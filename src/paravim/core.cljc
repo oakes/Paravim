@@ -522,11 +522,14 @@
                            (t/scale font-size-multiplier font-size-multiplier)))))
     ;; insert/update the game record
     (if-let [game' (session/get-game session)]
-      (let [;; update the total/delta time in the game record
-            game (merge game' game)
-            ;; read from command chan and update game record if necessary
+      (let [;; read from command chan and update game record if necessary
             poll-input! (:paravim.core/poll-input! game)
-            game (poll-input! game)]
+            game (if poll-input!
+                   (poll-input! game)
+                   ;; if `game` has no poll-input, use the one from the session.
+                   ;; this would only happen in old versions of the play-cljc template
+                   ;; because it wasn't passing the latest game map to this function.
+                   ((:paravim.core/poll-input! game') (merge game' game)))]
         ;; put new game record in the session
         (swap! session/*session
           (fn [session]
