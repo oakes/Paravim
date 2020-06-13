@@ -31,8 +31,7 @@
                    path file-name
                    lines clojure?
                    cursor-line cursor-column
-                   font window
-                   selected-text])
+                   font window])
 (defrecord Constants [base-rect-entity
                       base-rects-entity
                       font-width

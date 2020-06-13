@@ -274,30 +274,35 @@
       (update buffer :rects-entity assoc-rects base-rect-entity color rects))
     buffer))
 
+(defn normalize-range [{:keys [start-line start-column end-line end-column] :as range-data} force-left-to-right?]
+  (let [;; make sure the range is always going the same direction
+        range-data (if (or (> start-line end-line)
+                           (and (= start-line end-line)
+                                (> start-column end-column)))
+                     {:start-line end-line
+                      :start-column end-column
+                      :end-line start-line
+                      :end-column start-column}
+                     range-data)
+        ;; in visual block mode, make sure the block is top left to bottom right
+        {:keys [start-column end-column]} range-data
+        range-data (if (and force-left-to-right? (> start-column end-column))
+                     (assoc range-data :start-column end-column :end-column start-column)
+                     range-data)
+        ;; include the last column in the selection
+        range-data (update range-data :end-column inc)]
+    range-data))
+
 (def ^:const visual-block-mode (char 22))
 
 (defn update-selection [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as constants} visual-range]
   (if visual-range
     (let [{:keys [start-line start-column end-line end-column], visual-type :type} visual-range
-          ;; make sure the range is always going the same direction
-          visual-range (if (or (> start-line end-line)
-                               (and (= start-line end-line)
-                                    (> start-column end-column)))
-                         {:start-line end-line
-                          :start-column end-column
-                          :end-line start-line
-                          :end-column start-column}
-                         visual-range)
-          ;; the column the cursor is in doesn't seem to be included in the range
-          ;; add it manually so it is included in the selection
-          visual-range (update visual-range :end-column inc)
           rects (if (= visual-type visual-block-mode)
-                  [(range->rect font-width font-height visual-range)]
-                  (range->rects text-entity font-width font-height visual-range))]
-      (-> buffer
-          (update :rects-entity assoc-rects base-rect-entity colors/select-color rects)
-          (assoc :selected-text (not-empty (str/join \newline (range->text buffer visual-range))))))
-    (assoc buffer :selected-text nil)))
+                  [(range->rect font-width font-height (normalize-range visual-range true))]
+                  (range->rects text-entity font-width font-height (normalize-range visual-range false)))]
+      (update buffer :rects-entity assoc-rects base-rect-entity colors/select-color rects))
+    buffer))
 
 (defn update-search-highlights [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as constants} highlights]
   (let [rects (vec (mapcat (partial range->rects text-entity font-width font-height) highlights))]

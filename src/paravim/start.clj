@@ -124,9 +124,6 @@
             :f (repl/reload-file! (session/get-buffer session {:?id current-buffer}) pipes current-tab)
             :- (swap! session/*session c/font-dec)
             := (swap! session/*session c/font-inc)
-            :c (when (= mode 'VISUAL)
-                 (when-let [text (:selected-text (session/get-buffer session {:?id current-buffer}))]
-                   (GLFW/glfwSetClipboardString window text)))
             :v (if (= mode 'INSERT)
                  (let [text (GLFW/glfwGetClipboardString window)]
                    (vim/on-bulk-input vim text false))
