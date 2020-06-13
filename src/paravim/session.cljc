@@ -147,7 +147,7 @@
       (clarax/merge! mouse-hover {:target (:id bounding-box)
                                   :cursor :hand
                                   :mouse mouse}))
-    :update-cursor-when-font-changes
+    :update-buffer-when-font-changes
     (let [game Game
           window Window
           font Font
@@ -162,9 +162,13 @@
       (clarax/merge! buffer
         (-> buffer
             (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
+            (buffers/update-highlight constants)
+            (buffers/update-selection constants (:visual-range vim))
+            (cond-> (:show-search? vim)
+                    (buffers/update-search-highlights constants (:highlights vim)))
             (assoc :font font)))
       (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
-    :update-cursor-when-window-resizes
+    :update-buffer-when-window-resizes
     (let [game Game
           window Window
           font Font
@@ -186,6 +190,10 @@
       (clarax/merge! buffer
         (-> buffer
             (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
+            (buffers/update-highlight constants)
+            (buffers/update-selection constants (:visual-range vim))
+            (cond-> (:show-search? vim)
+                    (buffers/update-search-highlights constants (:highlights vim)))
             (assoc :window window)))
       (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     :rubber-band-effect
