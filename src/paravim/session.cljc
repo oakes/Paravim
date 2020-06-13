@@ -17,7 +17,7 @@
 (defrecord TextBox [id left right top bottom])
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
-(defrecord Vim [mode ascii control? show-search? command
+(defrecord Vim [mode ascii control? show-search?
                 visual-range highlights message])
 (defrecord Command [command-start command-text command-completion
                     command-text-entity command-cursor-entity])
@@ -218,11 +218,11 @@
           :camera-animation-time total-time)))
     :show-search-when-command-starts
     (let [command Command
+          :when (#{"/" "?"} (:command-start command))
           vim Vim
-          :when (and (not= command (:command vim))
-                     (#{"/" "?"} (:command-start command)))]
-      (clarax/merge! vim {:show-search? true
-                          :command command}))})
+          :when (and (not (:show-search? vim))
+                     (= (:mode vim) 'COMMAND_LINE))]
+      (clarax/merge! vim {:show-search? true}))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))
