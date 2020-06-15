@@ -136,11 +136,6 @@
       (clarax/merge (session/get-vim session) m)
       clara/fire-rules))
 
-(defn update-command [session m]
-  (-> session
-      (clarax/merge (session/get-command session) m)
-      clara/fire-rules))
-
 (defn- mouse->cursor-position [buffer mouse font-size text-box constants window]
   (let [text-top ((:top text-box) (:height window) font-size)
         {:keys [x y]} mouse
@@ -442,8 +437,9 @@
                 font-height
                 toolbar-text-entities highlight-text-entities]
          :as constants} (session/get-constants session)
-        {:keys [command-text-entity command-cursor-entity]} (session/get-command session)
-        {:keys [mode ascii control?] :as vim} (session/get-vim session)]
+        {:keys [mode ascii control?
+                command-text-entity command-cursor-entity]
+         :as vim} (session/get-vim session)]
     (when (and window (pos? game-width) (pos? game-height))
       (if (:paravim.core/clear? game)
         (c/render game (update screen-entity :viewport assoc :width game-width :height game-height))

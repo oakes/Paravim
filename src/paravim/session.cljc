@@ -18,9 +18,9 @@
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
 (defrecord Vim [mode ascii control? show-search?
-                visual-range highlights message])
-(defrecord Command [command-start command-text command-completion
-                    command-text-entity command-cursor-entity])
+                visual-range highlights message
+                command-start command-text command-completion
+                command-text-entity command-cursor-entity])
 (defrecord CurrentTab [id])
 (defrecord Tab [id buffer-id])
 (defrecord Buffer [id tab-id
@@ -101,11 +101,7 @@
     :get-constants
     (fn []
       (let [constants Constants]
-        constants))
-    :get-command
-    (fn []
-      (let [command Command]
-        command))})
+        constants))})
 
 (def rules
   '{:mouse-hovers-over-text
@@ -215,14 +211,7 @@
           :when (= (:id text-box) (:tab-id buffer))]
       (clarax/merge! buffer
         (assoc (scroll/animate-camera buffer (:size font) text-box window delta-time)
-          :camera-animation-time total-time)))
-    :show-search-when-command-starts
-    (let [command Command
-          :when (#{"/" "?"} (:command-start command))
-          vim Vim
-          :when (and (not (:show-search? vim))
-                     (= (:mode vim) 'COMMAND_LINE))]
-      (clarax/merge! vim {:show-search? true}))})
+          :camera-animation-time total-time)))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))
@@ -238,8 +227,7 @@
         (->Tab :repl-out nil)
         (->Font (/ 1 4))
         (map->Vim {:mode 'NORMAL
-                   :show-search? false})
-        (map->Command {}))
+                   :show-search? false}))
       clara/fire-rules
       atom))
 
@@ -256,6 +244,5 @@
   (def get-bounding-box (:get-bounding-box query-fns))
   (def get-text-box (:get-text-box query-fns))
   (def get-buffer (:get-buffer query-fns))
-  (def get-constants (:get-constants query-fns))
-  (def get-command (:get-command query-fns)))
+  (def get-constants (:get-constants query-fns)))
 

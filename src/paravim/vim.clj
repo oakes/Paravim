@@ -101,8 +101,7 @@
       (c/update-vim {:ascii nil})))
 
 (defn change-ascii [session constants s]
-  (let [{:keys [command-text command-start]} (session/get-command session)
-        {:keys [mode ascii]} (session/get-vim session)]
+  (let [{:keys [mode ascii command-text command-start]} (session/get-vim session)]
     (cond
       (and ascii *update-ui?*)
       (dissoc-ascii session ascii)
@@ -125,9 +124,10 @@
              (fn [session]
                (assoc-ascii session (session/get-constants session) ascii))))))
 
-(defn input [{:keys [command-text command-start command-completion] :as command} vim s]
+(defn input [vim session s]
   (if (= 'COMMAND_LINE (v/get-mode vim))
-    (let [pos (v/get-command-position vim)]
+    (let [{:keys [command-text command-start command-completion]} (session/get-vim session)
+          pos (v/get-command-position vim)]
       (case s
         "<Tab>"
         (when (and (= (count command-text) pos) command-completion)
@@ -139,6 +139,11 @@
               (v/input vim (str ch)))))
         ("<Right>" "<Left>" "<Up>" "<Down>")
         nil
+        "<Enter>"
+        (if (and (= ":" command-start)
+                 (contains? ascii-art command-text))
+          (v/input vim "<Esc>")
+          (v/input vim s))
         (if (and (= s "!")
                  (not (seq (some-> command-text str/trim))))
           nil ;; disable shell commands for now
@@ -158,39 +163,47 @@
   nil)
 
 (defn update-after-input [session vim s]
-  (let [current-buffer (v/get-current-buffer vim)
-        old-mode (:mode (session/get-vim session))
+  (let [;; get state from vim
+        current-buffer (v/get-current-buffer vim)
         mode (v/get-mode vim)
         cursor-line (dec (v/get-cursor-line vim))
         cursor-column (v/get-cursor-column vim)
+        ;; update ascii if necessary
         constants (session/get-constants session)
         session (change-ascii session constants s)
-        session (c/update-vim session {:mode mode
-                                       :message nil ;; clear any pre-existing message
-                                       :visual-range (when (v/visual-active? vim)
-                                                       (-> (v/get-visual-range vim)
-                                                           (update :start-line dec)
-                                                           (update :end-line dec)
-                                                           (assoc :type (v/get-visual-type vim))))
-                                       :highlights (mapv (fn [highlight]
-                                                           (-> highlight
-                                                               (update :start-line dec)
-                                                               (update :end-line dec)))
-                                                     (v/get-search-highlights vim 1 (v/get-line-count vim current-buffer)))})
-        font-size (:size (session/get-font session))
-        session (c/update-command session
-                                  (if (= mode 'COMMAND_LINE)
-                                    (-> (merge
-                                          (session/get-command session)
-                                          (c/command-text (v/get-command-text vim) (v/get-command-completion vim))
-                                          (when (not= old-mode 'COMMAND_LINE)
-                                            {:command-start s}))
-                                        (c/assoc-command constants mode font-size (v/get-command-position vim)))
-                                    (c/command-text nil nil)))]
+        ;; get vim from session
+        vim-info (session/get-vim session)
+        old-mode (:mode vim-info)
+        ;; update vim record
+        vim-info (assoc vim-info
+                   :mode mode
+                   :message nil ;; clear any pre-existing message
+                   :visual-range (when (v/visual-active? vim)
+                                   (-> (v/get-visual-range vim)
+                                       (update :start-line dec)
+                                       (update :end-line dec)
+                                       (assoc :type (v/get-visual-type vim))))
+                   :highlights (mapv (fn [highlight]
+                                       (-> highlight
+                                           (update :start-line dec)
+                                           (update :end-line dec)))
+                                 (v/get-search-highlights vim 1 (v/get-line-count vim current-buffer))))
+        vim-info (if (= mode 'COMMAND_LINE)
+                   (-> (merge
+                         vim-info
+                         (c/command-text (v/get-command-text vim) (v/get-command-completion vim))
+                         (when (not= old-mode 'COMMAND_LINE)
+                           (merge
+                             {:command-start s}
+                             (when (#{"/" "?"} s)
+                               {:show-search? true}))))
+                       (c/assoc-command constants mode (:size (session/get-font session)) (v/get-command-position vim)))
+                   (merge vim-info (c/command-text nil nil)))
+        session (c/update-vim session vim-info)]
     (update-buffer session current-buffer cursor-line cursor-column)))
 
 (defn on-input [vim session s]
-  (input (session/get-command session) vim s)
+  (input vim session s)
   (let [session (swap! session/*session update-after-input vim s)
         mode (:mode (session/get-vim session))]
     (when (and (= 'NORMAL mode)
