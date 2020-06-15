@@ -24,7 +24,7 @@
 (defrecord CurrentTab [id])
 (defrecord Tab [id buffer-id])
 (defrecord Buffer [id tab-id
-                   text-entity parinfer-text-entity
+                   text-entity parinfer-text-entity rects-entity
                    parsed-code needs-parinfer? needs-parinfer-init? needs-clojure-refresh?
                    camera camera-x camera-y camera-target-x camera-target-y camera-animation-time
                    scroll-speed-x scroll-speed-y
