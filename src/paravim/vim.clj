@@ -221,7 +221,7 @@
       (v/input vim "<Enter>"))
     (v/input vim (str ch)))
   (v/execute vim "set nopaste")
-  (swap! session/*session update-after-input vim s))
+  (swap! session/*session update-after-input vim nil))
 
 (defn repl-enter! [vim session {:keys [out out-pipe]}]
   (apply-parinfer! session vim)
