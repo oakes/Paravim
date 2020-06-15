@@ -170,7 +170,9 @@
         cursor-column (v/get-cursor-column vim)
         ;; update ascii if necessary
         constants (session/get-constants session)
-        session (change-ascii session constants s)
+        session (if s
+                  (change-ascii session constants s)
+                  session)
         ;; get vim from session
         vim-info (session/get-vim session)
         old-mode (:mode vim-info)
@@ -188,7 +190,7 @@
                                            (update :start-line dec)
                                            (update :end-line dec)))
                                  (v/get-search-highlights vim 1 (v/get-line-count vim current-buffer))))
-        vim-info (if (= mode 'COMMAND_LINE)
+        vim-info (if (and s (= mode 'COMMAND_LINE))
                    (-> (merge
                          vim-info
                          (c/command-text (v/get-command-text vim) (v/get-command-completion vim))
