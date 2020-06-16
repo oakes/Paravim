@@ -79,10 +79,9 @@
                       (decelerate scroll-speed-x))
         new-speed-y (if (== new-y camera-target-y)
                       0
-                      (decelerate scroll-speed-y))
-        text-top ((:top text-box) (:height window) font-size)]
+                      (decelerate scroll-speed-y))]
     (assoc buffer
-      :camera (t/translate constants/orig-camera new-x (- new-y text-top))
+      :camera (t/translate constants/orig-camera new-x new-y)
       :camera-x new-x
       :camera-y new-y
       :scroll-speed-x new-speed-x

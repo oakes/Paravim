@@ -405,25 +405,29 @@
 (defn render-buffer [game session constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor?]
   (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera camera-y]} (session/get-buffer session {:?id buffer-ptr})]
     (when-let [text-box (session/get-text-box session {:?id current-tab})]
-      (when (and rects-entity show-cursor?)
-        (c/render game (-> rects-entity
-                           (t/project game-width game-height)
-                           (t/camera camera)
-                           (t/scale font-size-multiplier font-size-multiplier))))
-      (let [[lines-to-skip-count lines-to-crop-count] (buffers/get-visible-lines text-entity constants text-box game-height camera-y font-size-multiplier)]
-        (when parinfer-text-entity
-          (c/render game (-> parinfer-text-entity
-                             (crop-text-entity lines-to-skip-count lines-to-crop-count)
+      (let [text-top ((:top text-box) game-height font-size-multiplier)]
+        (when (and rects-entity show-cursor?)
+          (c/render game (-> rects-entity
                              (t/project game-width game-height)
                              (t/camera camera)
+                             (t/translate 0 text-top)
                              (t/scale font-size-multiplier font-size-multiplier))))
-        (c/render game (-> text-entity
-                           (crop-text-entity lines-to-skip-count lines-to-crop-count)
-                           (cond-> (not show-cursor?)
-                                   (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha))
-                           (t/project game-width game-height)
-                           (t/camera camera)
-                           (t/scale font-size-multiplier font-size-multiplier)))))))
+        (let [[lines-to-skip-count lines-to-crop-count] (buffers/get-visible-lines text-entity constants text-box game-height camera-y font-size-multiplier)]
+          (when parinfer-text-entity
+            (c/render game (-> parinfer-text-entity
+                               (crop-text-entity lines-to-skip-count lines-to-crop-count)
+                               (t/project game-width game-height)
+                               (t/camera camera)
+                               (t/translate 0 text-top)
+                               (t/scale font-size-multiplier font-size-multiplier))))
+          (c/render game (-> text-entity
+                             (crop-text-entity lines-to-skip-count lines-to-crop-count)
+                             (cond-> (not show-cursor?)
+                                     (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha))
+                             (t/project game-width game-height)
+                             (t/camera camera)
+                             (t/translate 0 text-top)
+                             (t/scale font-size-multiplier font-size-multiplier))))))))
 
 (defn tick [game]
   (let [session @session/*session
