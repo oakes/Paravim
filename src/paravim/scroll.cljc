@@ -61,16 +61,6 @@
                          min-scroll-speed
                          scroll-speed-y)})))
 
-(defn update-camera [buffer camera-x camera-y font-size text-box window]
-  (let [{game-height :height} window
-        text-top ((:top text-box) game-height font-size)]
-    (assoc buffer
-      :camera (t/translate constants/orig-camera camera-x (- camera-y text-top))
-      :camera-x camera-x
-      :camera-y camera-y
-      :camera-target-x camera-x
-      :camera-target-y camera-y)))
-
 (defn animate-camera [{:keys [camera-x camera-y
                               camera-target-x camera-target-y
                               scroll-speed-x scroll-speed-y] :as buffer}
@@ -89,8 +79,12 @@
                       (decelerate scroll-speed-x))
         new-speed-y (if (== new-y camera-target-y)
                       0
-                      (decelerate scroll-speed-y))]
-    (assoc (update-camera buffer new-x new-y font-size text-box window)
+                      (decelerate scroll-speed-y))
+        text-top ((:top text-box) (:height window) font-size)]
+    (assoc buffer
+      :camera (t/translate constants/orig-camera new-x (- new-y text-top))
+      :camera-x new-x
+      :camera-y new-y
       :scroll-speed-x new-speed-x
       :scroll-speed-y new-speed-y)))
 
