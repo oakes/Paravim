@@ -113,9 +113,6 @@
                    :else
                    camera-y)]
     (assoc buffer
-      :camera (t/translate constants/orig-camera camera-x (- camera-y text-top))
-      :camera-x camera-x
-      :camera-y camera-y
       :camera-target-x camera-x
       :camera-target-y camera-y)))
 

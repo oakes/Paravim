@@ -203,9 +203,10 @@
     (let [{:keys [delta-time total-time] :as game} Game
           window Window
           font Font
-          {:keys [camera-x camera-y camera-target-x camera-target-y camera-animation-time] :as buffer} Buffer
+          {:keys [camera camera-x camera-y camera-target-x camera-target-y camera-animation-time] :as buffer} Buffer
           :when (and (not= total-time camera-animation-time)
-                     (or (not (== camera-x camera-target-x))
+                     (or (nil? camera)
+                         (not (== camera-x camera-target-x))
                          (not (== camera-y camera-target-y))))
           text-box TextBox
           :when (= (:id text-box) (:tab-id buffer))]
