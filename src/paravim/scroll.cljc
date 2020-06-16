@@ -38,10 +38,10 @@
         text-top ((:top text-box) game-height font-size)
         text-bottom ((:bottom text-box) game-height font-size)
         char-counts (get-in buffer [:text-entity :uniforms 'u_char_counts])
-        max-line-count (if (seq char-counts)
+        max-char-count (if (seq char-counts)
                          (apply max char-counts)
                          0)
-        text-width (* max-line-count font-size font-width)
+        text-width (* max-char-count font-size font-width)
         text-height (* (count char-counts) font-size font-height)
         max-x (- text-width game-width)
         max-y (- text-height (- text-bottom text-top))]
