@@ -193,7 +193,7 @@
     :rubber-band-effect
     (let [window Window
           font Font
-          {:keys [camera-target-x camera-target-y scroll-speed-x scroll-speed-y] :as buffer} Buffer
+          buffer Buffer
           text-box TextBox
           :when (= (:id text-box) (:tab-id buffer))
           constants Constants]
