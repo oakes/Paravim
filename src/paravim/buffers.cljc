@@ -89,6 +89,14 @@
          characters
          data)))))
 
+(defn assoc-lines [text-entity font-entity font-height lines]
+  (-> (reduce-kv
+        (fn [entity line-num line]
+          (chars/assoc-line entity line-num (mapv #(chars/crop-char font-entity %) line)))
+        text-entity
+        lines)
+      (chars/update-uniforms font-height colors/text-alpha)))
+
 (defn update-lines [lines new-lines first-line line-count-change]
   (if (= 0 line-count-change)
     (reduce-kv
@@ -102,9 +110,7 @@
       (rrb/catvec
         (rrb/subvec lines 0 first-line)
         new-lines
-        (if (seq lines) ;; see test: delete-all-lines
-          (rrb/subvec lines (+ first-line lines-to-remove))
-          [])))))
+        (rrb/subvec lines (+ first-line lines-to-remove))))))
 
 (defn replace-lines [text-entity font-entity new-lines first-line line-count-change]
   (let [new-chars (mapv
@@ -123,13 +129,11 @@
       (let [lines-to-remove (if (neg? line-count-change)
                               (+ (* -1 line-count-change) (count new-lines))
                               (- (count new-lines) line-count-change))
-            text-entity (if (seq (:characters text-entity)) ;; see test: delete-all-lines
-                          (reduce
-                            (fn [text-entity _]
-                              (chars/dissoc-line text-entity first-line))
-                            text-entity
-                            (range 0 lines-to-remove))
-                          text-entity)
+            text-entity (reduce
+                          (fn [text-entity _]
+                            (chars/dissoc-line text-entity first-line))
+                          text-entity
+                          (range 0 lines-to-remove))
             text-entity (reduce-kv
                           (fn [text-entity line-offset char-entities]
                             (chars/insert-line text-entity (+ first-line line-offset) char-entities))
@@ -155,14 +159,23 @@
       :text-entity (chars/update-uniforms text-entity font-height colors/text-alpha)
       :parinfer-text-entity (chars/update-uniforms parinfer-text-entity font-height colors/parinfer-alpha))))
 
-(defn update-text-buffer [{:keys [lines] :as buffer} {:keys [base-font-entity font-height] :as constants} new-lines first-line line-count-change]
-  (-> buffer
-      (assoc :lines (update-lines lines new-lines first-line line-count-change))
-      (update :text-entity
-              (fn [text-entity]
-                (-> text-entity
-                    (replace-lines base-font-entity new-lines first-line line-count-change)
-                    (chars/update-uniforms font-height colors/text-alpha))))))
+(defn update-text-buffer [{:keys [lines] :as buffer} {:keys [base-text-entity base-font-entity font-height] :as constants} new-lines first-line line-count-change]
+  (let [lines' (update-lines lines new-lines first-line line-count-change)]
+    (if (seq lines')
+      (-> buffer
+          (assoc :lines lines')
+          (update :text-entity
+                  (fn [text-entity]
+                    (-> text-entity
+                        (replace-lines base-font-entity new-lines first-line line-count-change)
+                        (chars/update-uniforms font-height colors/text-alpha)))))
+      ;; if the lines are empty, insert a single blank line
+      ;; vim seems to always want there to be at least one line
+      ;; see test: delete-all-lines
+      (let [lines' [""]]
+        (-> buffer
+            (assoc :lines lines')
+            (assoc :text-entity (assoc-lines base-text-entity base-font-entity font-height lines')))))))
 
 (defn get-visible-lines [{:keys [characters] :as text-entity}
                          {:keys [font-height] :as constants}

@@ -228,19 +228,11 @@
 (defn clojure-path? [path]
   (-> path get-extension clojure-exts))
 
-(defn assoc-lines [text-entity font-entity font-height lines]
-  (-> (reduce-kv
-        (fn [entity line-num line]
-          (chars/assoc-line entity line-num (mapv #(chars/crop-char font-entity %) line)))
-        text-entity
-        lines)
-      (chars/update-uniforms font-height colors/text-alpha)))
-
 (defn ->buffer [id {:keys [base-font-entity base-text-entity font-height] :as constants} path file-name lines current-tab]
   (let [clojure? (or (= current-tab :repl-in)
                      (clojure-path? path))]
     {:id id
-     :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
+     :text-entity (buffers/assoc-lines base-text-entity base-font-entity font-height lines)
      :camera (t/translate constants/orig-camera 0 0)
      :camera-x 0
      :camera-y 0
@@ -259,7 +251,7 @@
 
 (defn ->ascii [id {:keys [base-font-entity base-text-entity font-height] :as constants} lines]
   {:id id
-   :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
+   :text-entity (buffers/assoc-lines base-text-entity base-font-entity font-height lines)
    :camera (t/translate constants/orig-camera 0 0)
    :camera-x 0
    :camera-y 0
@@ -321,7 +313,7 @@
                     tab-spacing (* font-width 2)
                     tab-entities (reduce
                                    (fn [m {:keys [id text]}]
-                                     (assoc m id (assoc-lines roboto-text-entity roboto-font-entity font-height [text])))
+                                     (assoc m id (buffers/assoc-lines roboto-text-entity roboto-font-entity font-height [text])))
                                    {}
                                    constants/tabs)
                     bounding-boxes (reduce-kv
@@ -334,7 +326,7 @@
                                      constants/tabs)
                     button-entities (reduce
                                       (fn [m {:keys [id text]}]
-                                        (assoc m id (assoc-lines roboto-text-entity roboto-font-entity font-height [text])))
+                                        (assoc m id (buffers/assoc-lines roboto-text-entity roboto-font-entity font-height [text])))
                                       {}
                                       constants/buttons)
                     bounding-boxes (reduce-kv

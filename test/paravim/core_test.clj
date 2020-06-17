@@ -31,7 +31,11 @@
   (v/set-current-buffer vim core-buffer)
   (is (= 5 (count-lines core-buffer)))
   (run! (partial vim/on-input vim @session/*session) ["g" "g" "d" "G"])
-  (is (= 0 (count-lines core-buffer)))
+  (is (= 1 (count-lines core-buffer)))
+  (vim/on-input vim @session/*session "p")
+  (is (= 6 (count-lines core-buffer)))
+  ;; undo changes
+  (vim/on-input vim @session/*session "u")
   (vim/on-input vim @session/*session "u")
   (is (= 5 (count-lines core-buffer))))
 
