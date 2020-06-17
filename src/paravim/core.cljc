@@ -241,7 +241,7 @@
                      (clojure-path? path))]
     {:id id
      :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
-     :camera nil ;; initialized in the :move-camera-to-target rule
+     :camera (t/translate constants/orig-camera 0 0)
      :camera-x 0
      :camera-y 0
      :camera-target-x 0
