@@ -75,9 +75,8 @@
    :home "Home"
    :end "End"})
 
-(defn on-mouse-move! [game window xpos ypos]
-  (let [density-ratio (float (get-density-ratio window))
-        x (* xpos density-ratio)
+(defn on-mouse-move! [{:keys [::c/density-ratio] :as game} window xpos ypos]
+  (let [x (* xpos density-ratio)
         y (* ypos density-ratio)
         session (swap! session/*session c/update-mouse x y)
         mouse-hover (session/get-mouse-hover session)]
@@ -241,8 +240,7 @@
                 ;; single-command-chan is like command-chan but can only contain one command
                 ::c/single-command-chan (async/chan (async/sliding-buffer 1))
                 ::c/repl-output [])]
-     (when (pos-int? density-ratio)
-       (swap! session/*session c/font-multiply density-ratio))
+     (swap! session/*session c/font-multiply density-ratio)
      (c/init game)
      (vim/init game)
      (when-not (::disable-repl? game)
