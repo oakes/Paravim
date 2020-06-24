@@ -17,6 +17,7 @@
    {'u_matrix 'mat3
     'u_char_counts ['int constants/max-lines]
     'u_start_line 'int
+    'u_start_column 'int
     'u_font_height 'float}
    :outputs
    '{v_tex_coord vec2
@@ -29,10 +30,17 @@
            (=int current_line 0)
            ("for" "(int i=0; i<1000; ++i)"
              (+= total_char_count [u_char_counts i])
-             ("if" (> total_char_count gl_InstanceID) "break")
-             ("else" (+= current_line 1)))
+             ("if" (> total_char_count gl_InstanceID)
+               (-= total_char_count [u_char_counts i])
+               "break")
+             ("else"
+               (+= current_line 1)))
            (=mat3 translate_matrix a_translate_matrix)
            (+= [translate_matrix 2 1] (* u_font_height (+ u_start_line current_line)))
+           (=int current_column (- gl_InstanceID total_char_count))
+           ("if" (> u_start_column current_column)
+             (= v_color (vec4 "0.0" "0.0" "0.0" "0.0"))
+             "return")
            (= gl_Position
               (vec4
                 (.xy (* u_matrix
@@ -47,7 +55,8 @@
   {:precision "mediump float"
    :uniforms
    '{u_image sampler2D
-     u_alpha float}
+     u_alpha float
+     u_show_blocks int}
    :inputs
    '{v_tex_coord vec2
      v_color vec4}
@@ -57,6 +66,9 @@
    '{main ([] void)}
    :functions
    '{main ([]
+           ("if" (== u_show_blocks 1)
+             (= o_color v_color)
+             "return")
            ;; get the color from the attributes
            (=vec4 input_color v_color)
            ;; set its alpha color if necessary
@@ -109,7 +121,9 @@
       'u_char_counts (mapv count characters)
       'u_font_height font-height
       'u_alpha alpha
-      'u_start_line 0))
+      'u_start_line 0
+      'u_start_column 0
+      'u_show_blocks 0))
 
 (def ^:const instanced-font-attrs->unis
   '{a_translate_matrix u_translate_matrix

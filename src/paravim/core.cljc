@@ -439,6 +439,8 @@
                                    (crop-text-entity start-line end-line)
                                    (cond-> (not show-cursor?)
                                            (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha))
+                                   (assoc-in [:uniforms 'u_show_blocks]
+                                             (if (< minimap-font-size constants/minimap-min-size-to-show-chars) 1 0))
                                    (t/project game-width game-height)
                                    (t/translate (- game-width minimap-width) text-top)
                                    (t/scale font-size-multiplier font-size-multiplier)
