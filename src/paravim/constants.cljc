@@ -30,4 +30,8 @@
 (def font-size-step (/ 1 16))
 (def min-font-size (/ 1 8))
 (def max-font-size 1)
+(def default-font-size (/ 1 4))
+(def minimap-scale 6)
+(def minimap-min-chars 30)
+(def max-lines 1000)
 

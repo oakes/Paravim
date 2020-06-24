@@ -25,6 +25,7 @@
 (defrecord Tab [id buffer-id])
 (defrecord Buffer [id tab-id
                    text-entity parinfer-text-entity rects-entity
+                   minimap-entity minimap-rects-entity show-minimap?
                    parsed-code needs-parinfer? needs-parinfer-init? needs-clojure-refresh?
                    camera camera-x camera-y camera-target-x camera-target-y camera-animation-time
                    scroll-speed-x scroll-speed-y
@@ -225,7 +226,7 @@
         (->Tab :files nil)
         (->Tab :repl-in nil)
         (->Tab :repl-out nil)
-        (->Font (/ 1 4))
+        (->Font constants/default-font-size)
         (map->Vim {:mode 'NORMAL
                    :show-search? false}))
       clara/fire-rules

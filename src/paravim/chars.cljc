@@ -2,6 +2,7 @@
   (:require [play-cljc.transforms :as t]
             [play-cljc.math :as m]
             [play-cljc.instances :as i]
+            [paravim.constants :as constants]
             [com.rpl.specter :as specter]
             [clojure.core.rrb-vector :as rrb]))
 
@@ -13,10 +14,10 @@
      a_texture_matrix mat3
      a_scale_matrix mat3}
    :uniforms
-   '{u_matrix mat3
-     u_char_counts [int 1000]
-     u_start_line int
-     u_font_height float}
+   {'u_matrix 'mat3
+    'u_char_counts ['int constants/max-lines]
+    'u_start_line 'int
+    'u_font_height 'float}
    :outputs
    '{v_tex_coord vec2
      v_color vec4}
