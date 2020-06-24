@@ -394,7 +394,7 @@
               'u_start_line lines-to-skip-count)
       (:attribute-lengths text-entity))))
 
-(defn render-buffer [game session constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor?]
+(defn render-buffer [game session constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor? show-minimap?]
   (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera camera-y]} (session/get-buffer session {:?id buffer-ptr})]
     (when-let [text-box (session/get-text-box session {:?id current-tab})]
       (let [text-top ((:top text-box) game-height font-size-multiplier)]
@@ -419,7 +419,16 @@
                              (t/project game-width game-height)
                              (t/camera camera)
                              (t/translate 0 text-top)
-                             (t/scale font-size-multiplier font-size-multiplier))))))))
+                             (t/scale font-size-multiplier font-size-multiplier)))
+          (when show-minimap?
+            (c/render game (-> text-entity
+                               (cond-> (not show-cursor?)
+                                       (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha))
+                               (t/project game-width game-height)
+                               (t/camera camera)
+                               (t/translate 0 text-top)
+                               (t/scale font-size-multiplier font-size-multiplier)
+                               (t/scale 1/5 1/5)))))))))
 
 (defn tick [game]
   (let [session @session/*session
@@ -446,13 +455,13 @@
                                           (t/translate 0 0)
                                           (t/scale game-width game-height))))))
       (if (and ascii (= current-tab :files))
-        (render-buffer game session constants font-size-multiplier game-width game-height current-tab ascii false)
-        (render-buffer game session constants font-size-multiplier game-width game-height current-tab current-buffer (not= mode 'COMMAND_LINE)))
+        (render-buffer game session constants font-size-multiplier game-width game-height current-tab ascii false false)
+        (render-buffer game session constants font-size-multiplier game-width game-height current-tab current-buffer (not= mode 'COMMAND_LINE) true))
       (case current-tab
         :repl-in (when-let [buffer-ptr (:buffer-id (session/get-tab session {:?id :repl-out}))]
-                   (render-buffer game session constants font-size-multiplier game-width game-height :repl-out buffer-ptr false))
+                   (render-buffer game session constants font-size-multiplier game-width game-height :repl-out buffer-ptr false false))
         :repl-out (when-let [buffer-ptr (:buffer-id (session/get-tab session {:?id :repl-in}))]
-                    (render-buffer game session constants font-size-multiplier game-width game-height :repl-in buffer-ptr false))
+                    (render-buffer game session constants font-size-multiplier game-width game-height :repl-in buffer-ptr false true))
         nil)
       (when (and base-rects-entity base-rect-entity)
         (c/render game (-> base-rects-entity
