@@ -447,9 +447,9 @@
         (render-buffer game session constants font-size-multiplier game-width game-height current-tab current-buffer (not= mode 'COMMAND_LINE) true))
       (case current-tab
         :repl-in (when-let [buffer-ptr (:buffer-id (session/get-tab session {:?id :repl-out}))]
-                   (render-buffer game session constants font-size-multiplier game-width game-height :repl-out buffer-ptr false false))
+                   (render-buffer game session constants font-size-multiplier game-width game-height :repl-out buffer-ptr false true))
         :repl-out (when-let [buffer-ptr (:buffer-id (session/get-tab session {:?id :repl-in}))]
-                    (render-buffer game session constants font-size-multiplier game-width game-height :repl-in buffer-ptr false true))
+                    (render-buffer game session constants font-size-multiplier game-width game-height :repl-in buffer-ptr false false))
         nil)
       (when (and base-rects-entity base-rect-entity)
         (c/render game (-> base-rects-entity
