@@ -209,7 +209,8 @@
                      (not= [window font buffer] (:anchor minimap)))]
       (let [new-minimap (minimap/->minimap buffer constants (:size font) (:width window) (:height window) text-box)
             new-buffer (assoc buffer :show-minimap? (:show? new-minimap))]
-        (clarax/merge! buffer new-buffer)
+        (when (not= buffer new-buffer)
+          (clarax/merge! buffer new-buffer))
         (clarax/merge! minimap
           (assoc new-minimap
                  ;; this prevents the rule from firing if none of these three things have changed
