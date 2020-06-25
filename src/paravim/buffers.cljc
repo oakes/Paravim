@@ -323,3 +323,15 @@
       (update buffer :rects-entity assoc-rects base-rect-entity colors/search-color rects))
     buffer))
 
+(defn crop-text-entity [text-entity lines-to-skip-count lines-to-crop-count]
+  (let [[chars-to-skip-count chars-to-crop-count char-counts] (get-visible-chars text-entity lines-to-skip-count lines-to-crop-count)]
+    (reduce-kv
+      (fn [text-entity attr-name length]
+        (update-in text-entity [:attributes attr-name :data] rrb/subvec
+                   (* length chars-to-skip-count)
+                   (* length chars-to-crop-count)))
+      (update text-entity :uniforms assoc
+              'u_char_counts char-counts
+              'u_start_line lines-to-skip-count)
+      (:attribute-lengths text-entity))))
+

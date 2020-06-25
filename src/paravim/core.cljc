@@ -6,6 +6,7 @@
             [paravim.buffers :as buffers]
             [paravim.constants :as constants]
             [paravim.scroll :as scroll]
+            [paravim.minimap :as minimap]
             #?(:clj [paravim.repl :refer [reload-file!]])
             [clara.rules :as clara]
             [clarax.rules :as clarax]
@@ -382,23 +383,11 @@
   {:viewport {:x 0 :y 0 :width 0 :height 0}
    :clear {:color colors/bg-color :depth 1}})
 
-(defn crop-text-entity [text-entity lines-to-skip-count lines-to-crop-count]
-  (let [[chars-to-skip-count chars-to-crop-count char-counts] (buffers/get-visible-chars text-entity lines-to-skip-count lines-to-crop-count)]
-    (reduce-kv
-      (fn [text-entity attr-name length]
-        (update-in text-entity [:attributes attr-name :data] rrb/subvec
-                   (* length chars-to-skip-count)
-                   (* length chars-to-crop-count)))
-      (update text-entity :uniforms assoc
-              'u_char_counts char-counts
-              'u_start_line lines-to-skip-count)
-      (:attribute-lengths text-entity))))
-
 (defn render-buffer [game session constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor? show-minimap?]
-  (when-let [{:keys [lines rects-entity text-entity parinfer-text-entity camera camera-y]} (session/get-buffer session {:?id buffer-ptr})]
+  (when-let [{:keys [lines rects-entity text-entity parinfer-text-entity camera camera-y]
+              :as buffer} (session/get-buffer session {:?id buffer-ptr})]
     (when-let [text-box (session/get-text-box session {:?id current-tab})]
-      (let [text-top ((:top text-box) game-height font-size-multiplier)
-            text-bottom ((:bottom text-box) game-height font-size-multiplier)]
+      (let [text-top ((:top text-box) game-height font-size-multiplier)]
         (when (and rects-entity show-cursor?)
           (c/render game (-> rects-entity
                              (t/project game-width game-height)
@@ -408,13 +397,13 @@
         (let [[lines-to-skip-count lines-to-crop-count] (buffers/get-visible-lines text-entity constants text-box game-height camera-y font-size-multiplier)]
           (when parinfer-text-entity
             (c/render game (-> parinfer-text-entity
-                               (crop-text-entity lines-to-skip-count lines-to-crop-count)
+                               (buffers/crop-text-entity lines-to-skip-count lines-to-crop-count)
                                (t/project game-width game-height)
                                (t/camera camera)
                                (t/translate 0 text-top)
                                (t/scale font-size-multiplier font-size-multiplier))))
           (c/render game (-> text-entity
-                             (crop-text-entity lines-to-skip-count lines-to-crop-count)
+                             (buffers/crop-text-entity lines-to-skip-count lines-to-crop-count)
                              (cond-> (not show-cursor?)
                                      (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha))
                              (t/project game-width game-height)
@@ -422,58 +411,11 @@
                              (t/translate 0 text-top)
                              (t/scale font-size-multiplier font-size-multiplier)))
           (when show-minimap?
-            (let [font-height (* (:font-height constants) font-size-multiplier)
-                  minimap-width (/ game-width constants/minimap-scale)
-                  minimap-height (- text-bottom text-top)
-                  minimap-font-size (/ font-size-multiplier constants/minimap-scale)
-                  minimap-font-width (* (:font-width constants) minimap-font-size)
-                  minimap-font-height (* (:font-height constants) minimap-font-size)
-                  minimap-line-count (min (/ minimap-height minimap-font-height) constants/max-lines)
-                  minimap-chars (/ minimap-width minimap-font-width) 
-                  line-count (count lines)
-                  start-line 0
-                  end-line (min line-count minimap-line-count)
-                  minimap-is-overflowing (> line-count minimap-line-count)
-                  start-line (if minimap-is-overflowing
-                               (min
-                                 ; lines above
-                                 (/ (max camera-y 0) font-height)
-                                 ; lines below
-                                 (- line-count minimap-line-count))
-                               0)
-                  visible-lines (/ minimap-height (* (:font-height constants) font-size-multiplier))]
-              (when (and (> minimap-chars constants/minimap-min-chars)
-                         (> line-count visible-lines))
-                (c/render game (-> (:base-rects-entity constants)
-                                   (t/project game-width game-height)
-                                   (i/assoc 0 (-> (:base-rect-entity constants)
-                                                  (t/color colors/bg-color)
-                                                  (t/translate (- game-width minimap-width) text-top)
-                                                  (t/scale minimap-width minimap-height)))
-                                   (i/assoc 1 (-> (:base-rect-entity constants)
-                                                  (t/color colors/minimap-text-view-color)
-                                                  (t/translate (- game-width minimap-width) text-top)
-                                                  (t/translate 0 (- (/ camera-y constants/minimap-scale)
-                                                                    (* start-line minimap-font-height)))
-                                                  (t/scale minimap-width (/ minimap-height constants/minimap-scale))))))
-                (c/render game (-> text-entity
-                                   (cond-> minimap-is-overflowing
-                                           (crop-text-entity
-                                             start-line
-                                             (min
-                                               (+ minimap-line-count start-line)
-                                               line-count)))
-                                   (cond-> (not show-cursor?)
-                                           (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha))
-                                   (assoc-in [:uniforms 'u_start_line] start-line)
-                                   (assoc-in [:uniforms 'u_show_blocks]
-                                             (if (< minimap-font-size constants/minimap-min-size-to-show-chars) 1 0))
-                                   (t/project game-width game-height)
-                                   (t/translate (- game-width minimap-width) text-top)
-                                   (cond-> (> start-line 0)
-                                           (t/translate 0 (- (* start-line minimap-font-height))))
-                                   (t/scale font-size-multiplier font-size-multiplier)
-                                   (t/scale (/ 1 constants/minimap-scale) (/ 1 constants/minimap-scale))))))))))))
+            (when-let [minimap (minimap/->minimap buffer constants font-size-multiplier game-width game-height text-box)]
+              (c/render game (:rects-entity minimap))
+              (c/render game (-> (:text-entity minimap)
+                                 (cond-> (not show-cursor?)
+                                         (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha)))))))))))
 
 (defn tick [game]
   (let [session @session/*session
