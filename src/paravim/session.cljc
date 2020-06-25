@@ -103,7 +103,7 @@
     :get-minimap
     (fn [?id]
       (let [minimap Minimap
-            :when (= (:id minimap) ?id)]
+            :when (= (:buffer-id minimap) ?id)]
         minimap))
     :get-constants
     (fn []
