@@ -20,8 +20,6 @@
         minimap-line-count (int (min (/ minimap-height minimap-font-height) constants/max-lines))
         minimap-chars (int (/ minimap-width minimap-font-width))
         line-count (count lines)
-        start-line 0
-        end-line (min line-count minimap-line-count)
         minimap-is-overflowing (> line-count minimap-line-count)
         start-line (if minimap-is-overflowing
                      (int
@@ -31,6 +29,7 @@
                          ; lines below
                          (- line-count minimap-line-count)))
                      0)
+        end-line (min line-count minimap-line-count)
         start-column (int (/ camera-x font-width))
         visible-lines (int (/ minimap-height font-height))]
     (when (and (> minimap-chars constants/minimap-min-chars)
