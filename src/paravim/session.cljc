@@ -14,7 +14,7 @@
 (defrecord Game [total-time delta-time context])
 (defrecord Window [width height])
 (defrecord Mouse [x y])
-(defrecord MouseHover [target cursor mouse])
+(defrecord MouseHover [target cursor mouse-anchor])
 (defrecord TextBox [id left right top bottom])
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
@@ -27,12 +27,12 @@
 (defrecord Buffer [id tab-id
                    text-entity parinfer-text-entity rects-entity
                    parsed-code needs-parinfer? needs-parinfer-init? needs-clojure-refresh?
-                   camera camera-x camera-y camera-target-x camera-target-y camera-animation-time
+                   camera camera-x camera-y camera-target-x camera-target-y total-time-anchor
                    scroll-speed-x scroll-speed-y
                    path file-name
                    lines clojure?
                    cursor-line cursor-column
-                   font window])
+                   font-anchor window-anchor])
 (defrecord Minimap [id show? text-entity rects-entity anchor])
 (defrecord Constants [base-rect-entity
                       base-rects-entity
@@ -115,7 +115,7 @@
     (let [window Window
           mouse Mouse
           mouse-hover MouseHover
-          :when (not= mouse (:mouse mouse-hover))
+          :when (not= mouse (:mouse-anchor mouse-hover))
           current-tab CurrentTab
           :when (not= nil (:id current-tab))
           font Font
@@ -127,12 +127,12 @@
                          (bottom (:height window) (:size font))))]
       (clarax/merge! mouse-hover {:target :text
                                   :cursor :ibeam
-                                  :mouse mouse}))
+                                  :mouse-anchor mouse}))
     :mouse-hovers-over-bounding-box
     (let [window Window
           mouse Mouse
           mouse-hover MouseHover
-          :when (not= mouse (:mouse mouse-hover))
+          :when (not= mouse (:mouse-anchor mouse-hover))
           font Font
           {:keys [x1 y1 x2 y2 align] :as bounding-box} BoundingBox
           :when (let [font-size (:size font)
@@ -149,13 +149,13 @@
                        (<= y1 (:y mouse) y2)))]
       (clarax/merge! mouse-hover {:target (:id bounding-box)
                                   :cursor :hand
-                                  :mouse mouse}))
+                                  :mouse-anchor mouse}))
     :update-buffer-when-font-changes
     (let [game Game
           window Window
           font Font
           buffer Buffer
-          :when (and (not= font (:font buffer))
+          :when (and (not= font (:font-anchor buffer))
                      ;; ignore ascii buffers
                      (number? (:id buffer)))
           vim Vim
@@ -168,7 +168,7 @@
             (buffers/update-highlight constants)
             (buffers/update-selection constants (:visual-range vim))
             (buffers/update-search-highlights constants vim)
-            (assoc :font font)))
+            (assoc :font-anchor font)))
       (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     :update-buffer-when-window-resizes
     (let [game Game
@@ -178,7 +178,7 @@
           tab Tab
           :when (= (:id tab) (:id current-tab))
           buffer Buffer
-          :when (and (not= window (:window buffer))
+          :when (and (not= window (:window-anchor buffer))
                      (or (= (:id buffer) (:buffer-id tab))
                          ;; if we're in the repl, make sure both the input and output are refreshed
                          (= (:tab-id buffer) (case (:id current-tab)
@@ -195,7 +195,7 @@
             (buffers/update-highlight constants)
             (buffers/update-selection constants (:visual-range vim))
             (buffers/update-search-highlights constants vim)
-            (assoc :window window)))
+            (assoc :window-anchor window)))
       (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     :update-minimap
     (let [window Window
@@ -224,15 +224,15 @@
     (let [{:keys [delta-time total-time] :as game} Game
           window Window
           font Font
-          {:keys [camera-x camera-y camera-target-x camera-target-y camera-animation-time] :as buffer} Buffer
-          :when (and (not= total-time camera-animation-time)
+          {:keys [camera-x camera-y camera-target-x camera-target-y total-time-anchor] :as buffer} Buffer
+          :when (and (not= total-time total-time-anchor)
                      (or (not (== camera-x camera-target-x))
                          (not (== camera-y camera-target-y))))
           text-box TextBox
           :when (= (:id text-box) (:tab-id buffer))]
       (clarax/merge! buffer
         (assoc (scroll/animate-camera buffer (:size font) text-box window delta-time)
-          :camera-animation-time total-time)))})
+          :total-time-anchor total-time)))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))

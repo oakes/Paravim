@@ -171,7 +171,7 @@
                           constants (session/get-constants session)
                           font (session/get-font session)]
                       (async/put! (:paravim.core/command-chan game)
-                                  [:move-cursor (mouse->cursor-position buffer (:mouse mouse-hover) (:size font) text-box constants window)])))
+                                  [:move-cursor (mouse->cursor-position buffer (:mouse-anchor mouse-hover) (:size font) text-box constants window)])))
             nil))))))
 
 (defn scroll! [session xoffset yoffset]
