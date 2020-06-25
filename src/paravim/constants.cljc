@@ -32,7 +32,7 @@
 (def max-font-size 1)
 (def default-font-size (/ 1 4))
 
-(def repl-in-lines 6)
+(def repl-in-lines 5)
 
 (def minimap-scale 6)
 (def minimap-min-chars 30)
