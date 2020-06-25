@@ -411,13 +411,12 @@
                              (t/camera camera)
                              (t/translate 0 text-top)
                              (t/scale font-size-multiplier font-size-multiplier)))
-          (when show-minimap?
+          (when (and show-minimap? (:show-minimap? buffer))
             (when-let [minimap (session/get-minimap session {:?id buffer-ptr})]
-              (when (:show? minimap)
-                (c/render game (:rects-entity minimap))
-                (c/render game (-> (:text-entity minimap)
-                                   (cond-> (not show-cursor?)
-                                           (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha))))))))))))
+              (c/render game (:rects-entity minimap))
+              (c/render game (-> (:text-entity minimap)
+                                 (cond-> (not show-cursor?)
+                                         (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha)))))))))))
 
 (defn tick [game]
   (let [session @session/*session

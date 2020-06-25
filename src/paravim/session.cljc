@@ -32,8 +32,8 @@
                    path file-name
                    lines clojure?
                    cursor-line cursor-column
-                   font-anchor window-anchor])
-(defrecord Minimap [id show? text-entity rects-entity anchor])
+                   font-anchor window-anchor show-minimap?])
+(defrecord Minimap [buffer-id show? text-entity rects-entity anchor])
 (defrecord Constants [base-rect-entity
                       base-rects-entity
                       font-width
@@ -207,10 +207,13 @@
           minimap Minimap
           :when (and (= (:id minimap) (:id buffer))
                      (not= [window font buffer] (:anchor minimap)))]
-      (clarax/merge! minimap
-        (assoc (minimap/->minimap buffer constants (:size font) (:width window) (:height window) text-box)
-               ;; this prevents the rule from firing if none of these three things have changed
-               :anchor [window font buffer])))
+      (let [new-minimap (minimap/->minimap buffer constants (:size font) (:width window) (:height window) text-box)
+            new-buffer (assoc buffer :show-minimap? (:show? new-minimap))]
+        (clarax/merge! buffer new-buffer)
+        (clarax/merge! minimap
+          (assoc new-minimap
+                 ;; this prevents the rule from firing if none of these three things have changed
+                 :anchor [window font new-buffer]))))
     :rubber-band-effect
     (let [window Window
           font Font

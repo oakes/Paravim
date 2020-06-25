@@ -33,7 +33,7 @@
         start-column (int (/ camera-x font-width))
         visible-lines (int (/ minimap-height font-height))]
     (hash-map
-      :id (:id buffer)
+      :buffer-id (:id buffer)
       :show? (and (> minimap-chars constants/minimap-min-chars)
                   (> line-count visible-lines))
       :rects-entity
