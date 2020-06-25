@@ -31,6 +31,9 @@
 (def min-font-size (/ 1 8))
 (def max-font-size 1)
 (def default-font-size (/ 1 4))
+
+(def repl-in-lines 6)
+
 (def minimap-scale 6)
 (def minimap-min-chars 30)
 (def minimap-min-size-to-show-chars (/ (* default-font-size 2) minimap-scale))

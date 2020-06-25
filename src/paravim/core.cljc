@@ -297,8 +297,8 @@
                font-height (:font-height baked-font)
                snap-to-top (fn [game-height multiplier] (* font-height multiplier))
                snap-to-bottom (fn [game-height multiplier] (- game-height (* font-height multiplier)))
-               repl-in-top (fn [game-height multiplier] (- game-height (* 5 font-height multiplier)))
-               repl-out-bottom (fn [game-height multiplier] (- game-height (* 6 font-height multiplier)))
+               repl-in-top (fn [game-height multiplier] (- game-height (* constants/repl-in-lines font-height multiplier)))
+               repl-out-bottom (fn [game-height multiplier] (- game-height (* constants/repl-in-lines font-height multiplier)))
                text-boxes {:files {:left 0 :right 0 :top snap-to-top :bottom snap-to-bottom}
                            :repl-in {:left 0 :right 0 :top repl-in-top :bottom snap-to-bottom}
                            :repl-out {:left 0 :right 0 :top snap-to-top :bottom repl-out-bottom}}]
@@ -395,7 +395,7 @@
                              (t/camera camera)
                              (t/translate 0 text-top)
                              (t/scale font-size-multiplier font-size-multiplier))))
-        (let [[lines-to-skip-count lines-to-crop-count] (buffers/get-visible-lines text-entity constants text-box game-height camera-y font-size-multiplier)]
+        (let [[lines-to-skip-count lines-to-crop-count] (buffers/get-visible-lines buffer constants text-box game-height font-size-multiplier)]
           (when parinfer-text-entity
             (c/render game (-> parinfer-text-entity
                                (buffers/crop-text-entity lines-to-skip-count lines-to-crop-count)

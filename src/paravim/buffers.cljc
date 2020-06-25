@@ -177,13 +177,13 @@
             (assoc :lines lines')
             (assoc :text-entity (assoc-lines base-text-entity base-font-entity font-height lines')))))))
 
-(defn get-visible-lines [{:keys [characters] :as text-entity}
+(defn get-visible-lines [{:keys [text-entity camera-y tab-id] :as buffer}
                          {:keys [font-height] :as constants}
                          {:keys [top bottom] :as text-box}
                          game-height
-                         camera-y
                          font-size]
-  (let [text-height (- (bottom game-height font-size)
+  (let [{:keys [characters]} text-entity
+        text-height (- (bottom game-height font-size)
                        (top game-height font-size))
         char-height (* font-height font-size)
         line-count (count characters)
@@ -191,7 +191,9 @@
                                         line-count))
         lines-to-crop-count (max 0 (min (+ lines-to-skip-count
                                            (int (/ text-height char-height))
-                                           1)
+                                           ;; in the files tab, let buffers render one more line
+                                           ;; so it can be seen underneath the command pane
+                                           (if (= tab-id :files) 1 0))
                                         line-count))]
     [lines-to-skip-count lines-to-crop-count]))
 
