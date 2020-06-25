@@ -2,6 +2,7 @@
   (:require [paravim.buffers :as buffers]
             [paravim.scroll :as scroll]
             [paravim.constants :as constants]
+            [paravim.minimap :as minimap]
             [clara.rules :as clara]
             [clarax.rules :as clarax]
             [clojure.string :as str]
@@ -32,6 +33,7 @@
                    lines clojure?
                    cursor-line cursor-column
                    font window])
+(defrecord Minimap [id show? text-entity rects-entity anchor])
 (defrecord Constants [base-rect-entity
                       base-rects-entity
                       font-width
@@ -98,6 +100,11 @@
       (let [buffer Buffer
             :when (= (:id buffer) ?id)]
         buffer))
+    :get-minimap
+    (fn [?id]
+      (let [minimap Minimap
+            :when (= (:id minimap) ?id)]
+        minimap))
     :get-constants
     (fn []
       (let [constants Constants]
@@ -190,6 +197,20 @@
             (buffers/update-search-highlights constants vim)
             (assoc :window window)))
       (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
+    :update-minimap
+    (let [window Window
+          font Font
+          buffer Buffer
+          text-box TextBox
+          :when (= (:id text-box) (:tab-id buffer))
+          constants Constants
+          minimap Minimap
+          :when (and (= (:id minimap) (:id buffer))
+                     (not= [window font buffer] (:anchor minimap)))]
+      (clarax/merge! minimap
+        (assoc (minimap/->minimap buffer constants (:size font) (:width window) (:height window) text-box)
+               ;; this prevents the rule from firing if none of these three things have changed
+               :anchor [window font buffer])))
     :rubber-band-effect
     (let [window Window
           font Font
@@ -244,5 +265,6 @@
   (def get-bounding-box (:get-bounding-box query-fns))
   (def get-text-box (:get-text-box query-fns))
   (def get-buffer (:get-buffer query-fns))
+  (def get-minimap (:get-minimap query-fns))
   (def get-constants (:get-constants query-fns)))
 

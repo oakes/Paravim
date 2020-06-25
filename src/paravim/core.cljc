@@ -6,7 +6,6 @@
             [paravim.buffers :as buffers]
             [paravim.constants :as constants]
             [paravim.scroll :as scroll]
-            [paravim.minimap :as minimap]
             #?(:clj [paravim.repl :refer [reload-file!]])
             [clara.rules :as clara]
             [clarax.rules :as clarax]
@@ -123,14 +122,16 @@
         clara/fire-rules)
     (-> session
         (clara/insert (session/map->Buffer buffer))
+        (clara/insert (session/map->Minimap {:id (:id buffer)}))
         clara/fire-rules)))
 
 (defn remove-buffer [session buffer-id]
-  (if-let [buffer (session/get-buffer session {:?id buffer-id})]
+  (let [buffer (session/get-buffer session {:?id buffer-id})
+        minimap (session/get-minimap session {:?id buffer-id})]
     (-> session
-        (clara/retract buffer)
-        clara/fire-rules)
-    session))
+        (cond-> buffer (clara/retract buffer))
+        (cond-> minimap (clara/retract minimap))
+        clara/fire-rules)))
 
 (defn update-vim [session m]
   (-> session
@@ -411,11 +412,12 @@
                              (t/translate 0 text-top)
                              (t/scale font-size-multiplier font-size-multiplier)))
           (when show-minimap?
-            (when-let [minimap (minimap/->minimap buffer constants font-size-multiplier game-width game-height text-box)]
-              (c/render game (:rects-entity minimap))
-              (c/render game (-> (:text-entity minimap)
-                                 (cond-> (not show-cursor?)
-                                         (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha)))))))))))
+            (when-let [minimap (session/get-minimap session {:?id buffer-ptr})]
+              (when (:show? minimap)
+                (c/render game (:rects-entity minimap))
+                (c/render game (-> (:text-entity minimap)
+                                   (cond-> (not show-cursor?)
+                                           (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha))))))))))))
 
 (defn tick [game]
   (let [session @session/*session
