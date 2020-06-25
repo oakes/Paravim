@@ -43,7 +43,10 @@
                          0)
         text-width (* max-char-count font-size font-width)
         text-height (* (count char-counts) font-size font-height)
-        max-x (- text-width game-width)
+        text-view-width (if (:show-minimap? buffer)
+                          (- game-width (/ game-width constants/minimap-scale))
+                          game-width)
+        max-x (- text-width text-view-width)
         max-y (- text-height (- text-bottom text-top))]
     [(-> camera-x (min max-x) (max 0))
      (-> camera-y (min max-y) (max 0))]))
@@ -94,21 +97,24 @@
         text-bottom ((:bottom text-box) game-height font-size)
         cursor-bottom (+ top height)
         cursor-right (+ left width)
-        text-height (- text-bottom text-top)
-        camera-bottom (+ camera-y text-height)
-        camera-right (+ camera-x game-width)
+        text-view-width (if (:show-minimap? buffer)
+                          (- game-width (/ game-width constants/minimap-scale))
+                          game-width)
+        text-view-height (- text-bottom text-top)
+        camera-bottom (+ camera-y text-view-height)
+        camera-right (+ camera-x text-view-width)
         camera-x (cond
                    (< left camera-x)
                    left
                    (> cursor-right camera-right)
-                   (- cursor-right game-width)
+                   (- cursor-right text-view-width)
                    :else
                    camera-x)
         camera-y (cond
                    (< top camera-y)
                    top
                    (> cursor-bottom camera-bottom 0)
-                   (- cursor-bottom text-height)
+                   (- cursor-bottom text-view-height)
                    :else
                    camera-y)]
     (assoc buffer
