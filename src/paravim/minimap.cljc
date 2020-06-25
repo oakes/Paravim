@@ -5,7 +5,7 @@
             [play-cljc.instances :as i]
             [play-cljc.transforms :as t]))
 
-(defn ->minimap [{:keys [text-entity lines camera-y] :as buffer}
+(defn ->minimap [{:keys [text-entity lines camera-x camera-y] :as buffer}
                  {:keys [base-rects-entity base-rect-entity] :as constants}
                  font-size-multiplier game-width game-height text-box]
   (let [text-top ((:top text-box) game-height font-size-multiplier)
@@ -17,20 +17,22 @@
         minimap-font-size (/ font-size-multiplier constants/minimap-scale)
         minimap-font-width (* (:font-width constants) minimap-font-size)
         minimap-font-height (* (:font-height constants) minimap-font-size)
-        minimap-line-count (min (/ minimap-height minimap-font-height) constants/max-lines)
-        minimap-chars (/ minimap-width minimap-font-width)
+        minimap-line-count (int (min (/ minimap-height minimap-font-height) constants/max-lines))
+        minimap-chars (int (/ minimap-width minimap-font-width))
         line-count (count lines)
         start-line 0
         end-line (min line-count minimap-line-count)
         minimap-is-overflowing (> line-count minimap-line-count)
         start-line (if minimap-is-overflowing
-                     (min
-                       ; lines above
-                       (/ (max camera-y 0) font-height)
-                       ; lines below
-                       (- line-count minimap-line-count))
+                     (int
+                       (min
+                         ; lines above
+                         (/ (max camera-y 0) font-height)
+                         ; lines below
+                         (- line-count minimap-line-count)))
                      0)
-        visible-lines (/ minimap-height font-height)]
+        start-column (int (/ camera-x font-width))
+        visible-lines (int (/ minimap-height font-height))]
     (when (and (> minimap-chars constants/minimap-min-chars)
                (> line-count visible-lines))
       (hash-map
@@ -56,10 +58,13 @@
                         (+ minimap-line-count start-line)
                         line-count)))
             (assoc-in [:uniforms 'u_start_line] start-line)
+            (assoc-in [:uniforms 'u_start_column] start-column)
             (assoc-in [:uniforms 'u_show_blocks]
                       (if (< minimap-font-size constants/minimap-min-size-to-show-chars) 1 0))
             (t/project game-width game-height)
             (t/translate (- game-width minimap-width) text-top)
+            (cond-> (> start-column 0)
+                    (t/translate (- (* start-column minimap-font-width)) 0))
             (cond-> (> start-line 0)
                     (t/translate 0 (- (* start-line minimap-font-height))))
             (t/scale font-size-multiplier font-size-multiplier)
