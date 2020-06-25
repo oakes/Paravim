@@ -6,6 +6,7 @@
 (def cursor-color [(/ 112 255) (/ 128 255) (/ 144 255) 0.9])
 (def select-color [(/ 148 255) (/ 69 255) (/ 5 255) 0.8])
 (def search-color [(/ 127 255) (/ 52 255) (/ 83 255) 0.8])
+(def minimap-text-view-color [1 1 1 0.25])
 
 (def text-alpha 1.0)
 (def parinfer-alpha 0.15)
