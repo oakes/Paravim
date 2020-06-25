@@ -205,7 +205,7 @@
           :when (= (:id text-box) (:tab-id buffer))
           constants Constants
           minimap Minimap
-          :when (and (= (:id minimap) (:id buffer))
+          :when (and (= (:buffer-id minimap) (:id buffer))
                      (not= [window font buffer] (:anchor minimap)))]
       (let [new-minimap (minimap/->minimap buffer constants (:size font) (:width window) (:height window) text-box)
             new-buffer (assoc buffer :show-minimap? (:show? new-minimap))]

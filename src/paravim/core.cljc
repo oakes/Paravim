@@ -122,7 +122,7 @@
         clara/fire-rules)
     (-> session
         (clara/insert (session/map->Buffer buffer))
-        (clara/insert (session/map->Minimap {:id (:id buffer)}))
+        (clara/insert (session/map->Minimap {:buffer-id (:id buffer)}))
         clara/fire-rules)))
 
 (defn remove-buffer [session buffer-id]
