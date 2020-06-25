@@ -66,14 +66,15 @@
    '{main ([] void)}
    :functions
    '{main ([]
-           ("if" (== u_show_blocks 1)
-             (= o_color v_color)
-             "return")
            ;; get the color from the attributes
            (=vec4 input_color v_color)
            ;; set its alpha color if necessary
            ("if" (== (.w input_color) "1.0")
              (= (.w input_color) u_alpha))
+           ;; render the chars as blocks for the minimap
+           ("if" (== u_show_blocks 1)
+             (= o_color input_color)
+             "return")
            ;; get the color from the texture
            (= o_color (texture u_image v_tex_coord))
            ;; if it's black, make it a transparent pixel
