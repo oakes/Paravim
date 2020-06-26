@@ -385,7 +385,7 @@
    :clear {:color colors/bg-color :depth 1}})
 
 (defn render-buffer [game session constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor? show-minimap?]
-  (when-let [{:keys [lines rects-entity text-entity parinfer-text-entity camera camera-y]
+  (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]
               :as buffer} (session/get-buffer session {:?id buffer-ptr})]
     (when-let [text-box (session/get-text-box session {:?id current-tab})]
       (let [text-top ((:top text-box) game-height font-size-multiplier)]
