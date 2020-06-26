@@ -232,7 +232,10 @@
 
 (defn ->buffer [id {:keys [base-font-entity base-text-entity font-height] :as constants} path file-name lines current-tab]
   (let [clojure? (or (= current-tab :repl-in)
-                     (clojure-path? path))]
+                     (and (clojure-path? path)
+                          ;; disable clojure support in large files for now,
+                          ;; because it will be too slow to type
+                          (< (count lines) constants/max-lines)))]
     {:id id
      :text-entity (buffers/assoc-lines base-text-entity base-font-entity font-height lines)
      :camera (t/translate constants/orig-camera 0 0)
