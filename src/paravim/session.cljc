@@ -249,13 +249,11 @@
 #?(:clj (defmacro merge-into-session [rules-and-queries]
           (let [default-rules-and-queries (merge queries rules)
                 common-keys (set/intersection (-> default-rules-and-queries keys set) (-> rules-and-queries keys set))]
-            `(cond
-               (not (nil? @*session))
-               (throw (ex-info "Can't update session because it has already been created" {}))
-               ~(> (count common-keys) 0)
-               (throw (ex-info (str "The following key(s) are invalid because they are already being used: " ~common-keys) {}))
-               :else
-               (reset! *initial-session (->session ~(merge default-rules-and-queries rules-and-queries)))))))
+            `(do
+               (when ~(> (count common-keys) 0)
+                 (throw (ex-info (str "The following key(s) are invalid because they are already being used: " ~common-keys) {})))
+               (reset! *initial-session (->session ~(merge default-rules-and-queries rules-and-queries)))
+               (reset! *session nil)))))
 
 (defn def-queries [session]
   (let [query-fns (clarax/query-fns session)]

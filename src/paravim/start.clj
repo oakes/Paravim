@@ -100,42 +100,45 @@
         release? (= action GLFW/GLFW_RELEASE)
         control-key? (control-keycode? keycode)]
     (when (or press? release?)
-      (swap! session/*session c/update-vim
-             {:control? (or (and control? (not control-key?))
-                            (and press? control-key?))}))
+      (swap! session/*session
+             (fn [session]
+               (when session ;; this could be momentarily nil while hot code reloading
+                 (c/update-vim session
+                   {:control? (or (and control? (not control-key?))
+                                  (and press? control-key?))})))))
     (when press?
-      (let [session @session/*session
-            {:keys [mode]} (session/get-vim session)
-            k (keycode->keyword keycode)
-            current-tab (:id (session/get-current-tab session))
-            current-buffer (session/get-current-buffer session)]
-        (cond
-          ;; pressing enter in the repl
-          (and (= current-tab :repl-in)
-               (= k :enter)
-               (= mode 'NORMAL))
-          (vim/repl-enter! vim session pipes)
-          ;; all ctrl shortcuts
-          control?
-          (case k
-            (:tab :backtick)
-            (c/shift-current-tab! game session (if shift? -1 1))
-            :f (repl/reload-file! (session/get-buffer session {:?id current-buffer}) pipes current-tab)
-            :- (swap! session/*session c/font-dec)
-            := (swap! session/*session c/font-inc)
-            :v (if (= mode 'INSERT)
-                 (let [text (GLFW/glfwGetClipboardString window)]
-                   (vim/on-bulk-input vim text false))
-                 (vim/on-input vim session "<C-V>"))
-            ; else
-            (when-let [key-name (if k
-                                  (keyword->name k)
-                                  (keycode->char keycode))]
-              (vim/on-input vim session (str "<C-" (when shift? "S-") key-name ">"))))
-          ;; all other input
-          :else
-          (when-let [key-name (keyword->name k)]
-            (vim/on-input vim session (str "<" key-name ">"))))))))
+      (when-let [session @session/*session]
+        (let [{:keys [mode]} (session/get-vim session)
+              k (keycode->keyword keycode)
+              current-tab (:id (session/get-current-tab session))
+              current-buffer (session/get-current-buffer session)]
+          (cond
+            ;; pressing enter in the repl
+            (and (= current-tab :repl-in)
+                 (= k :enter)
+                 (= mode 'NORMAL))
+            (vim/repl-enter! vim session pipes)
+            ;; all ctrl shortcuts
+            control?
+            (case k
+              (:tab :backtick)
+              (c/shift-current-tab! game session (if shift? -1 1))
+              :f (repl/reload-file! (session/get-buffer session {:?id current-buffer}) pipes current-tab)
+              :- (swap! session/*session c/font-dec)
+              := (swap! session/*session c/font-inc)
+              :v (if (= mode 'INSERT)
+                   (let [text (GLFW/glfwGetClipboardString window)]
+                     (vim/on-bulk-input vim text false))
+                   (vim/on-input vim session "<C-V>"))
+              ; else
+              (when-let [key-name (if k
+                                    (keyword->name k)
+                                    (keycode->char keycode))]
+                (vim/on-input vim session (str "<C-" (when shift? "S-") key-name ">"))))
+            ;; all other input
+            :else
+            (when-let [key-name (keyword->name k)]
+              (vim/on-input vim session (str "<" key-name ">")))))))))
 
 (defn on-char! [{:keys [::c/vim] :as game} window codepoint]
   (vim/on-input vim @session/*session (str (char codepoint))))
