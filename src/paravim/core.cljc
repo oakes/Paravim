@@ -398,8 +398,8 @@
                           (clara/fire-rules $)))))))))))
   ;; init vim
   ((:paravim.vim/init game) game)
-  ;; return game map
-  game)
+  ;; return session
+  @session/*session)
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
@@ -442,7 +442,7 @@
 (defn tick [game]
   (let [session @session/*session
         session (if (nil? session) ;; this should only happen during dev, when paravim.session is reloaded
-                  (do (init game) @session/*session)
+                  (init game)
                   session)
         font-size-multiplier (:size (session/get-font session))
         current-tab (:id (session/get-current-tab session))
