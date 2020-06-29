@@ -5,7 +5,9 @@
             [paravim.session :as session]
             [libvim-clj.core :as v]
             [play-cljc.gl.core :as pc]
-            [clojure.core.async :as async])
+            [clojure.core.async :as async]
+            [clojure.tools.cli :as cli]
+            [clojure.java.io :as io])
   (:import  [org.lwjgl.glfw GLFW Callbacks
              GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWMouseButtonCallbackI
              GLFWCharCallbackI GLFWFramebufferSizeCallbackI GLFWWindowCloseCallbackI
@@ -273,6 +275,32 @@
     (GLFW/glfwDestroyWindow window)
     (GLFW/glfwTerminate)))
 
+(def cli-options
+  [["-i" "--init PATH" "Init file"]
+   ["-u" "--usage" "Show CLI usage options"]])
+
+(defn parse-cli [args]
+  (let [cli (cli/parse-opts args cli-options)]
+    (cond
+      ;; if there are CLI errors, print error messages and usage summary
+      (:errors cli)
+      (do
+        (println (:errors cli) "\n" (:summary cli))
+        (System/exit 0))
+      ;; if user asked for CLI usage, print the usage summary
+      (get-in cli [:options :usage])
+      (do
+        (println (:summary cli))
+        (System/exit 0))
+      ;; valid cli options
+      :else
+      (when-let [path (get-in cli [:options :init])]
+        (let [path (if (.startsWith path "~")
+                     (.getCanonicalPath (io/file (System/getProperty "user.home") (subs path 1)))
+                     path)]
+          (load-file path))))))
+
 (defn -main [& args]
+  (parse-cli args)
   (let [window (->window)]
     (start (pc/->game window) window)))
