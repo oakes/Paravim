@@ -548,8 +548,3 @@
       ;; return new game record
       game)))
 
-;; this dummy function is overwritten in paravim.start-dev
-;; so we can run things whenever this ns is reloaded
-(defonce ^:private on-reload (fn []))
-(on-reload)
-
