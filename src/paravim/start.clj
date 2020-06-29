@@ -204,7 +204,8 @@
                               (c/update-vim (second input))
                               (c/insert-buffer-refresh (session/get-current-buffer session)))))
                       nil))
-      (when (vim/ready-to-append? @session/*session vim repl-output)
+      (when (some-> @session/*session ;; this could be momentarily nil while hot code reloading
+                    (vim/ready-to-append? vim repl-output))
         (binding [vim/*update-ui?* false]
           (vim/append-to-buffer! game @session/*session (first repl-output)))
         (assoc game ::c/repl-output (vec (rest repl-output)))))
@@ -242,10 +243,10 @@
                 ::c/command-chan command-chan
                 ;; single-command-chan is like command-chan but can only contain one command
                 ::c/single-command-chan (async/chan (async/sliding-buffer 1))
-                ::c/repl-output [])]
+                ::c/repl-output []
+                ::vim/init vim/init)]
      (c/init game)
      (swap! session/*session c/font-multiply density-ratio)
-     (vim/init game)
      (when-not (::disable-repl? game)
        (repl/start-repl-thread! nil pipes #(async/put! command-chan [:append %])))
      game)))

@@ -396,6 +396,9 @@
                             $
                             bounding-boxes)
                           (clara/fire-rules $)))))))))))
+  ;; init vim
+  ((:paravim.vim/init game) game)
+  ;; return game map
   game)
 
 (def screen-entity
