@@ -241,9 +241,11 @@
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))
 
-(def *initial-session (atom (->session-wrapper)))
-
+(def *initial-session (atom nil))
 (def *session (atom nil))
+
+(defn init []
+  (or @*initial-session (->session-wrapper)))
 
 #?(:clj (defmacro merge-into-session [rules-and-queries]
           `(do

@@ -285,7 +285,7 @@
   ;; initialize session
   (session/def-queries
     (reset! session/*session
-      (-> @session/*initial-session
+      (-> (session/init)
           (clara/insert
             (session/->Mouse 0 0)
             (session/->MouseHover nil nil nil)
