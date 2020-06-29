@@ -240,8 +240,8 @@
                 ;; single-command-chan is like command-chan but can only contain one command
                 ::c/single-command-chan (async/chan (async/sliding-buffer 1))
                 ::c/repl-output [])]
-     (swap! session/*session c/font-multiply density-ratio)
      (c/init game)
+     (swap! session/*session c/font-multiply density-ratio)
      (vim/init game)
      (when-not (::disable-repl? game)
        (repl/start-repl-thread! nil pipes #(async/put! command-chan [:append %])))
@@ -272,4 +272,3 @@
 (defn -main [& args]
   (let [window (->window)]
     (start (pc/->game window) window)))
-

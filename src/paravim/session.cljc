@@ -6,6 +6,7 @@
             [clara.rules :as clara]
             [clarax.rules :as clarax]
             [clojure.string :as str]
+            [clojure.set :as set]
             [clojure.core.async :as async]
             #?(:clj  [clarax.macros-java :refer [->session]]
                :cljs [clarax.macros-js :refer-macros [->session]]))
@@ -48,93 +49,93 @@
 (def queries
   '{:get-game
     (fn []
-      (let [game Game]
+      (let [game paravim.session.Game]
         game))
     :get-window
     (fn []
-      (let [window Window]
+      (let [window paravim.session.Window]
         window))
     :get-mouse
     (fn []
-      (let [mouse Mouse]
+      (let [mouse paravim.session.Mouse]
         mouse))
     :get-current-tab
     (fn []
-      (let [current-tab CurrentTab]
+      (let [current-tab paravim.session.CurrentTab]
         current-tab))
     :get-current-buffer
     (fn []
-      (let [current-tab CurrentTab
-            tab Tab
+      (let [current-tab paravim.session.CurrentTab
+            tab paravim.session.Tab
             :when (= (:id tab) (:id current-tab))]
         (:buffer-id tab)))
     :get-tab
     (fn [?id]
-      (let [tab Tab
+      (let [tab paravim.session.Tab
             :when (= (:id tab) ?id)]
         tab))
     :get-mouse-hover
     (fn []
-      (let [mouse-hover MouseHover]
+      (let [mouse-hover paravim.session.MouseHover]
         mouse-hover))
     :get-font
     (fn []
-      (let [font Font]
+      (let [font paravim.session.Font]
         font))
     :get-vim
     (fn []
-      (let [vim Vim]
+      (let [vim paravim.session.Vim]
         vim))
     :get-bounding-box
     (fn [?id]
-      (let [bounding-box BoundingBox
+      (let [bounding-box paravim.session.BoundingBox
             :when (= (:id bounding-box) ?id)]
         bounding-box))
     :get-text-box
     (fn [?id]
-      (let [text-box TextBox
+      (let [text-box paravim.session.TextBox
             :when (= (:id text-box) ?id)]
         text-box))
     :get-buffer
     (fn [?id]
-      (let [buffer Buffer
+      (let [buffer paravim.session.Buffer
             :when (= (:id buffer) ?id)]
         buffer))
     :get-minimap
     (fn [?id]
-      (let [minimap Minimap
+      (let [minimap paravim.session.Minimap
             :when (= (:buffer-id minimap) ?id)]
         minimap))
     :get-constants
     (fn []
-      (let [constants Constants]
+      (let [constants paravim.session.Constants]
         constants))})
 
 (def rules
   '{:mouse-hovers-over-text
-    (let [window Window
-          mouse Mouse
-          mouse-hover MouseHover
+    (let [window paravim.session.Window
+          mouse paravim.session.Mouse
+          mouse-hover paravim.session.MouseHover
           :when (not= mouse (:mouse-anchor mouse-hover))
-          current-tab CurrentTab
+          current-tab paravim.session.CurrentTab
           :when (not= nil (:id current-tab))
-          font Font
-          {:keys [id left right top bottom] :as text-box} TextBox
+          font paravim.session.Font
+          {:keys [id left right top bottom] :as text-box} paravim.session.TextBox
           :when (and (= id (:id current-tab))
                      (<= left (:x mouse) (- (:width window) right))
                      (<= (top (:height window) (:size font))
                          (:y mouse)
                          (bottom (:height window) (:size font))))]
-      (clarax/merge! mouse-hover {:target :text
-                                  :cursor :ibeam
-                                  :mouse-anchor mouse}))
+      (clarax.rules/merge! mouse-hover {:target :text
+                                        :cursor :ibeam
+                                        :mouse-anchor mouse}))
     :mouse-hovers-over-bounding-box
-    (let [window Window
-          mouse Mouse
-          mouse-hover MouseHover
+    (let [window paravim.session.Window
+          mouse paravim.session.Mouse
+          mouse-hover paravim.session.MouseHover
           :when (not= mouse (:mouse-anchor mouse-hover))
-          font Font
-          {:keys [x1 y1 x2 y2 align] :as bounding-box} BoundingBox
+          font paravim.session.Font
+          {:keys [x1 y1 x2 y2 align] :as bounding-box} paravim.session.BoundingBox
           :when (let [font-size (:size font)
                       game-width (:width window)
                       x1 (cond->> (* x1 font-size)
@@ -147,37 +148,37 @@
                       y2 (* y2 font-size)]
                   (and (<= x1 (:x mouse) x2)
                        (<= y1 (:y mouse) y2)))]
-      (clarax/merge! mouse-hover {:target (:id bounding-box)
-                                  :cursor :hand
-                                  :mouse-anchor mouse}))
+      (clarax.rules/merge! mouse-hover {:target (:id bounding-box)
+                                        :cursor :hand
+                                        :mouse-anchor mouse}))
     :update-buffer-when-font-changes
-    (let [game Game
-          window Window
-          font Font
-          buffer Buffer
+    (let [game paravim.session.Game
+          window paravim.session.Window
+          font paravim.session.Font
+          buffer paravim.session.Buffer
           :when (and (not= font (:font-anchor buffer))
                      ;; ignore ascii buffers
                      (number? (:id buffer)))
-          vim Vim
-          text-box TextBox
+          vim paravim.session.Vim
+          text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))
-          constants Constants]
-      (clarax/merge! buffer
+          constants paravim.session.Constants]
+      (clarax.rules/merge! buffer
         (-> buffer
-            (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
-            (buffers/update-highlight constants)
-            (buffers/update-selection constants (:visual-range vim))
-            (buffers/update-search-highlights constants vim)
+            (paravim.buffers/update-cursor (:mode vim) (:size font) text-box constants window)
+            (paravim.buffers/update-highlight constants)
+            (paravim.buffers/update-selection constants (:visual-range vim))
+            (paravim.buffers/update-search-highlights constants vim)
             (assoc :font-anchor font)))
-      (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
+      (clojure.core.async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     :update-buffer-when-window-resizes
-    (let [game Game
-          window Window
-          font Font
-          current-tab CurrentTab
-          tab Tab
+    (let [game paravim.session.Game
+          window paravim.session.Window
+          font paravim.session.Font
+          current-tab paravim.session.CurrentTab
+          tab paravim.session.Tab
           :when (= (:id tab) (:id current-tab))
-          buffer Buffer
+          buffer paravim.session.Buffer
           :when (and (not= window (:window-anchor buffer))
                      (or (= (:id buffer) (:buffer-id tab))
                          ;; if we're in the repl, make sure both the input and output are refreshed
@@ -185,90 +186,91 @@
                                                :repl-in :repl-out
                                                :repl-out :repl-in
                                                nil))))
-          vim Vim
-          text-box TextBox
+          vim paravim.session.Vim
+          text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))
-          constants Constants]
-      (clarax/merge! buffer
+          constants paravim.session.Constants]
+      (clarax.rules/merge! buffer
         (-> buffer
-            (buffers/update-cursor (:mode vim) (:size font) text-box constants window)
-            (buffers/update-highlight constants)
-            (buffers/update-selection constants (:visual-range vim))
-            (buffers/update-search-highlights constants vim)
+            (paravim.buffers/update-cursor (:mode vim) (:size font) text-box constants window)
+            (paravim.buffers/update-highlight constants)
+            (paravim.buffers/update-selection constants (:visual-range vim))
+            (paravim.buffers/update-search-highlights constants vim)
             (assoc :window-anchor window)))
-      (async/put! (:paravim.core/single-command-chan game) [:resize-window]))
+      (clojure.core.async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     :update-minimap
-    (let [window Window
-          font Font
-          buffer Buffer
-          text-box TextBox
+    (let [window paravim.session.Window
+          font paravim.session.Font
+          buffer paravim.session.Buffer
+          text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))
-          constants Constants
-          minimap Minimap
+          constants paravim.session.Constants
+          minimap paravim.session.Minimap
           :when (and (= (:buffer-id minimap) (:id buffer))
                      (not= [window font buffer] (:anchor minimap)))]
-      (let [new-minimap (minimap/->minimap buffer constants (:size font) (:width window) (:height window) text-box)
+      (let [new-minimap (paravim.minimap/->minimap buffer constants (:size font) (:width window) (:height window) text-box)
             new-buffer (assoc buffer :show-minimap? (:show? new-minimap))]
         (when (not= buffer new-buffer)
-          (clarax/merge! buffer new-buffer))
-        (clarax/merge! minimap
+          (clarax.rules/merge! buffer new-buffer))
+        (clarax.rules/merge! minimap
           (assoc new-minimap
                  ;; this prevents the rule from firing if none of these three things have changed
                  :anchor [window font new-buffer]))))
     :rubber-band-effect
-    (let [window Window
-          font Font
-          buffer Buffer
-          text-box TextBox
+    (let [window paravim.session.Window
+          font paravim.session.Font
+          buffer paravim.session.Buffer
+          text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))
-          constants Constants]
-      (some->> (scroll/rubber-band-camera buffer (:size font) text-box constants window)
-               (clarax/merge! buffer)))
+          constants paravim.session.Constants]
+      (some->> (paravim.scroll/rubber-band-camera buffer (:size font) text-box constants window)
+               (clarax.rules/merge! buffer)))
     :move-camera-to-target
-    (let [{:keys [delta-time total-time] :as game} Game
-          window Window
-          font Font
-          {:keys [camera-x camera-y camera-target-x camera-target-y total-time-anchor] :as buffer} Buffer
+    (let [{:keys [delta-time total-time] :as game} paravim.session.Game
+          window paravim.session.Window
+          font paravim.session.Font
+          {:keys [camera-x camera-y camera-target-x camera-target-y total-time-anchor] :as buffer} paravim.session.Buffer
           :when (and (not= total-time total-time-anchor)
                      (or (not (== camera-x camera-target-x))
                          (not (== camera-y camera-target-y))))
-          text-box TextBox
+          text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))]
-      (clarax/merge! buffer
-        (assoc (scroll/animate-camera buffer (:size font) text-box window delta-time)
+      (clarax.rules/merge! buffer
+        (assoc (paravim.scroll/animate-camera buffer (:size font) text-box window delta-time)
           :total-time-anchor total-time)))})
 
 #?(:clj (defmacro ->session-wrapper []
           (list '->session (merge queries rules))))
 
-(def *session
-  (-> (->session-wrapper)
-      (clara/insert
-        (->Mouse 0 0)
-        (->MouseHover nil nil nil)
-        (->CurrentTab :files)
-        (->Tab :files nil)
-        (->Tab :repl-in nil)
-        (->Tab :repl-out nil)
-        (->Font constants/default-font-size)
-        (map->Vim {:mode 'NORMAL
-                   :show-search? false}))
-      clara/fire-rules
-      atom))
+(def *initial-session (atom (->session-wrapper)))
 
-(let [query-fns (clarax/query-fns @*session)]
-  (def get-game (:get-game query-fns))
-  (def get-window (:get-window query-fns))
-  (def get-mouse (:get-mouse query-fns))
-  (def get-mouse-hover (:get-mouse-hover query-fns))
-  (def get-font (:get-font query-fns))
-  (def get-vim (:get-vim query-fns))
-  (def get-current-tab (:get-current-tab query-fns))
-  (def get-current-buffer (:get-current-buffer query-fns))
-  (def get-tab (:get-tab query-fns))
-  (def get-bounding-box (:get-bounding-box query-fns))
-  (def get-text-box (:get-text-box query-fns))
-  (def get-buffer (:get-buffer query-fns))
-  (def get-minimap (:get-minimap query-fns))
-  (def get-constants (:get-constants query-fns)))
+(def *session (atom nil))
+
+#?(:clj (defmacro merge-into-session [rules-and-queries]
+          (let [default-rules-and-queries (merge queries rules)
+                common-keys (set/intersection (-> default-rules-and-queries keys set) (-> rules-and-queries keys set))]
+            `(cond
+               (not (nil? @*session))
+               (throw (ex-info "Can't update session because it has already been created" {}))
+               ~(> (count common-keys) 0)
+               (throw (ex-info (str "The following key(s) are invalid because they are already being used: " ~common-keys) {}))
+               :else
+               (reset! *initial-session (->session ~(merge default-rules-and-queries rules-and-queries)))))))
+
+(defn def-queries [session]
+  (let [query-fns (clarax/query-fns session)]
+    (def get-game (:get-game query-fns))
+    (def get-window (:get-window query-fns))
+    (def get-mouse (:get-mouse query-fns))
+    (def get-mouse-hover (:get-mouse-hover query-fns))
+    (def get-font (:get-font query-fns))
+    (def get-vim (:get-vim query-fns))
+    (def get-current-tab (:get-current-tab query-fns))
+    (def get-current-buffer (:get-current-buffer query-fns))
+    (def get-tab (:get-tab query-fns))
+    (def get-bounding-box (:get-bounding-box query-fns))
+    (def get-text-box (:get-text-box query-fns))
+    (def get-buffer (:get-buffer query-fns))
+    (def get-minimap (:get-minimap query-fns))
+    (def get-constants (:get-constants query-fns))))
 

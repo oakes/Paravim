@@ -282,6 +282,21 @@
   ;; allow transparency in images
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
+  ;; initialize session
+  (session/def-queries
+    (reset! session/*session
+      (-> @session/*initial-session
+          (clara/insert
+            (session/->Mouse 0 0)
+            (session/->MouseHover nil nil nil)
+            (session/->CurrentTab :files)
+            (session/->Tab :files nil)
+            (session/->Tab :repl-in nil)
+            (session/->Tab :repl-out nil)
+            (session/->Font constants/default-font-size)
+            (session/map->Vim {:mode 'NORMAL
+                               :show-search? false}))
+          clara/fire-rules)))
   ;; create rect entities
   (let [base-rect-entity (e/->entity game primitives/rect)
         base-rects-entity (c/compile game (i/->instanced-entity base-rect-entity))]
@@ -423,6 +438,9 @@
 
 (defn tick [game]
   (let [session @session/*session
+        session (if (nil? session) ;; this should only happen during dev, when paravim.session is reloaded
+                  (do (init game) @session/*session)
+                  session)
         font-size-multiplier (:size (session/get-font session))
         current-tab (:id (session/get-current-tab session))
         current-buffer (session/get-current-buffer session)
@@ -510,27 +528,25 @@
                            (t/project game-width game-height)
                            (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                            (t/scale font-size-multiplier font-size-multiplier)))))
-    ;; insert/update the game record
-    (if-let [game' (session/get-game session)]
-      (let [;; read from command chan and update game record if necessary
-            poll-input! (:paravim.core/poll-input! game)
-            game (if poll-input!
-                   (poll-input! game)
-                   ;; if `game` has no poll-input, use the one from the session.
-                   ;; this would only happen in old versions of the play-cljc template
-                   ;; because it wasn't passing the latest game map to this function.
-                   ((:paravim.core/poll-input! game') (merge game' game)))]
-        ;; put new game record in the session
-        (swap! session/*session
-          (fn [session]
+    ;; update the game record
+    (let [game' (session/get-game session)
+          ;; read from command chan and update game record if necessary
+          poll-input! (:paravim.core/poll-input! game)
+          game (if poll-input!
+                 (poll-input! game)
+                 ;; if `game` has no poll-input, use the one from the session.
+                 ;; this would only happen in old versions of the play-cljc template
+                 ;; because it wasn't passing the latest game map to this function.
+                 ((:paravim.core/poll-input! game') (merge game' game)))]
+      ;; put new game record in the session
+      (swap! session/*session
+        (fn [session]
+          (when session ;; this could be momentarily nil while reloading the paravim.session ns
             (-> session
                 (clarax/merge game' game)
-                clara/fire-rules)))
-        ;; return new game record
-        game)
-      ;; if game record doesn't exist, call `init` again.
-      ;; this is only useful during development for code reloading.
-      (init game))))
+                clara/fire-rules))))
+      ;; return new game record
+      game)))
 
 ;; this dummy function is overwritten in paravim.start-dev
 ;; so we can run things whenever this ns is reloaded
