@@ -397,7 +397,11 @@
                             bounding-boxes)
                           (clara/fire-rules $)))))))))))
   ;; init vim
-  ((:paravim.vim/init game) game)
+  ;; this should never be nil, but it could be after
+  ;; hot code reloading if this function isn't given the
+  ;; game map created in paravim.start
+  (when-let [init-vim (:paravim.vim/init game)]
+    (init-vim game))
   ;; return session
   @session/*session)
 
