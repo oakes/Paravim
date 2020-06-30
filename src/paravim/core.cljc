@@ -404,10 +404,7 @@
                    (swap! session/*session
                      (fn [session]
                        (->> entities
-                            (reduce
-                              (fn [s entity]
-                                (clara/insert s entity))
-                              session)
+                            (reduce clara/insert session)
                             clara/fire-rules))))]
     (if-let [entities @*entities]
       (callback entities)
