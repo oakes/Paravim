@@ -363,8 +363,8 @@
                    :text-boxes text-boxes
                    :bounding-boxes bounding-boxes})))))))))
 
-; this will cache the entities so they aren't recaculated after re-running `init`
-(defonce *entities (atom nil))
+; cache the entities so they aren't recaculated after reloading the session
+(defonce ^:private *entity-cache (atom nil))
 
 (defn init [game]
   ;; allow transparency in images
@@ -387,7 +387,7 @@
                                  :show-search? false}))))
   ;; initialize entities
   (let [callback (fn [{:keys [constants text-boxes bounding-boxes] :as entities}]
-                   (reset! *entities entities)
+                   (reset! *entity-cache entities)
                    (swap! session/*session
                           (fn [session]
                             (as-> session $
@@ -403,7 +403,7 @@
                                     $
                                     bounding-boxes)
                                   (clara/fire-rules $)))))]
-    (if-let [entities @*entities]
+    (if-let [entities @*entity-cache]
       (callback entities)
       (init-entities game callback)))
   ;; init vim
