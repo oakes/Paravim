@@ -427,7 +427,7 @@
         (when (and rects-entity show-cursor?)
           (c/render game (-> rects-entity
                              (t/project game-width game-height)
-                             (t/camera camera)
+                             (t/invert camera)
                              (t/translate 0 text-top)
                              (t/scale font-size-multiplier font-size-multiplier))))
         (let [[lines-to-skip-count lines-to-crop-count] (buffers/get-visible-lines buffer constants text-box game-height font-size-multiplier)]
@@ -435,7 +435,7 @@
             (c/render game (-> parinfer-text-entity
                                (buffers/crop-text-entity lines-to-skip-count lines-to-crop-count)
                                (t/project game-width game-height)
-                               (t/camera camera)
+                               (t/invert camera)
                                (t/translate 0 text-top)
                                (t/scale font-size-multiplier font-size-multiplier))))
           (c/render game (-> text-entity
@@ -443,7 +443,7 @@
                              (cond-> (not show-cursor?)
                                      (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha))
                              (t/project game-width game-height)
-                             (t/camera camera)
+                             (t/invert camera)
                              (t/translate 0 text-top)
                              (t/scale font-size-multiplier font-size-multiplier)))
           (when (and show-minimap? (:show-minimap? buffer))

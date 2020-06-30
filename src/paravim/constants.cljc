@@ -1,7 +1,7 @@
 (ns paravim.constants
   (:require [play-cljc.gl.entities-2d :as e]))
 
-(def orig-camera (e/->camera true))
+(def orig-camera (e/->camera))
 
 (def buttons [{:id :font-inc
                :text "Font +"
