@@ -278,26 +278,7 @@
     text-entity
     (keys chars/instanced-font-attrs->unis)))
 
-(defn init [game]
-  ;; allow transparency in images
-  (gl game enable (gl game BLEND))
-  (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
-  ;; initialize session
-  (session/def-queries
-    (reset! session/*session
-      (-> (session/init)
-          (clara/insert
-            (session/->Mouse 0 0)
-            (session/->MouseHover nil nil nil)
-            (session/->CurrentTab :files)
-            (session/->Tab :files nil)
-            (session/->Tab :repl-in nil)
-            (session/->Tab :repl-out nil)
-            (session/->Font constants/default-font-size)
-            (session/map->Vim {:mode 'NORMAL
-                               :show-search? false}))
-          clara/fire-rules)))
-  ;; create rect entities
+(defn init-entities [game callback]
   (let [base-rect-entity (e/->entity game primitives/rect)
         base-rects-entity (c/compile game (i/->instanced-entity base-rect-entity))]
     ;; load fonts
@@ -368,34 +349,69 @@
                                                                 (t/color colors/yellow-color)))))
                                                 button-entities
                                                 constants/buttons)]
-                (swap! session/*session
-                  (fn [session]
-                    (as-> session $
-                          (clara/insert $
-                            (session/map->Game game)
-                            (session/->Window (utils/get-width game) (utils/get-height game))
-                            (session/map->Constants
-                              {:base-rect-entity base-rect-entity
-                               :base-rects-entity base-rects-entity
-                               :font-width font-width
-                               :font-height font-height
-                               :base-font-entity base-font-entity
-                               :base-text-entity base-text-entity
-                               :roboto-font-entity roboto-font-entity
-                               :roboto-text-entity roboto-text-entity
-                               :toolbar-text-entities (merge tab-entities button-entities)
-                               :highlight-text-entities highlight-button-entities}))
-                          (reduce-kv
-                            (fn [session id text-box]
-                              (clara/insert session (session/map->TextBox (assoc text-box :id id))))
-                            $
-                            text-boxes)
-                          (reduce-kv
-                            (fn [session id bounding-box]
-                              (clara/insert session (session/map->BoundingBox (assoc bounding-box :id id))))
-                            $
-                            bounding-boxes)
-                          (clara/fire-rules $)))))))))))
+                (callback
+                  (as-> [] $
+                        (conj $
+                          (session/map->Constants
+                            {:base-rect-entity base-rect-entity
+                             :base-rects-entity base-rects-entity
+                             :font-width font-width
+                             :font-height font-height
+                             :base-font-entity base-font-entity
+                             :base-text-entity base-text-entity
+                             :roboto-font-entity roboto-font-entity
+                             :roboto-text-entity roboto-text-entity
+                             :toolbar-text-entities (merge tab-entities button-entities)
+                             :highlight-text-entities highlight-button-entities}))
+                        (reduce-kv
+                          (fn [v id text-box]
+                            (conj v (session/map->TextBox (assoc text-box :id id))))
+                          $
+                          text-boxes)
+                        (reduce-kv
+                          (fn [v id bounding-box]
+                            (conj v (session/map->BoundingBox (assoc bounding-box :id id))))
+                          $
+                          bounding-boxes)))))))))))
+
+; this will cache the entities so they aren't recaculated after re-running `init`
+(defonce *entities (atom nil))
+
+(defn init [game]
+  ;; allow transparency in images
+  (gl game enable (gl game BLEND))
+  (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
+  ;; initialize session
+  (session/def-queries
+    (reset! session/*session
+      (-> (session/init)
+          (clara/insert
+            (session/map->Game game)
+            (session/->Window (utils/get-width game) (utils/get-height game))
+            (session/->Mouse 0 0)
+            (session/->MouseHover nil nil nil)
+            (session/->CurrentTab :files)
+            (session/->Tab :files nil)
+            (session/->Tab :repl-in nil)
+            (session/->Tab :repl-out nil)
+            (session/->Font constants/default-font-size)
+            (session/map->Vim {:mode 'NORMAL
+                               :show-search? false}))
+          clara/fire-rules)))
+  ;; create rect entities
+  (let [callback (fn [entities]
+                   (reset! *entities entities)
+                   (swap! session/*session
+                     (fn [session]
+                       (->> entities
+                            (reduce
+                              (fn [s entity]
+                                (clara/insert s entity))
+                              session)
+                            clara/fire-rules))))]
+    (if-let [entities @*entities]
+      (callback entities)
+      (init-entities game callback)))
   ;; init vim
   ;; this should never be nil, but it could be after
   ;; hot code reloading if this function isn't given the
