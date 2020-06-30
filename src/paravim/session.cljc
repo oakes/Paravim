@@ -9,7 +9,7 @@
             [clojure.core.async :as async]
             #?(:clj  [clarax.macros-java :refer [->session]]
                :cljs [clarax.macros-js :refer-macros [->session]]))
-  #?(:cljs (:require-macros [paravim.session :refer [->session-wrapper]])))
+  #?(:cljs (:require-macros [paravim.session :refer [merge-into-session]])))
 
 (defrecord Game [total-time delta-time context])
 (defrecord Window [width height])
@@ -238,22 +238,20 @@
         (assoc (paravim.scroll/animate-camera buffer (:size font) text-box window delta-time)
           :total-time-anchor total-time)))})
 
-#?(:clj (defmacro ->session-wrapper []
-          (list '->session (merge queries rules))))
-
-(def *initial-session (atom (->session-wrapper)))
+(defonce *initial-session (atom nil))
 (defonce *session (atom nil))
 (defonce *reload? (atom false))
-
-;; when this ns is reloaded, reload the session
-(when @*session
-  (reset! *reload? true))
 
 #?(:clj (defmacro merge-into-session [rules-and-queries]
           `(do
              (reset! *initial-session (->session ~(merge queries rules rules-and-queries)))
-             (reset! *reload? true)
+             ;; reload the session if it's been created already
+             (when @*session
+               (reset! *reload? true))
              nil)))
+
+;; create initial session
+(merge-into-session {})
 
 (defn def-queries [session]
   (let [query-fns (clarax/query-fns session)]
