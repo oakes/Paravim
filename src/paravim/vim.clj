@@ -3,6 +3,8 @@
             [paravim.session :as session]
             [paravim.constants :as constants]
             [paravim.utils :as utils]
+            [clara.rules :as clara]
+            [clarax.rules :as clarax]
             [libvim-clj.core :as v]
             [clojure.string :as str]
             [clojure.java.io :as io]

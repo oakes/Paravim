@@ -350,29 +350,18 @@
                                                 button-entities
                                                 constants/buttons)]
                 (callback
-                  (as-> [] $
-                        (conj $
-                          (session/map->Constants
-                            {:base-rect-entity base-rect-entity
-                             :base-rects-entity base-rects-entity
-                             :font-width font-width
-                             :font-height font-height
-                             :base-font-entity base-font-entity
-                             :base-text-entity base-text-entity
-                             :roboto-font-entity roboto-font-entity
-                             :roboto-text-entity roboto-text-entity
-                             :toolbar-text-entities (merge tab-entities button-entities)
-                             :highlight-text-entities highlight-button-entities}))
-                        (reduce-kv
-                          (fn [v id text-box]
-                            (conj v (session/map->TextBox (assoc text-box :id id))))
-                          $
-                          text-boxes)
-                        (reduce-kv
-                          (fn [v id bounding-box]
-                            (conj v (session/map->BoundingBox (assoc bounding-box :id id))))
-                          $
-                          bounding-boxes)))))))))))
+                  {:constants {:base-rect-entity base-rect-entity
+                               :base-rects-entity base-rects-entity
+                               :font-width font-width
+                               :font-height font-height
+                               :base-font-entity base-font-entity
+                               :base-text-entity base-text-entity
+                               :roboto-font-entity roboto-font-entity
+                               :roboto-text-entity roboto-text-entity
+                               :toolbar-text-entities (merge tab-entities button-entities)
+                               :highlight-text-entities highlight-button-entities}
+                   :text-boxes text-boxes
+                   :bounding-boxes bounding-boxes})))))))))
 
 ; this will cache the entities so they aren't recaculated after re-running `init`
 (defonce *entities (atom nil))
@@ -382,30 +371,36 @@
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
   ;; initialize session
-  (session/def-queries
-    (reset! session/*session
-      (-> (session/init)
-          (clara/insert
-            (session/map->Game game)
-            (session/->Window (utils/get-width game) (utils/get-height game))
-            (session/->Mouse 0 0)
-            (session/->MouseHover nil nil nil)
-            (session/->CurrentTab :files)
-            (session/->Tab :files nil)
-            (session/->Tab :repl-in nil)
-            (session/->Tab :repl-out nil)
-            (session/->Font constants/default-font-size)
-            (session/map->Vim {:mode 'NORMAL
-                               :show-search? false}))
-          clara/fire-rules)))
-  ;; create rect entities
-  (let [callback (fn [entities]
+  (let [session (-> @session/*initial-session
+                    (clara/insert
+                      (session/map->Game game)
+                      (session/->Window (utils/get-width game) (utils/get-height game))
+                      (session/->Mouse 0 0)
+                      (session/->MouseHover nil nil nil)
+                      (session/->CurrentTab :files)
+                      (session/->Tab :files nil)
+                      (session/->Tab :repl-in nil)
+                      (session/->Tab :repl-out nil)
+                      (session/->Font constants/default-font-size)
+                      (session/map->Vim {:mode 'NORMAL
+                                         :show-search? false})))
+        callback (fn [{:keys [constants text-boxes bounding-boxes] :as entities}]
                    (reset! *entities entities)
-                   (swap! session/*session
-                     (fn [session]
-                       (->> entities
-                            (reduce clara/insert session)
-                            clara/fire-rules))))]
+                   (as-> session $
+                         (clara/insert $ (session/map->Constants constants))
+                         (reduce-kv
+                           (fn [session id text-box]
+                             (clara/insert session (session/map->TextBox (assoc text-box :id id))))
+                           $
+                           text-boxes)
+                         (reduce-kv
+                           (fn [session id bounding-box]
+                             (clara/insert session (session/map->BoundingBox (assoc bounding-box :id id))))
+                           $
+                           bounding-boxes)
+                         (clara/fire-rules $)
+                         (reset! session/*session $)
+                         (session/def-queries $)))]
     (if-let [entities @*entities]
       (callback entities)
       (init-entities game callback)))
@@ -415,8 +410,8 @@
   ;; game map created in paravim.start
   (when-let [init-vim (:paravim.vim/init game)]
     (init-vim game))
-  ;; return session
-  @session/*session)
+  ;; return game map
+  game)
 
 (def screen-entity
   {:viewport {:x 0 :y 0 :width 0 :height 0}
@@ -457,10 +452,10 @@
                                          (assoc-in [:uniforms 'u_alpha] colors/unfocused-alpha)))))))))))
 
 (defn tick [game]
+  (when @session/*reload?
+    (reset! session/*reload? false)
+    (init game))
   (let [session @session/*session
-        session (if (nil? session) ;; this should only happen during dev, when paravim.session is reloaded
-                  (init game)
-                  session)
         font-size-multiplier (:size (session/get-font session))
         current-tab (:id (session/get-current-tab session))
         current-buffer (session/get-current-buffer session)
