@@ -104,10 +104,9 @@
     (when (or press? release?)
       (swap! session/*session
              (fn [session]
-               (when session ;; this could be momentarily nil while hot code reloading
-                 (c/update-vim session
-                   {:control? (or (and control? (not control-key?))
-                                  (and press? control-key?))})))))
+               (c/update-vim session
+                 {:control? (or (and control? (not control-key?))
+                                (and press? control-key?))}))))
     (when press?
       (when-let [session @session/*session]
         (let [{:keys [mode]} (session/get-vim session)
@@ -206,11 +205,11 @@
                               (c/update-vim (second input))
                               (c/insert-buffer-refresh (session/get-current-buffer session)))))
                       nil))
-      (when (some-> @session/*session ;; this could be momentarily nil while hot code reloading
-                    (vim/ready-to-append? vim repl-output))
-        (binding [vim/*update-ui?* false]
-          (vim/append-to-buffer! game @session/*session (first repl-output)))
-        (assoc game ::c/repl-output (vec (rest repl-output)))))
+      (when-let [session @session/*session] ;; this could be momentarily nil while hot code reloading
+        (when (vim/ready-to-append? session vim repl-output)
+          (binding [vim/*update-ui?* false]
+            (vim/append-to-buffer! game session (first repl-output)))
+          (assoc game ::c/repl-output (vec (rest repl-output))))))
     game))
 
 (defn ->window []
