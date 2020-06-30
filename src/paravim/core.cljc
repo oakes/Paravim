@@ -45,7 +45,7 @@
   (let [buffer-id-or-path (or (:buffer-id (session/get-tab session {:?id tab-id}))
                               ;; if no buffer exists, open a new one
                               (get constants/tab->path tab-id))]
-    (async/put! (:paravim.core/command-chan game) [:new-buf buffer-id-or-path])))
+    (async/put! (::command-chan game) [:new-buf buffer-id-or-path])))
 
 (defn shift-current-tab! [game session direction]
   (let [current-tab (session/get-current-tab session)
@@ -170,7 +170,7 @@
                           window (session/get-window session)
                           constants (session/get-constants session)
                           font (session/get-font session)]
-                      (async/put! (:paravim.core/command-chan game)
+                      (async/put! (::command-chan game)
                                   [:move-cursor (mouse->cursor-position buffer (:mouse-anchor mouse-hover) (:size font) text-box constants window)])))
             nil))))))
 
@@ -472,7 +472,7 @@
                 command-text-entity command-cursor-entity]
          :as vim} (session/get-vim session)]
     (when (and window (pos? game-width) (pos? game-height))
-      (if (:paravim.core/clear? game)
+      (if (::clear? game)
         (c/render game (update screen-entity :viewport assoc :width game-width :height game-height))
         (c/render game (-> base-rects-entity
                            (t/project game-width game-height)
@@ -548,13 +548,13 @@
     ;; update the game record
     (let [game' (session/get-game session)
           ;; read from command chan and update game record if necessary
-          poll-input! (:paravim.core/poll-input! game)
+          poll-input! (::poll-input! game)
           game (if poll-input!
                  (poll-input! game)
                  ;; if `game` has no poll-input, use the one from the session.
                  ;; this would only happen in old versions of the play-cljc template
                  ;; because it wasn't passing the latest game map to this function.
-                 ((:paravim.core/poll-input! game') (merge game' game)))]
+                 ((::poll-input! game') (merge game' game)))]
       ;; put new game record in the session
       (swap! session/*session
         (fn [session]
