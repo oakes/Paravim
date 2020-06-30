@@ -8,6 +8,7 @@
   (str/escape s {\return ""}))
 
 (def ^:const repl-buffer-size 32)
+(def *current-ns (atom nil))
 
 (defn pipe-into-console! [in-pipe callback]
   (let [ca (char-array repl-buffer-size)]
@@ -54,16 +55,45 @@
               (finally (println "=== Finished ==="))))))))
   pipes)
 
-(defn reload-file! [buffer pipes current-tab]
-  (let [{:keys [out-pipe]} pipes
-        {:keys [lines file-name clojure?]} buffer]
-    (when (and clojure? (= current-tab :files))
+(defn reload-file! [{:keys [lines file-name clojure?] :as buffer} pipes current-tab]
+  (when (and clojure? (= current-tab :files))
+    (let [{:keys [out-pipe]} pipes
+          content (str/join \newline lines)
+          first-form (try (read-string {:read-cond :allow} content)
+                       (catch Exception _))
+          new-ns (when (and (list? first-form)
+                            (= 'ns (first first-form))
+                            (symbol? (second first-form))
+                            (not= @*current-ns (second first-form)))
+                   (second first-form))
+          reload-content (str "(do "
+                              (pr-str '(println))
+                              (pr-str (list 'println "Reloading" file-name))
+                              content
+                              ;; newline in case the last line of `content` is a comment
+                              \newline
+                              (pr-str '(reset! paravim.repl/*current-ns (-> *ns* str symbol)))
+                              '(quote ...done)
+                              ")"
+                              ;; newline to force repl to finish
+                              \newline)]
+      (when new-ns
+        (doto out-pipe
+          (.write (->
+                    (list 'do
+                      '(println)
+                      (list 'println "Switching to" (list 'quote new-ns))
+                      (list 'try
+                        (list 'doto (list 'quote new-ns)
+                          'require
+                          'in-ns)
+                        '(quote ...done)
+                        '(catch Exception _ (quote ...failed))))
+                    pr-str
+                    (str \newline)))
+          .flush))
       (doto out-pipe
-        (.write (str "(do "
-                     (pr-str '(println))
-                     (pr-str (list 'println "Reloading" file-name))
-                     (str/join \newline lines)
-                     ")\n"))
+        (.write reload-content)
         .flush)
       true)))
 
