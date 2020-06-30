@@ -371,36 +371,38 @@
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
   ;; initialize session
-  (let [session (-> @session/*initial-session
-                    (clara/insert
-                      (session/map->Game game)
-                      (session/->Window (utils/get-width game) (utils/get-height game))
-                      (session/->Mouse 0 0)
-                      (session/->MouseHover nil nil nil)
-                      (session/->CurrentTab :files)
-                      (session/->Tab :files nil)
-                      (session/->Tab :repl-in nil)
-                      (session/->Tab :repl-out nil)
-                      (session/->Font constants/default-font-size)
-                      (session/map->Vim {:mode 'NORMAL
-                                         :show-search? false})))
-        callback (fn [{:keys [constants text-boxes bounding-boxes] :as entities}]
+  (session/def-queries
+    (reset! session/*session
+            (clara/insert @session/*initial-session
+              (session/map->Game game)
+              (session/->Window (utils/get-width game) (utils/get-height game))
+              (session/->Mouse 0 0)
+              (session/->MouseHover nil nil nil)
+              (session/->CurrentTab :files)
+              (session/->Tab :files nil)
+              (session/->Tab :repl-in nil)
+              (session/->Tab :repl-out nil)
+              (session/->Font constants/default-font-size)
+              (session/map->Vim {:mode 'NORMAL
+                                 :show-search? false}))))
+  ;; initialize entities
+  (let [callback (fn [{:keys [constants text-boxes bounding-boxes] :as entities}]
                    (reset! *entities entities)
-                   (as-> session $
-                         (clara/insert $ (session/map->Constants constants))
-                         (reduce-kv
-                           (fn [session id text-box]
-                             (clara/insert session (session/map->TextBox (assoc text-box :id id))))
-                           $
-                           text-boxes)
-                         (reduce-kv
-                           (fn [session id bounding-box]
-                             (clara/insert session (session/map->BoundingBox (assoc bounding-box :id id))))
-                           $
-                           bounding-boxes)
-                         (clara/fire-rules $)
-                         (reset! session/*session $)
-                         (session/def-queries $)))]
+                   (swap! session/*session
+                          (fn [session]
+                            (as-> session $
+                                  (clara/insert $ (session/map->Constants constants))
+                                  (reduce-kv
+                                    (fn [session id text-box]
+                                      (clara/insert session (session/map->TextBox (assoc text-box :id id))))
+                                    $
+                                    text-boxes)
+                                  (reduce-kv
+                                    (fn [session id bounding-box]
+                                      (clara/insert session (session/map->BoundingBox (assoc bounding-box :id id))))
+                                    $
+                                    bounding-boxes)
+                                  (clara/fire-rules $)))))]
     (if-let [entities @*entities]
       (callback entities)
       (init-entities game callback)))
