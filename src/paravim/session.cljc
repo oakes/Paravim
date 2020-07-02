@@ -242,16 +242,16 @@
 (defonce *session (atom nil))
 (defonce *reload? (atom false))
 
-#?(:clj (defmacro merge-into-session [rules-and-queries]
+#?(:clj (defmacro merge-into-session [& args]
           `(do
-             (reset! *initial-session (->session ~(merge queries rules rules-and-queries)))
+             (reset! *initial-session (->session ~(apply merge queries rules args)))
              ;; reload the session if it's been created already
              (when @*session
                (reset! *reload? true))
              nil)))
 
 ;; create initial session
-(merge-into-session {})
+(merge-into-session)
 
 (defn def-queries [session]
   (let [query-fns (clarax/query-fns session)]
