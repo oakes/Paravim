@@ -13,7 +13,7 @@
         font-width (* (:font-width constants) font-size-multiplier)
         font-height (* (:font-height constants) font-size-multiplier)
         minimap-width (/ game-width constants/minimap-scale)
-        minimap-height (- text-bottom text-top)
+        minimap-height (max 0 (- text-bottom text-top))
         minimap-font-size (/ font-size-multiplier constants/minimap-scale)
         minimap-font-width (* (:font-width constants) minimap-font-size)
         minimap-font-height (* (:font-height constants) minimap-font-size)
