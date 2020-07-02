@@ -32,7 +32,7 @@
            :test {:extra-paths ["test"]
                   :main-opts ["test.clj"]}
            :macos {:jvm-opts ["-XstartOnFirstThread"]}
-           :profiler {:extra-deps {com.clojure-goes-fast/clj-async-profiler {:mvn/version "0.4.0"}}
+           :profiler {:extra-deps {com.clojure-goes-fast/clj-async-profiler {:mvn/version "0.4.1"}}
                       :jvm-opts ["-Djdk.attach.allowAttachSelf"
                                  "-XX:+UnlockDiagnosticVMOptions"
                                  "-XX:+DebugNonSafepoints"]}}}
