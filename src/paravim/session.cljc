@@ -202,7 +202,7 @@
             (paravim.buffers/update-search-highlights constants vim)
             (assoc :window-anchor window)))
       (clojure.core.async/put! (:paravim.core/single-command-chan game) [:resize-window]))
-    ::update-minimap
+    ::minimap
     (let [window paravim.session.Window
           font paravim.session.Font
           buffer paravim.session.Buffer
