@@ -19,7 +19,7 @@
   (let [{:keys [font-height font-width] :as constants} (session/get-constants session)
         current-tab (:id (session/get-current-tab session))]
     (when-let [{:keys [top bottom]} (session/get-text-box session {:?id current-tab})]
-      (let [font-size-multiplier (:size (session/get-font session))
+      (let [font-size-multiplier (/ (:size (session/get-font session)) font-height)
             text-height (- (bottom height font-size-multiplier)
                            (top height font-size-multiplier))
             font-height (* font-height font-size-multiplier)

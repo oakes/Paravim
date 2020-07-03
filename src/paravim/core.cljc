@@ -87,7 +87,7 @@
                   (buffers/update-clojure-buffer constants)
                   (assoc :needs-clojure-refresh? false))
               $)
-            (buffers/update-cursor $ (:mode vim) (:size font) text-box constants window)
+            (buffers/update-cursor $ (:mode vim) (/ (:size font) (:font-height constants)) text-box constants window)
             (buffers/update-highlight $ constants)
             (buffers/update-selection $ constants (:visual-range vim))
             (buffers/update-search-highlights $ constants vim)
@@ -139,15 +139,16 @@
       clara/fire-rules))
 
 (defn- mouse->cursor-position [buffer mouse font-size text-box constants window]
-  (let [text-top ((:top text-box) (:height window) font-size)
+  (let [font-size-multiplier (/ font-size (:font-height constants))
+        text-top ((:top text-box) (:height window) font-size-multiplier)
         {:keys [x y]} mouse
         {:keys [camera-x camera-y]} buffer
         column (-> (+ x camera-x)
-                   (/ (* font-size (:font-width constants)))
+                   (/ (* font-size-multiplier (:font-width constants)))
                    long)
         line (-> (+ y camera-y)
                  (- text-top)
-                 (/ (* font-size (:font-height constants)))
+                 (/ (* font-size-multiplier (:font-height constants)))
                  long)]
     [line column]))
 
@@ -214,7 +215,7 @@
           command-text-entity (-> (chars/assoc-line base-text-entity 0 char-entities)
                                   (chars/update-uniforms font-height colors/text-alpha))
           line-chars (get-in command-text-entity [:characters 0])
-          command-cursor-entity (i/assoc base-rects-entity 0 (buffers/->cursor-entity vim-mode constants line-chars 0 (inc position) font-size))]
+          command-cursor-entity (i/assoc base-rects-entity 0 (buffers/->cursor-entity vim-mode constants line-chars 0 (inc position) (/ font-size font-height)))]
       (assoc-command-entity command command-text-entity command-cursor-entity))
     (assoc-command-entity command nil nil)))
 
@@ -374,6 +375,7 @@
   (session/def-queries
     (reset! session/*session
             (clara/insert @session/*initial-session
+              (session/->Init)
               (session/map->Game game)
               (session/->Window (utils/get-width game) (utils/get-height game))
               (session/->Mouse 0 0)
@@ -401,11 +403,17 @@
                                     (fn [session id bounding-box]
                                       (clara/insert session (session/map->BoundingBox (assoc bounding-box :id id))))
                                     $
-                                    bounding-boxes)
-                                  (clara/fire-rules $)))))]
+                                    bounding-boxes)))))]
     (if-let [entities @*entity-cache]
       (callback entities)
       (init-entities game callback)))
+  ;; fire rules
+  (swap! session/*session
+         (fn [session]
+           (let [session (clara/fire-rules session)]
+             (if-let [init (clara/query session ::session/get-init)]
+               (clara/retract session init)
+               session))))
   ;; init vim
   ;; this should never be nil, but it could be after
   ;; hot code reloading if this function isn't given the
@@ -458,7 +466,6 @@
     (reset! session/*reload? false)
     (init game))
   (let [session @session/*session
-        font-size-multiplier (:size (session/get-font session))
         current-tab (:id (session/get-current-tab session))
         current-buffer (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id current-buffer})
@@ -468,6 +475,7 @@
                 font-height
                 toolbar-text-entities highlight-text-entities]
          :as constants} (session/get-constants session)
+        font-size-multiplier (/ (:size (session/get-font session)) font-height)
         {:keys [mode ascii control?
                 command-text-entity command-cursor-entity]
          :as vim} (session/get-vim session)]

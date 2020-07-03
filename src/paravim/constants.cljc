@@ -1,5 +1,7 @@
 (ns paravim.constants
-  (:require [play-cljc.gl.entities-2d :as e]))
+  (:require [play-cljc.gl.entities-2d :as e]
+            #?(:clj [paravim.text :refer [get-font-height]]))
+  #?(:cljs (:require-macros [paravim.text :refer [get-font-height]])))
 
 (def orig-camera (e/->camera))
 
@@ -27,15 +29,17 @@
 (def tab-ids (mapv :id tabs))
 (def tab? (set tab-ids))
 
-(def font-size-step (/ 1 16))
-(def min-font-size (/ 1 8))
-(def max-font-size 1)
-(def default-font-size (/ 1 4))
+(def font-height (get-font-height))
+(def font-size-step (/ font-height 16))
+(def min-font-size (/ font-height 8))
+(def max-font-size font-height)
+(def default-font-multiplier 1/4)
+(def default-font-size (* font-height default-font-multiplier))
 
 (def repl-in-lines 5)
 
 (def minimap-scale 6)
 (def minimap-min-chars 30)
-(def minimap-min-size-to-show-chars (/ (* default-font-size 2) minimap-scale))
+(def minimap-min-size-to-show-chars (/ (* default-font-multiplier 2) minimap-scale))
 (def max-lines 1000)
 

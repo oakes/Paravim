@@ -5,10 +5,15 @@
 ;;
 ;; :jvm-opts ["-Dparavim.init=init.clj"]
 
-(require '[paravim.session :as session])
-(import '[paravim.session Font])
+(require
+  '[paravim.session :as session]
+  '[clarax.rules :as clarax])
+
+(import
+  '[paravim.session Init Font])
 
 (session/merge-into-session
-  {:font-changed
-   (let [font Font]
-     (println font))})
+  {:init
+   (let [init Init
+         font Font]
+     (clarax/merge! font {:size 32}))})
