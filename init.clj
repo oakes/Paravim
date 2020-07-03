@@ -12,18 +12,23 @@
 
 (import '[paravim.session Font])
 
-(defrecord Init [])
+(def *first-run? (atom true))
+
+(defmacro run-only-once [& body]
+  `(when @*first-run?
+     (reset! *first-run? false)
+     ~@body))
 
 (session/merge-into-session
-  {;; this is a new custom rule
-   ;; that will run when the session initializes
+  {;; a custom rule
    :init
-   (let [init Init
-         font Font]
-     (clara/retract! init) ;; ensures this rule doesn't run again
-     (clarax/merge! font {:size 32}))
+   (let [font Font]
+     ;; `run-only-once` is a hacky way to
+     ;; only change things on init.
+     ;; without it, it would be impossible
+     ;; to change the font afterwards!
+     (run-only-once
+       (clarax/merge! font {:size 32})))
    ;; this overwrites paravim's minimap rule,
    ;; which has the effect of disabling it
    :paravim.session/minimap nil})
-
-(swap! session/*initial-session clara/insert (->Init)) ;; make the :init rule run
