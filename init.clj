@@ -26,4 +26,4 @@
    ;; which has the effect of disabling it
    :paravim.session/minimap nil})
 
-(swap! session/*session clara/insert (->Init)) ;; make the :init rule run
+(swap! session/*initial-session clara/insert (->Init)) ;; make the :init rule run

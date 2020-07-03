@@ -233,6 +233,13 @@
   ([game]
    (init game (vim/->vim) (async/chan)))
   ([game vim command-chan]
+   ;; load init file
+   (when-let [path (not-empty (System/getProperty "paravim.init"))]
+     (println "Loading Paravim init file:" path)
+     (let [path (if (.startsWith path "~")
+                  (.getCanonicalPath (io/file (System/getProperty "user.home") (subs path 1)))
+                  path)]
+       (load-file path)))
    (let [pipes (repl/create-pipes)
          density-ratio (get-density-ratio (:context game))
          game (assoc game
@@ -249,13 +256,6 @@
      (swap! session/*session c/font-multiply density-ratio)
      (when-not (::disable-repl? game)
        (repl/start-repl-thread! nil pipes #(async/put! command-chan [:append %])))
-     ;; load init file
-     (when-let [path (not-empty (System/getProperty "paravim.init"))]
-       (println "Loading Paravim init file:" path)
-       (let [path (if (.startsWith path "~")
-                    (.getCanonicalPath (io/file (System/getProperty "user.home") (subs path 1)))
-                    path)]
-         (load-file path)))
      game)))
 
 (defn- start [game window]

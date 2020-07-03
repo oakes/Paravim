@@ -377,20 +377,19 @@
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
   ;; initialize session
   (session/def-queries
-    (swap! session/*session
-           (fn [session]
-              (clara/insert session
-                (session/map->Game game)
-                (session/->Window (utils/get-width game) (utils/get-height game))
-                (session/->Mouse 0 0)
-                (session/->MouseHover nil nil nil)
-                (session/->CurrentTab :files)
-                (session/->Tab :files nil)
-                (session/->Tab :repl-in nil)
-                (session/->Tab :repl-out nil)
-                (session/->Font constants/default-font-size)
-                (session/map->Vim {:mode 'NORMAL
-                                   :show-search? false})))))
+    (reset! session/*session
+            (clara/insert @session/*initial-session
+              (session/map->Game game)
+              (session/->Window (utils/get-width game) (utils/get-height game))
+              (session/->Mouse 0 0)
+              (session/->MouseHover nil nil nil)
+              (session/->CurrentTab :files)
+              (session/->Tab :files nil)
+              (session/->Tab :repl-in nil)
+              (session/->Tab :repl-out nil)
+              (session/->Font constants/default-font-size)
+              (session/map->Vim {:mode 'NORMAL
+                                 :show-search? false}))))
   ;; initialize entities
   (let [callback (fn [{:keys [constants text-boxes bounding-boxes] :as entities}]
                    (reset! *entity-cache entities)
