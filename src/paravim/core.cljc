@@ -99,7 +99,11 @@
   (let [font (session/get-font session)
         curr-val (:size font)
         new-val (+ curr-val diff)]
-    (if (<= constants/min-font-size new-val constants/max-font-size)
+    (if (or (<= constants/min-font-size new-val constants/max-font-size)
+            ;; the user went outside of the normal font size range
+            ;; via their init file, so let them change it
+            (< curr-val constants/min-font-size)
+            (> curr-val constants/max-font-size))
       (-> session
           (clarax/merge font {:size new-val})
           clara/fire-rules)
