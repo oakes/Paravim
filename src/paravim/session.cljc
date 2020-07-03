@@ -11,7 +11,6 @@
                :cljs [clarax.macros-js :refer-macros [->session]]))
   #?(:cljs (:require-macros [paravim.session :refer [merge-into-session]])))
 
-(defrecord Init [])
 (defrecord Game [total-time delta-time context])
 (defrecord Window [width height])
 (defrecord Mouse [x y])
@@ -47,11 +46,7 @@
                       highlight-text-entities])
 
 (def queries
-  '{::get-init
-    (fn []
-      (let [init paravim.session.Init]
-        init))
-    ::get-game
+  '{::get-game
     (fn []
       (let [game paravim.session.Game]
         game))
@@ -243,15 +238,17 @@
         (assoc (paravim.scroll/animate-camera buffer (/ (:size font) paravim.constants/font-height) text-box window delta-time)
           :total-time-anchor total-time)))})
 
-(defonce *initial-session (atom nil))
 (defonce *session (atom nil))
 (defonce *reload? (atom false))
 
 #?(:clj (defmacro merge-into-session [& args]
-          `(do
-             (reset! *initial-session (->session ~(apply merge queries rules args)))
+          `(let [old-session# @*session]
+             (reset! *session (->session ~(->> (apply merge queries rules args)
+                                               ;; remove nil rules (this allows people to disable rules)
+                                               (filter second)
+                                               (into {}))))
              ;; reload the session if it's been created already
-             (when @*session
+             (when old-session#
                (reset! *reload? true))
              nil)))
 

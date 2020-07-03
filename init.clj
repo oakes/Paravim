@@ -7,13 +7,23 @@
 
 (require
   '[paravim.session :as session]
+  '[clara.rules :as clara]
   '[clarax.rules :as clarax])
 
-(import
-  '[paravim.session Init Font])
+(import '[paravim.session Font])
+
+(defrecord Init [])
 
 (session/merge-into-session
-  {:init
+  {;; this is a new custom rule
+   ;; that will run when the session initializes
+   :init
    (let [init Init
          font Font]
-     (clarax/merge! font {:size 32}))})
+     (clara/retract! init) ;; ensures this rule doesn't run again
+     (clarax/merge! font {:size 32}))
+   ;; this overwrites paravim's minimap rule,
+   ;; which has the effect of disabling it
+   :paravim.session/minimap nil})
+
+(swap! session/*session clara/insert (->Init)) ;; make the :init rule run
