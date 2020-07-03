@@ -25,8 +25,7 @@
         org.lwjgl/lwjgl-stb$natives-windows {:mvn/version "3.2.3"}}
  :aliases {:dev {:extra-deps {orchestra {:mvn/version "2018.12.06-2"}
                               expound {:mvn/version "0.7.2"}}
-                 :main-opts ["dev.clj"]
-                 :jvm-opts ["-Dparavim.init=init.clj"]}
+                 :main-opts ["dev.clj"]}
            :prod {:extra-deps {leiningen {:mvn/version "2.9.0"}}
                   :main-opts ["prod.clj"]}
            :test {:extra-paths ["test"]
@@ -35,4 +34,5 @@
            :profiler {:extra-deps {com.clojure-goes-fast/clj-async-profiler {:mvn/version "0.4.1"}}
                       :jvm-opts ["-Djdk.attach.allowAttachSelf"
                                  "-XX:+UnlockDiagnosticVMOptions"
-                                 "-XX:+DebugNonSafepoints"]}}}
+                                 "-XX:+DebugNonSafepoints"]}
+           :init {:jvm-opts ["-Dparavim.init=init.clj"]}}}
