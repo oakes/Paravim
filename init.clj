@@ -12,12 +12,11 @@
 
 (import '[paravim.session Font])
 
-(def *first-run? (atom true))
-
-(defmacro run-only-once [& body]
-  `(when @*first-run?
-     (reset! *first-run? false)
-     ~@body))
+(let [*first-run? (atom true)]
+  (defn run-only-once [body-fn]
+    (when @*first-run?
+      (reset! *first-run? false)
+      (body-fn))))
 
 (session/merge-into-session
   {;; a custom rule
@@ -28,7 +27,8 @@
      ;; without it, it would be impossible
      ;; to change the font afterwards!
      (run-only-once
-       (clarax/merge! font {:size 32})))
+       (fn []
+         (clarax/merge! font {:size 32}))))
    ;; this overwrites paravim's minimap rule,
    ;; which has the effect of disabling it
    :paravim.session/minimap nil})
