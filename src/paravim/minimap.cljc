@@ -32,12 +32,11 @@
         end-line (min line-count minimap-line-count)
         start-column (int (/ camera-x font-width))
         visible-lines (int (/ minimap-height font-height))]
-    (hash-map
-      :buffer-id (:id buffer)
-      :show? (and (> minimap-chars constants/minimap-min-chars)
-                  (> line-count visible-lines))
-      :rects-entity
-      (-> base-rects-entity
+    {:buffer-id (:id buffer)
+     :show? (and (> minimap-chars constants/minimap-min-chars)
+                 (> line-count visible-lines))
+     :rects-entity
+     (-> base-rects-entity
          (t/project game-width game-height)
          (i/assoc 0 (-> base-rect-entity
                         (t/color colors/bg-color)
@@ -49,23 +48,23 @@
                         (t/translate 0 (- (/ camera-y constants/minimap-scale)
                                           (* start-line minimap-font-height)))
                         (t/scale minimap-width (/ minimap-height constants/minimap-scale)))))
-      :text-entity
-      (-> text-entity
-          (cond-> minimap-is-overflowing
-                  (buffers/crop-text-entity
-                    start-line
-                    (min
-                      (+ minimap-line-count start-line)
-                      line-count)))
-          (assoc-in [:uniforms 'u_start_line] start-line)
-          (assoc-in [:uniforms 'u_start_column] start-column)
-          (assoc-in [:uniforms 'u_show_blocks]
-                    (if (< minimap-font-size constants/minimap-min-size-to-show-chars) 1 0))
-          (t/project game-width game-height)
-          (t/translate (- game-width minimap-width) text-top)
-          (cond-> (> start-column 0)
-                  (t/translate (- (* start-column minimap-font-width)) 0))
-          (cond-> (> start-line 0)
-                  (t/translate 0 (- (* start-line minimap-font-height))))
-          (t/scale font-size-multiplier font-size-multiplier)
-          (t/scale (/ 1 constants/minimap-scale) (/ 1 constants/minimap-scale))))))
+     :text-entity
+     (-> text-entity
+         (cond-> minimap-is-overflowing
+                 (buffers/crop-text-entity
+                   start-line
+                   (min
+                     (+ minimap-line-count start-line)
+                     line-count)))
+         (assoc-in [:uniforms 'u_start_line] start-line)
+         (assoc-in [:uniforms 'u_start_column] start-column)
+         (assoc-in [:uniforms 'u_show_blocks]
+                   (if (< minimap-font-size constants/minimap-min-size-to-show-chars) 1 0))
+         (t/project game-width game-height)
+         (t/translate (- game-width minimap-width) text-top)
+         (cond-> (> start-column 0)
+                 (t/translate (- (* start-column minimap-font-width)) 0))
+         (cond-> (> start-line 0)
+                 (t/translate 0 (- (* start-line minimap-font-height))))
+         (t/scale font-size-multiplier font-size-multiplier)
+         (t/scale (/ 1 constants/minimap-scale) (/ 1 constants/minimap-scale)))}))
