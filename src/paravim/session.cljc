@@ -253,8 +253,12 @@
     (let [font paravim.session.Font
           font-multiplier paravim.session.FontMultiplier
           constants paravim.session.Constants]
-      (if (== 0 (:size font))
+      (cond
+        ;; font needs to be initialized
+        (== 0 (:size font))
         (clarax.rules/merge! font {:size (* (:size font-multiplier) (:font-height constants))})
+        ;; change the multiplier to match the font size
+        (pos? (:size font))
         (clarax.rules/merge! font-multiplier {:size (/ (:size font) (:font-height constants))})))})
 
 (defonce *initial-session (atom nil))
