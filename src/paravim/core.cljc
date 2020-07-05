@@ -274,7 +274,8 @@
    :scroll-speed-x 0
    :scroll-speed-y 0
    :lines lines
-   :tab-id :files})
+   :tab-id :files
+   :last-update 0})
 
 (defn assoc-attr-lengths [text-entity]
   (reduce

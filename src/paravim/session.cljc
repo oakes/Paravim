@@ -200,12 +200,14 @@
       (clojure.core.async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     ::minimap
     (let [game Game
+          :when (:total-time game)
           window paravim.session.Window
           font paravim.session.Font
-          buffer paravim.session.Buffer
+          {:keys [last-update] :as buffer} paravim.session.Buffer
           ;; performance: delay updating the minimap
-          :when (> (- (:total-time game) (:last-update buffer))
-                   constants/minimap-update-delay)
+          :when (and (some? last-update)
+                     (> (- (:total-time game) last-update)
+                        constants/minimap-update-delay))
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))
           constants paravim.session.Constants
