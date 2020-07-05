@@ -15,7 +15,7 @@
      a_scale_matrix mat3}
    :uniforms
    {'u_matrix 'mat3
-    'u_char_counts ['int constants/max-lines]
+    'u_char_counts ['int constants/max-visible-lines]
     'u_start_line 'int
     'u_start_column 'int
     'u_font_height 'float}

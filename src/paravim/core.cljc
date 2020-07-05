@@ -240,7 +240,7 @@
                      (and (clojure-path? path)
                           ;; disable clojure support in large files for now,
                           ;; because it will be too slow to type
-                          (< (count lines) constants/max-lines)))]
+                          (< (count lines) constants/max-clojure-lines)))]
     {:id id
      :text-entity (buffers/assoc-lines base-text-entity base-font-entity font-height lines)
      :camera (t/translate constants/orig-camera 0 0)

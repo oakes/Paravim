@@ -17,7 +17,7 @@
         minimap-font-size (/ font-size-multiplier constants/minimap-scale)
         minimap-font-width (* (:font-width constants) minimap-font-size)
         minimap-font-height (* (:font-height constants) minimap-font-size)
-        minimap-line-count (int (min (/ minimap-height minimap-font-height) constants/max-lines))
+        minimap-line-count (int (min (/ minimap-height minimap-font-height) constants/max-visible-lines))
         minimap-chars (int (/ minimap-width minimap-font-width))
         line-count (count lines)
         minimap-is-overflowing (> line-count minimap-line-count)
