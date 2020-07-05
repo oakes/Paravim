@@ -18,6 +18,7 @@
 (defrecord TextBox [id left right top bottom])
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
+(defrecord FontMultiplier [size])
 (defrecord Vim [mode ascii control? show-search?
                 visual-range highlights message
                 command-start command-text command-completion
@@ -82,6 +83,10 @@
     (fn []
       (let [font paravim.session.Font]
         font))
+    ::get-font-multiplier
+    (fn []
+      (let [font paravim.session.FontMultiplier]
+        font))
     ::get-vim
     (fn []
       (let [vim paravim.session.Vim]
@@ -119,13 +124,13 @@
           :when (not= mouse (:mouse-anchor mouse-hover))
           current-tab paravim.session.CurrentTab
           :when (not= nil (:id current-tab))
-          font paravim.session.Font
+          font paravim.session.FontMultiplier
           {:keys [id left right top bottom] :as text-box} paravim.session.TextBox
           :when (and (= id (:id current-tab))
                      (<= left (:x mouse) (- (:width window) right))
-                     (<= (top (:height window) (/ (:size font) paravim.constants/font-height))
+                     (<= (top (:height window) (:size font))
                          (:y mouse)
-                         (bottom (:height window) (/ (:size font) paravim.constants/font-height))))]
+                         (bottom (:height window) (:size font))))]
       (clarax.rules/merge! mouse-hover {:target :text
                                         :cursor :ibeam
                                         :mouse-anchor mouse}))
@@ -134,9 +139,9 @@
           mouse paravim.session.Mouse
           mouse-hover paravim.session.MouseHover
           :when (not= mouse (:mouse-anchor mouse-hover))
-          font paravim.session.Font
+          font paravim.session.FontMultiplier
           {:keys [x1 y1 x2 y2 align] :as bounding-box} paravim.session.BoundingBox
-          :when (let [font-size (/ (:size font) paravim.constants/font-height)
+          :when (let [font-size (:size font)
                       game-width (:width window)
                       x1 (cond->> (* x1 font-size)
                                   (= :right align)
@@ -154,7 +159,7 @@
     ::update-buffer-when-font-changes
     (let [game paravim.session.Game
           window paravim.session.Window
-          font paravim.session.Font
+          font paravim.session.FontMultiplier
           buffer paravim.session.Buffer
           :when (and (not= font (:font-anchor buffer))
                      ;; ignore ascii buffers
@@ -165,7 +170,7 @@
           constants paravim.session.Constants]
       (clarax.rules/merge! buffer
         (-> buffer
-            (paravim.buffers/update-cursor (:mode vim) (/ (:size font) paravim.constants/font-height) text-box constants window)
+            (paravim.buffers/update-cursor (:mode vim) (:size font) text-box constants window)
             (paravim.buffers/update-highlight constants)
             (paravim.buffers/update-selection constants (:visual-range vim))
             (paravim.buffers/update-search-highlights constants vim)
@@ -174,7 +179,7 @@
     ::update-buffer-when-window-resizes
     (let [game paravim.session.Game
           window paravim.session.Window
-          font paravim.session.Font
+          font paravim.session.FontMultiplier
           current-tab paravim.session.CurrentTab
           tab paravim.session.Tab
           :when (= (:id tab) (:id current-tab))
@@ -192,7 +197,7 @@
           constants paravim.session.Constants]
       (clarax.rules/merge! buffer
         (-> buffer
-            (paravim.buffers/update-cursor (:mode vim) (/ (:size font) paravim.constants/font-height) text-box constants window)
+            (paravim.buffers/update-cursor (:mode vim) (:size font) text-box constants window)
             (paravim.buffers/update-highlight constants)
             (paravim.buffers/update-selection constants (:visual-range vim))
             (paravim.buffers/update-search-highlights constants vim)
@@ -202,7 +207,7 @@
     (let [game Game
           :when (:total-time game)
           window paravim.session.Window
-          font paravim.session.Font
+          font paravim.session.FontMultiplier
           {:keys [last-update] :as buffer} paravim.session.Buffer
           ;; performance: delay updating the minimap
           :when (and (some? last-update)
@@ -214,7 +219,7 @@
           minimap paravim.session.Minimap
           :when (and (= (:buffer-id minimap) (:id buffer))
                      (not= [window font buffer] (:anchor minimap)))]
-      (let [new-minimap (paravim.minimap/->minimap buffer constants (/ (:size font) paravim.constants/font-height) (:width window) (:height window) text-box)
+      (let [new-minimap (paravim.minimap/->minimap buffer constants (:size font) (:width window) (:height window) text-box)
             new-buffer (assoc buffer :show-minimap? (:show? new-minimap))]
         (when (not= buffer new-buffer)
           (clarax.rules/merge! buffer new-buffer))
@@ -224,17 +229,17 @@
                  :anchor [window font new-buffer]))))
     ::rubber-band-effect
     (let [window paravim.session.Window
-          font paravim.session.Font
+          font paravim.session.FontMultiplier
           buffer paravim.session.Buffer
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))
           constants paravim.session.Constants]
-      (some->> (paravim.scroll/rubber-band-camera buffer (/ (:size font) paravim.constants/font-height) text-box constants window)
+      (some->> (paravim.scroll/rubber-band-camera buffer (:size font) text-box constants window)
                (clarax.rules/merge! buffer)))
     ::move-camera-to-target
     (let [{:keys [delta-time total-time] :as game} paravim.session.Game
           window paravim.session.Window
-          font paravim.session.Font
+          font paravim.session.FontMultiplier
           {:keys [camera-x camera-y camera-target-x camera-target-y total-time-anchor] :as buffer} paravim.session.Buffer
           :when (and (not= total-time total-time-anchor)
                      (or (not (== camera-x camera-target-x))
@@ -242,8 +247,15 @@
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))]
       (clarax.rules/merge! buffer
-        (assoc (paravim.scroll/animate-camera buffer (/ (:size font) paravim.constants/font-height) text-box window delta-time)
-          :total-time-anchor total-time)))})
+        (assoc (paravim.scroll/animate-camera buffer (:size font) text-box window delta-time)
+          :total-time-anchor total-time)))
+    ::font
+    (let [font paravim.session.Font
+          font-multiplier paravim.session.FontMultiplier
+          constants paravim.session.Constants]
+      (if (== 0 (:size font))
+        (clarax.rules/merge! font {:size (* (:size font-multiplier) (:font-height constants))})
+        (clarax.rules/merge! font-multiplier {:size (/ (:size font) (:font-height constants))})))})
 
 (defonce *initial-session (atom nil))
 (defonce *session (atom nil))
@@ -270,6 +282,7 @@
     (def get-mouse (::get-mouse query-fns))
     (def get-mouse-hover (::get-mouse-hover query-fns))
     (def get-font (::get-font query-fns))
+    (def get-font-multiplier (::get-font-multiplier query-fns))
     (def get-vim (::get-vim query-fns))
     (def get-current-tab (::get-current-tab query-fns))
     (def get-current-buffer (::get-current-buffer query-fns))

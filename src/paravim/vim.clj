@@ -19,7 +19,7 @@
   (let [{:keys [font-height font-width] :as constants} (session/get-constants session)
         current-tab (:id (session/get-current-tab session))]
     (when-let [{:keys [top bottom]} (session/get-text-box session {:?id current-tab})]
-      (let [font-size-multiplier (/ (:size (session/get-font session)) font-height)
+      (let [font-size-multiplier (:size (session/get-font-multiplier session))
             text-height (- (bottom height font-size-multiplier)
                            (top height font-size-multiplier))
             font-height (* font-height font-size-multiplier)
@@ -201,7 +201,7 @@
                              {:command-start s}
                              (when (#{"/" "?"} s)
                                {:show-search? true}))))
-                       (c/assoc-command constants mode (:size (session/get-font session)) (v/get-command-position vim)))
+                       (c/assoc-command constants mode (:size (session/get-font-multiplier session)) (v/get-command-position vim)))
                    (merge vim-info (c/command-text nil nil)))
         session (c/update-vim session vim-info)]
     (update-buffer session current-buffer cursor-line cursor-column)))

@@ -77,7 +77,7 @@
   (if-let [buffer (session/get-buffer session {:?id buffer-id})]
     (let [constants (session/get-constants session)
           vim (session/get-vim session)
-          font (session/get-font session)
+          font (session/get-font-multiplier session)
           text-box (session/get-text-box session {:?id (:tab-id buffer)})
           window (session/get-window session)]
       (as-> buffer $
@@ -87,7 +87,7 @@
                   (buffers/update-clojure-buffer constants)
                   (assoc :needs-clojure-refresh? false))
               $)
-            (buffers/update-cursor $ (:mode vim) (/ (:size font) (:font-height constants)) text-box constants window)
+            (buffers/update-cursor $ (:mode vim) (:size font) text-box constants window)
             (buffers/update-highlight $ constants)
             (buffers/update-selection $ constants (:visual-range vim))
             (buffers/update-search-highlights $ constants vim)
@@ -95,15 +95,19 @@
             (clara/fire-rules $)))
     session))
 
-(defn change-font-size [session diff]
+(defn change-font-size [session diff-multiplier]
   (let [font (session/get-font session)
+        font-height (:font-height (session/get-constants session))
+        diff (* diff-multiplier font-height)
+        min-font-size (* constants/min-font-size font-height)
+        max-font-size (* constants/max-font-size font-height)
         curr-val (:size font)
         new-val (+ curr-val diff)]
-    (if (or (<= constants/min-font-size new-val constants/max-font-size)
+    (if (or (<= min-font-size new-val max-font-size)
             ;; the user went outside of the normal font size range
             ;; via their init file, so let them change it
-            (< curr-val constants/min-font-size)
-            (> curr-val constants/max-font-size))
+            (< curr-val min-font-size)
+            (> curr-val max-font-size))
       (-> session
           (clarax/merge font {:size new-val})
           clara/fire-rules)
@@ -116,7 +120,7 @@
   (change-font-size session constants/font-size-step))
 
 (defn font-multiply [session n]
-  (let [font-size (:size (session/get-font session))]
+  (let [font-size (:size (session/get-font-multiplier session))]
     (change-font-size session (- (* font-size n) font-size))))
 
 (defn upsert-buffer [session buffer]
@@ -144,9 +148,8 @@
       (clarax/merge (session/get-vim session) m)
       clara/fire-rules))
 
-(defn- mouse->cursor-position [buffer mouse font-size text-box constants window]
-  (let [font-size-multiplier (/ font-size (:font-height constants))
-        text-top ((:top text-box) (:height window) font-size-multiplier)
+(defn- mouse->cursor-position [buffer mouse font-size-multiplier text-box constants window]
+  (let [text-top ((:top text-box) (:height window) font-size-multiplier)
         {:keys [x y]} mouse
         {:keys [camera-x camera-y]} buffer
         column (-> (+ x camera-x)
@@ -176,7 +179,7 @@
                     (let [text-box (session/get-text-box session {:?id (:id current-tab)})
                           window (session/get-window session)
                           constants (session/get-constants session)
-                          font (session/get-font session)]
+                          font (session/get-font-multiplier session)]
                       (async/put! (::command-chan game)
                                   [:move-cursor (mouse->cursor-position buffer (:mouse-anchor mouse-hover) (:size font) text-box constants window)])))
             nil))))))
@@ -200,7 +203,7 @@
 
 (defn assoc-command [{:keys [command-start command-text command-completion] :as command}
                      {:keys [base-text-entity base-font-entity base-rects-entity font-height] :as constants}
-                     vim-mode font-size position]
+                     vim-mode font-size-multiplier position]
   (if command-text
     (let [char-entities (mapv #(-> base-font-entity
                                    (chars/crop-char %)
@@ -221,7 +224,7 @@
           command-text-entity (-> (chars/assoc-line base-text-entity 0 char-entities)
                                   (chars/update-uniforms font-height colors/text-alpha))
           line-chars (get-in command-text-entity [:characters 0])
-          command-cursor-entity (i/assoc base-rects-entity 0 (buffers/->cursor-entity vim-mode constants line-chars 0 (inc position) (/ font-size font-height)))]
+          command-cursor-entity (i/assoc base-rects-entity 0 (buffers/->cursor-entity vim-mode constants line-chars 0 (inc position) font-size-multiplier))]
       (assoc-command-entity command command-text-entity command-cursor-entity))
     (assoc-command-entity command nil nil)))
 
@@ -391,7 +394,8 @@
               (session/->Tab :files nil)
               (session/->Tab :repl-in nil)
               (session/->Tab :repl-out nil)
-              (session/->Font constants/default-font-size)
+              (session/->Font 0) ;; initialized in the font rule
+              (session/->FontMultiplier constants/default-font-multiplier)
               (session/map->Vim {:mode 'NORMAL
                                  :show-search? false}))))
   ;; initialize entities
@@ -471,13 +475,13 @@
         current-tab (:id (session/get-current-tab session))
         current-buffer (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id current-buffer})
+        font-size-multiplier (:size (session/get-font-multiplier session))
         {game-width :width game-height :height :as window} (session/get-window session)
         {:keys [base-rect-entity base-rects-entity
                 base-text-entity base-font-entity
                 font-height
                 toolbar-text-entities highlight-text-entities]
          :as constants} (session/get-constants session)
-        font-size-multiplier (/ (:size (session/get-font session)) font-height)
         {:keys [mode ascii control?
                 command-text-entity command-cursor-entity]
          :as vim} (session/get-vim session)]
