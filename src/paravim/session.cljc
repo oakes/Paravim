@@ -205,7 +205,7 @@
           buffer paravim.session.Buffer
           ;; performance: delay updating the minimap
           :when (> (- (:total-time game) (:last-update buffer))
-                   minimap/update-delay)
+                   constants/minimap-update-delay)
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))
           constants paravim.session.Constants
