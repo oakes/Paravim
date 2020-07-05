@@ -5,6 +5,8 @@
             [play-cljc.instances :as i]
             [play-cljc.transforms :as t]))
 
+(def update-delay 0.5) ;; seconds
+
 (defn ->minimap [{:keys [text-entity lines camera-x camera-y] :as buffer}
                  {:keys [base-rects-entity base-rect-entity] :as constants}
                  font-size-multiplier game-width game-height text-box]

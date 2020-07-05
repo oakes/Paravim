@@ -120,14 +120,16 @@
     (change-font-size session (- (* font-size n) font-size))))
 
 (defn upsert-buffer [session buffer]
-  (if-let [existing-buffer (session/get-buffer session {:?id (:id buffer)})]
-    (-> session
-        (clarax/merge existing-buffer buffer)
-        clara/fire-rules)
-    (-> session
-        (clara/insert (session/map->Buffer buffer))
-        (clara/insert (session/map->Minimap {:buffer-id (:id buffer)}))
-        clara/fire-rules)))
+  (let [total-time (-> session session/get-game :total-time)
+        buffer (assoc buffer :last-update total-time)]
+    (if-let [existing-buffer (session/get-buffer session {:?id (:id buffer)})]
+      (-> session
+          (clarax/merge existing-buffer buffer)
+          clara/fire-rules)
+      (-> session
+          (clara/insert (session/map->Buffer buffer))
+          (clara/insert (session/map->Minimap {:buffer-id (:id buffer)}))
+          clara/fire-rules))))
 
 (defn remove-buffer [session buffer-id]
   (let [buffer (session/get-buffer session {:?id buffer-id})
@@ -257,7 +259,8 @@
      :tab-id current-tab
      :clojure? clojure?
      :needs-clojure-refresh? clojure?
-     :needs-parinfer-init? clojure?}))
+     :needs-parinfer-init? clojure?
+     :last-update 0}))
 
 (defn ->ascii [id {:keys [base-font-entity base-text-entity font-height] :as constants} lines]
   {:id id

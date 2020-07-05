@@ -32,7 +32,8 @@
                    path file-name
                    lines clojure?
                    cursor-line cursor-column
-                   font-anchor window-anchor show-minimap?])
+                   font-anchor window-anchor show-minimap?
+                   last-update])
 (defrecord Minimap [buffer-id show? text-entity rects-entity anchor])
 (defrecord Constants [base-rect-entity
                       base-rects-entity
@@ -198,12 +199,13 @@
             (assoc :window-anchor window)))
       (clojure.core.async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     ::minimap
-    (let [window paravim.session.Window
+    (let [game Game
+          window paravim.session.Window
           font paravim.session.Font
-          {:keys [camera-x camera-y camera-target-x camera-target-y] :as buffer} paravim.session.Buffer
-          ;; performance: don't update minimap while animating the scroll
-          :when (and (== camera-x camera-target-x)
-                     (== camera-y camera-target-y))
+          buffer paravim.session.Buffer
+          ;; performance: delay updating the minimap
+          :when (> (- (:total-time game) (:last-update buffer))
+                   minimap/update-delay)
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))
           constants paravim.session.Constants
