@@ -200,7 +200,10 @@
     ::minimap
     (let [window paravim.session.Window
           font paravim.session.Font
-          buffer paravim.session.Buffer
+          {:keys [camera-x camera-y camera-target-x camera-target-y] :as buffer} paravim.session.Buffer
+          ;; performance: don't update minimap while animating the scroll
+          :when (and (== camera-x camera-target-x)
+                     (== camera-y camera-target-y))
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))
           constants paravim.session.Constants
