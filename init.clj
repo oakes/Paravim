@@ -28,7 +28,7 @@
      ;; to change the font afterwards!
      (run-only-once
        (fn []
-         (clarax/merge! font {:size 32}))))
+         (clarax/merge! font {:size 24}))))
    ;; this overwrites paravim's minimap rule,
    ;; which has the effect of disabling it
    :paravim.session/minimap nil})
