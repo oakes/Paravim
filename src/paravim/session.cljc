@@ -204,7 +204,7 @@
             (assoc :window-anchor window)))
       (clojure.core.async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     ::minimap
-    (let [game Game
+    (let [game paravim.session.Game
           :when (:total-time game)
           window paravim.session.Window
           font paravim.session.FontMultiplier
