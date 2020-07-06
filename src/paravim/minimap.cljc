@@ -5,51 +5,35 @@
             [play-cljc.instances :as i]
             [play-cljc.transforms :as t]))
 
-;(set! *unchecked-math* :warn-on-boxed)
-
-(defn ->minimap [{:keys [text-entity lines] :as buffer}
+(defn ->minimap [{:keys [text-entity lines camera-x camera-y] :as buffer}
                  {:keys [base-rects-entity base-rect-entity] :as constants}
                  font-size-multiplier game-width game-height text-box]
-  (let [camera-x (float (:camera-x buffer))
-        camera-y (float (:camera-y buffer))
-        font-size-multiplier (float font-size-multiplier)
-        game-width (int game-width)
-        game-height (int game-width)
-        text-top (float ((:top text-box) game-height font-size-multiplier))
-        text-bottom (float ((:bottom text-box) game-height font-size-multiplier))
-        constant-font-width (float (:font-width constants))
-        constant-font-height (float (:font-height constants))
-        font-width (* constant-font-width font-size-multiplier)
-        font-height (* constant-font-height font-size-multiplier)
-        ;; integer representing how much bigger the normal text is compared to the minimap's
-        minimap-scale (int constants/minimap-scale)
-        ;; the min chars that should fit horizontally (hide minimap if less)
-        minimap-min-chars (int constants/minimap-min-chars)
-        ;; the min font multiplier required to show chars rather than blocks
-        minimap-min-size-to-show-chars (float constants/minimap-min-size-to-show-chars)
-        minimap-width (float (/ game-width minimap-scale))
-        minimap-height (float (max 0.0 (- text-bottom text-top)))
-        minimap-font-size (float (/ font-size-multiplier minimap-scale))
-        minimap-font-width (float (* constant-font-width minimap-font-size))
-        minimap-font-height (float (* constant-font-height minimap-font-size))
-        minimap-line-count (int (min (/ minimap-height minimap-font-height)
-                                     (int constants/max-visible-lines)))
+  (let [text-top ((:top text-box) game-height font-size-multiplier)
+        text-bottom ((:bottom text-box) game-height font-size-multiplier)
+        font-width (* (:font-width constants) font-size-multiplier)
+        font-height (* (:font-height constants) font-size-multiplier)
+        minimap-width (/ game-width constants/minimap-scale)
+        minimap-height (max 0 (- text-bottom text-top))
+        minimap-font-size (/ font-size-multiplier constants/minimap-scale)
+        minimap-font-width (* (:font-width constants) minimap-font-size)
+        minimap-font-height (* (:font-height constants) minimap-font-size)
+        minimap-line-count (int (min (/ minimap-height minimap-font-height) constants/max-visible-lines))
         minimap-chars (int (/ minimap-width minimap-font-width))
-        line-count (int (count lines))
+        line-count (count lines)
         minimap-is-overflowing (> line-count minimap-line-count)
-        start-line (int
-                     (if minimap-is-overflowing
+        start-line (if minimap-is-overflowing
+                     (int
                        (min
                          ; lines above
-                         (/ (max camera-y 0.0) font-height)
+                         (/ (max camera-y 0) font-height)
                          ; lines below
-                         (- line-count minimap-line-count))
-                       0))
+                         (- line-count minimap-line-count)))
+                     0)
         end-line (min line-count minimap-line-count)
         start-column (int (/ camera-x font-width))
         visible-lines (int (/ minimap-height font-height))]
     {:buffer-id (:id buffer)
-     :show? (and (> minimap-chars minimap-min-chars)
+     :show? (and (> minimap-chars constants/minimap-min-chars)
                  (> line-count visible-lines))
      :rects-entity
      (-> base-rects-entity
@@ -61,9 +45,9 @@
          (i/assoc 1 (-> base-rect-entity
                         (t/color colors/minimap-text-view-color)
                         (t/translate (- game-width minimap-width) text-top)
-                        (t/translate 0 (- (/ camera-y minimap-scale)
+                        (t/translate 0 (- (/ camera-y constants/minimap-scale)
                                           (* start-line minimap-font-height)))
-                        (t/scale minimap-width (/ minimap-height minimap-scale)))))
+                        (t/scale minimap-width (/ minimap-height constants/minimap-scale)))))
      :text-entity
      (-> text-entity
          (cond-> minimap-is-overflowing
@@ -75,7 +59,7 @@
          (assoc-in [:uniforms 'u_start_line] start-line)
          (assoc-in [:uniforms 'u_start_column] start-column)
          (assoc-in [:uniforms 'u_show_blocks]
-                   (if (< minimap-font-size minimap-min-size-to-show-chars) 1 0))
+                   (if (< minimap-font-size constants/minimap-min-size-to-show-chars) 1 0))
          (t/project game-width game-height)
          (t/translate (- game-width minimap-width) text-top)
          (cond-> (> start-column 0)
@@ -83,4 +67,4 @@
          (cond-> (> start-line 0)
                  (t/translate 0 (- (* start-line minimap-font-height))))
          (t/scale font-size-multiplier font-size-multiplier)
-         (t/scale (/ 1 minimap-scale) (/ 1 minimap-scale)))}))
+         (t/scale (/ 1 constants/minimap-scale) (/ 1 constants/minimap-scale)))}))
