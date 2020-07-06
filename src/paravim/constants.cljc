@@ -37,7 +37,6 @@
 (def minimap-scale 6)
 (def minimap-min-chars 30)
 (def minimap-min-size-to-show-chars (/ (* default-font-multiplier 2) minimap-scale))
-(def minimap-update-delay 0.5) ;; seconds
 
 (def max-visible-lines 1000)
 (def max-clojure-lines 1000)

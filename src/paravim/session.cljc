@@ -209,10 +209,14 @@
           window paravim.session.Window
           font paravim.session.FontMultiplier
           {:keys [last-update] :as buffer} paravim.session.Buffer
-          ;; performance: delay updating the minimap
+          ;; wait until the next tick after the buffer was updated
+          ;; this makes it a lot faster, i think the buffer record
+          ;; is updated multiple times per tick, so this condition
+          ;; prevents this from running extra times.
+          ;; the better long-term solution is to break up the
+          ;; buffer record so we don't trigger rules more than necessary
           :when (and (some? last-update)
-                     (> (- (:total-time game) last-update)
-                        constants/minimap-update-delay))
+                     (> (:total-time game) last-update))
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))
           constants paravim.session.Constants
