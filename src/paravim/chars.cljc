@@ -25,31 +25,31 @@
    :signatures
    '{main ([] void)}
    :functions
-   '{main ([]
-           (=int total_char_count 0)
-           (=int current_line 0)
-           ("for" "(int i=0; i<1000; ++i)"
-             (+= total_char_count [u_char_counts i])
-             ("if" (> total_char_count gl_InstanceID)
-               (-= total_char_count [u_char_counts i])
-               "break")
-             ("else"
-               (+= current_line 1)))
-           (=mat3 translate_matrix a_translate_matrix)
-           (+= [translate_matrix 2 1] (* u_font_height (+ u_start_line current_line)))
-           (=int current_column (- gl_InstanceID total_char_count))
-           ("if" (> u_start_column current_column)
-             (= v_color (vec4 "0.0" "0.0" "0.0" "0.0"))
-             "return")
-           (= gl_Position
-              (vec4
-                (.xy (* u_matrix
-                        translate_matrix
-                        a_scale_matrix
-                        (vec3 a_position 1)))
-                0 1))
-           (= v_tex_coord (.xy (* a_texture_matrix (vec3 a_position 1))))
-           (= v_color a_color))}})
+   {'main (list '[]
+           '(=int total_char_count 0)
+           '(=int current_line 0)
+           (list "for" (str "(int i=0; i<" constants/max-visible-lines "; ++i)")
+             '(+= total_char_count [u_char_counts i])
+             '("if" (> total_char_count gl_InstanceID)
+                (-= total_char_count [u_char_counts i])
+                "break")
+             '("else"
+                (+= current_line 1)))
+           '(=mat3 translate_matrix a_translate_matrix)
+           '(+= [translate_matrix 2 1] (* u_font_height (+ u_start_line current_line)))
+           '(=int current_column (- gl_InstanceID total_char_count))
+           '("if" (> u_start_column current_column)
+              (= v_color (vec4 "0.0" "0.0" "0.0" "0.0"))
+              "return")
+           '(= gl_Position
+               (vec4
+                 (.xy (* u_matrix
+                         translate_matrix
+                         a_scale_matrix
+                         (vec3 a_position 1)))
+                 0 1))
+           '(= v_tex_coord (.xy (* a_texture_matrix (vec3 a_position 1))))
+           '(= v_color a_color))}})
 
 (def instanced-font-fragment-shader
   {:precision "mediump float"
