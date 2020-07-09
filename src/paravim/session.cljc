@@ -209,12 +209,12 @@
           window paravim.session.Window
           font paravim.session.FontMultiplier
           {:keys [last-update] :as buffer} paravim.session.Buffer
-          ;; wait until the next tick after the buffer was updated
-          ;; this makes it a lot faster, i think the buffer record
-          ;; is updated multiple times per tick, so this condition
-          ;; prevents this from running extra times.
-          ;; the better long-term solution is to break up the
-          ;; buffer record so we don't trigger rules more than necessary
+          ;; wait until the next tick after the buffer was updated.
+          ;; this makes scrolling a lot faster, because the buffer record
+          ;; can be updated multiple times per tick if multiple
+          ;; scroll events are fired back-to-back.
+          ;; this condition ensures that this rule will only fire
+          ;; once per tick.
           :when (and (some? last-update)
                      (> (:total-time game) last-update))
           text-box paravim.session.TextBox
