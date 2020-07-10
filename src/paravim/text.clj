@@ -18,5 +18,3 @@
          (-> .-src (set! ~(text/bitmap->data-uri bitmap)))
          (-> .-onload (set! #(~callback {:data image# :width ~width :height ~height} ~(font-key baked-fonts))))))))
 
-(defmacro get-font-height []
-  font-height)
