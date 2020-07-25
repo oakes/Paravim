@@ -9,6 +9,7 @@
             #?(:clj [paravim.repl :refer [reload-file!]])
             [clara.rules :as clara]
             [clarax.rules :as clarax]
+            [odoyle.rules :as o]
             [clojure.string :as str]
             [clojure.set :as set]
             [play-cljc.gl.utils :as u]
@@ -65,7 +66,7 @@
 
 (defn insert-buffer-update [session bu]
   (if-let [buffer (session/get-buffer session {:?id (:buffer-id bu)})]
-    (let [constants (session/get-constants session)]
+    (let [constants (session/get-constants @session/*osession)]
       (as-> buffer $
             (buffers/update-text-buffer $ constants (:lines bu) (:first-line bu) (:line-count-change bu))
             (assoc $ :needs-clojure-refresh? (:clojure? buffer))
@@ -75,7 +76,7 @@
 
 (defn insert-buffer-refresh [session buffer-id]
   (if-let [buffer (session/get-buffer session {:?id buffer-id})]
-    (let [constants (session/get-constants session)
+    (let [constants (session/get-constants @session/*osession)
           vim (session/get-vim session)
           font (session/get-font-multiplier session)
           text-box (session/get-text-box session {:?id (:tab-id buffer)})
@@ -97,7 +98,7 @@
 
 (defn change-font-size [session diff-multiplier]
   (let [font (session/get-font session)
-        font-height (:font-height (session/get-constants session))
+        font-height (:font-height (session/get-constants @session/*osession))
         diff (* diff-multiplier font-height)
         min-font-size (* constants/min-font-size font-height)
         max-font-size (* constants/max-font-size font-height)
@@ -178,7 +179,7 @@
             :text (when buffer
                     (let [text-box (session/get-text-box session {:?id (:id current-tab)})
                           window (session/get-window session)
-                          constants (session/get-constants session)
+                          constants (session/get-constants @session/*osession)
                           font (session/get-font-multiplier session)]
                       (async/put! (::command-chan game)
                                   [:move-cursor (mouse->cursor-position buffer (:mouse-anchor mouse-hover) (:size font) text-box constants window)])))
@@ -362,16 +363,16 @@
                                                 button-entities
                                                 constants/buttons)]
                 (callback
-                  {:constants {:base-rect-entity base-rect-entity
-                               :base-rects-entity base-rects-entity
-                               :font-width font-width
-                               :font-height font-height
-                               :base-font-entity base-font-entity
-                               :base-text-entity base-text-entity
-                               :roboto-font-entity roboto-font-entity
-                               :roboto-text-entity roboto-text-entity
-                               :toolbar-text-entities (merge tab-entities button-entities)
-                               :highlight-text-entities highlight-button-entities}
+                  {:constants {::session/base-rect-entity base-rect-entity
+                               ::session/base-rects-entity base-rects-entity
+                               ::session/font-width font-width
+                               ::session/font-height font-height
+                               ::session/base-font-entity base-font-entity
+                               ::session/base-text-entity base-text-entity
+                               ::session/roboto-font-entity roboto-font-entity
+                               ::session/roboto-text-entity roboto-text-entity
+                               ::session/toolbar-text-entities (merge tab-entities button-entities)
+                               ::session/highlight-text-entities highlight-button-entities}
                    :text-boxes text-boxes
                    :bounding-boxes bounding-boxes})))))))))
 
@@ -401,10 +402,14 @@
   ;; initialize entities
   (let [callback (fn [{:keys [constants text-boxes bounding-boxes] :as entities}]
                    (reset! *entity-cache entities)
+                   (swap! session/*osession
+                          (fn [session]
+                            (-> session
+                                (o/insert ::session/constant constants)
+                                o/fire-rules)))
                    (swap! session/*session
                           (fn [session]
                             (as-> session $
-                                  (clara/insert $ (session/map->Constants constants))
                                   (reduce-kv
                                     (fn [session id text-box]
                                       (clara/insert session (session/map->TextBox (assoc text-box :id id))))
@@ -481,7 +486,7 @@
                 base-text-entity base-font-entity
                 font-height
                 toolbar-text-entities highlight-text-entities]
-         :as constants} (session/get-constants session)
+         :as constants} (session/get-constants @session/*osession)
         {:keys [mode ascii control?
                 command-text-entity command-cursor-entity]
          :as vim} (session/get-vim session)]

@@ -16,7 +16,7 @@
 (def ^:dynamic *update-window?* true)
 
 (defn set-window-size! [vim session width height]
-  (let [{:keys [font-height font-width] :as constants} (session/get-constants session)
+  (let [{:keys [font-height font-width] :as constants} (session/get-constants @session/*osession)
         current-tab (:id (session/get-current-tab session))]
     (when-let [{:keys [top bottom]} (session/get-text-box session {:?id current-tab})]
       (let [font-size-multiplier (:size (session/get-font-multiplier session))
@@ -124,7 +124,7 @@
                          "intro")]
       (swap! session/*session
              (fn [session]
-               (assoc-ascii session (session/get-constants session) ascii))))))
+               (assoc-ascii session (session/get-constants @session/*osession) ascii))))))
 
 (defn input [vim session s]
   (if (= 'COMMAND_LINE (v/get-mode vim))
@@ -171,7 +171,7 @@
         cursor-line (dec (v/get-cursor-line vim))
         cursor-column (v/get-cursor-column vim)
         ;; update ascii if necessary
-        constants (session/get-constants session)
+        constants (session/get-constants @session/*osession)
         session (if s
                   (change-ascii session constants s)
                   session)
@@ -276,7 +276,7 @@
                               constants/tab->path)
                             :files)
             session @session/*session
-            constants (session/get-constants session)
+            constants (session/get-constants @session/*osession)
             existing-buffer (session/get-buffer session {:?id buffer-ptr})
             buffer (if (and existing-buffer (= (:lines existing-buffer) lines))
                      existing-buffer
