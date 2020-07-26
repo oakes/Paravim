@@ -96,8 +96,8 @@
             (clara/fire-rules $)))
     session))
 
-(defn change-font-size [session osession diff-multiplier]
-  (let [font (session/get-font session)
+(defn change-font-size [{:keys [osession] :as m} diff-multiplier]
+  (let [font (session/get-font osession)
         font-height (:font-height (session/get-constants osession))
         diff (* diff-multiplier font-height)
         min-font-size (* constants/min-font-size font-height)
@@ -109,20 +109,28 @@
             ;; via their init file, so let them change it
             (< curr-val min-font-size)
             (> curr-val max-font-size))
-      (-> session
-          (clarax/merge font {:size new-val})
-          clara/fire-rules)
-      session)))
+      (-> m
+          (update :session
+                  (fn [session]
+                    (-> session
+                        (clarax/merge (clara/query session ::session/get-font) {:size new-val})
+                        clara/fire-rules)))
+          (update :osession
+                  (fn [osession]
+                    (-> osession
+                        (o/insert ::session/font ::session/size new-val)
+                        o/fire-rules))))
+      m)))
 
 (defn font-dec [m]
-  (update m :session change-font-size (:osession m) (- constants/font-size-step)))
+  (change-font-size m (- constants/font-size-step)))
 
 (defn font-inc [m]
-  (update m :session change-font-size (:osession m) constants/font-size-step))
+  (change-font-size m constants/font-size-step))
 
 (defn font-multiply [m n]
-  (let [font-size (:size (session/get-font-multiplier (:session m)))]
-    (update m :session change-font-size (:osession m) (- (* font-size n) font-size))))
+  (let [font-size (:multiplier (session/get-font (:osession m)))]
+    (change-font-size m (- (* font-size n) font-size))))
 
 (defn upsert-buffer [session buffer]
   (let [total-time (-> session session/get-game :total-time)
@@ -407,7 +415,9 @@
                                       ::session/command-text nil
                                       ::session/command-completion nil
                                       ::session/command-text-entity nil
-                                      ::session/command-cursor-entity nil})))
+                                      ::session/command-cursor-entity nil})
+             (o/insert ::session/font {::session/size 0 ;; initialized in the font rule
+                                       ::session/multiplier constants/default-font-multiplier})))
   ;; initialize entities
   (let [callback (fn [{:keys [constants text-boxes bounding-boxes] :as entities}]
                    (reset! *entity-cache entities)
@@ -489,7 +499,7 @@
         current-tab (:id (session/get-current-tab session))
         current-buffer (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id current-buffer})
-        font-size-multiplier (:size (session/get-font-multiplier session))
+        font-size-multiplier (:multiplier (session/get-font osession))
         {game-width :width game-height :height :as window} (session/get-window session)
         {:keys [base-rect-entity base-rects-entity
                 base-text-entity base-font-entity

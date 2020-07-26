@@ -66,13 +66,41 @@
       [::vim ::command-text command-text]
       [::vim ::command-completion command-completion]
       [::vim ::command-text-entity command-text-entity]
-      [::vim ::command-cursor-entity command-cursor-entity]]}))
+      [::vim ::command-cursor-entity command-cursor-entity]]
+     ::get-font
+     [:what
+      [::font ::size size]
+      [::font ::multiplier multiplier]]}))
+
+(def orules
+  (o/ruleset
+    {::init-font-size
+     [:what
+      [::constant ::font-height font-height]
+      [::font ::size size {:then false}]
+      [::font ::multiplier multiplier]
+      :when
+      (== 0 size)
+      :then
+      (o/insert! ::font ::size (* multiplier font-height))]
+     ::update-font-multiplier
+     [:what
+      [::constant ::font-height font-height]
+      [::font ::size size]
+      [::font ::multiplier multiplier {:then false}]
+      :when
+      (pos? size)
+      :then
+      (o/insert! ::font ::multiplier (/ size font-height))]}))
 
 (defn get-constants [session]
   (first (o/query-all session ::get-constants)))
 
 (defn get-vim [session]
   (first (o/query-all session ::get-vim)))
+
+(defn get-font [session]
+  (first (o/query-all session ::get-font)))
 
 (def queries
   '{::get-game
@@ -294,7 +322,7 @@
                                                        (into {}))))
 
              (reset! *initial-osession
-               (reduce o/add-rule (o/->session) oqueries))
+               (reduce o/add-rule (o/->session) (concat oqueries orules)))
              ;; reload the session if it's been created already
              (when @*session
                (reset! *reload? true))
@@ -309,7 +337,6 @@
     (def get-window (::get-window query-fns))
     (def get-mouse (::get-mouse query-fns))
     (def get-mouse-hover (::get-mouse-hover query-fns))
-    (def get-font (::get-font query-fns))
     (def get-font-multiplier (::get-font-multiplier query-fns))
     (def get-current-tab (::get-current-tab query-fns))
     (def get-current-buffer (::get-current-buffer query-fns))
