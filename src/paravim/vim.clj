@@ -77,12 +77,10 @@
           (v/input vim "<Esc>")))
       (swap! session/*session
              (fn [m]
-               (update m :session
-                       (fn [session]
-                         (-> session
-                             (c/upsert-buffer {:id current-buffer
-                                               :needs-parinfer? false})
-                             (c/insert-buffer-refresh (:osession m) current-buffer)))))))))
+               (-> m
+                   (c/upsert-buffer {:id current-buffer
+                                     :needs-parinfer? false})
+                   (c/insert-buffer-refresh current-buffer)))))))
 
 (defn read-text-resource [path]
   (-> path io/resource slurp str/split-lines))
@@ -96,10 +94,7 @@
 
 (defn assoc-ascii [m constants ascii-name]
   (-> m
-      (update :session
-              (fn [session]
-                (-> session
-                    (c/upsert-buffer (c/->ascii ascii-name constants (read-text-resource (str "ascii/" ascii-name ".txt")))))))
+      (c/upsert-buffer (c/->ascii ascii-name constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
       (update :osession
               (fn [osession]
                 (c/new-tab! (session/get-game (:session m)) osession ::session/files)
@@ -161,20 +156,16 @@
           (v/input vim s))))
     (v/input vim s)))
 
-(defn update-buffer [session osession buffer-ptr cursor-line cursor-column]
-  (if-let [buffer (session/get-buffer session {:?id buffer-ptr})]
-    (-> session
+(defn update-buffer [m buffer-ptr cursor-line cursor-column]
+  (if-let [buffer (session/get-buffer (:session m) {:?id buffer-ptr})]
+    (-> m
         (c/upsert-buffer (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
-        (c/insert-buffer-refresh osession buffer-ptr))
-    session))
+        (c/insert-buffer-refresh buffer-ptr))
+    m))
 
 (defn update-cursor-position! [vim cursor-line cursor-column]
   (v/set-cursor-position vim (inc cursor-line) cursor-column)
-  (swap! session/*session
-        (fn [m]
-          (update m :session
-                  (fn [session]
-                    (update-buffer session (:osession m) (v/get-current-buffer vim) cursor-line cursor-column)))))
+  (swap! session/*session update-buffer (v/get-current-buffer vim) cursor-line cursor-column)
   nil)
 
 (defn update-after-input [m vim s]
@@ -221,7 +212,7 @@
                    (merge vim-info (c/command-text nil nil)))
         osession (o/insert osession ::session/vim vim-info)
         m (assoc m :session session :osession osession)]
-    (update m :session update-buffer osession current-buffer cursor-line cursor-column)))
+    (update-buffer m current-buffer cursor-line cursor-column)))
 
 (defn on-input [vim {:keys [session osession]} s]
   (input vim session osession s)
@@ -307,11 +298,8 @@
             (-> m
                 (c/update-tab current-tab buffer-ptr)
                 (c/update-current-tab current-tab)
-                (update :session
-                        (fn [session]
-                          (-> session
-                              (c/upsert-buffer buffer)
-                              (c/insert-buffer-refresh (:osession m) buffer-ptr))))))))
+                (c/upsert-buffer buffer)
+                (c/insert-buffer-refresh buffer-ptr)))))
       (do
         (when *update-window?*
           (async/put! (::c/command-chan game) [:set-window-title "Paravim"]))
@@ -323,13 +311,11 @@
         last-line (+ (dec end-line) line-count-change)
         lines (vec (for [i (range first-line last-line)]
                      (v/get-line vim buffer-ptr (inc i))))]
-    (swap! session/*session
-           (fn [m]
-             (update m :session c/insert-buffer-update (:osession m)
-               {:buffer-id buffer-ptr
-                :lines lines
-                :first-line first-line
-                :line-count-change line-count-change})))))
+    (swap! session/*session c/insert-buffer-update
+           {:buffer-id buffer-ptr
+            :lines lines
+            :first-line first-line
+            :line-count-change line-count-change})))
 
 (defn on-buf-delete [buffer-ptr]
   (swap! session/*session update :session c/remove-buffer buffer-ptr))

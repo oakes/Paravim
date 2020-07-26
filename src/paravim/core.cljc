@@ -90,37 +90,43 @@
                     (o/insert id ::session/buffer-id buffer-id)
                     o/fire-rules)))))
 
-(defn insert-buffer-update [session osession bu]
-  (if-let [buffer (session/get-buffer session {:?id (:buffer-id bu)})]
-    (let [constants (session/get-constants osession)]
-      (as-> buffer $
-            (buffers/update-text-buffer $ constants (:lines bu) (:first-line bu) (:line-count-change bu))
-            (assoc $ :needs-clojure-refresh? (:clojure? buffer))
-            (clarax/merge session buffer $)
-            (clara/fire-rules $)))
-    session))
+(defn insert-buffer-update [{:keys [osession] :as m} bu]
+  (-> m
+      (update :session
+              (fn [session]
+                (if-let [buffer (session/get-buffer session {:?id (:buffer-id bu)})]
+                  (let [constants (session/get-constants osession)]
+                    (as-> buffer $
+                          (buffers/update-text-buffer $ constants (:lines bu) (:first-line bu) (:line-count-change bu))
+                          (assoc $ :needs-clojure-refresh? (:clojure? buffer))
+                          (clarax/merge session buffer $)
+                          (clara/fire-rules $)))
+                  session)))))
 
-(defn insert-buffer-refresh [session osession buffer-id]
-  (if-let [buffer (session/get-buffer session {:?id buffer-id})]
-    (let [constants (session/get-constants osession)
-          vim (session/get-vim osession)
-          font-multiplier (:multiplier (session/get-font osession))
-          text-box (session/get-text-box osession (:tab-id buffer))
-          window (session/get-window osession)]
-      (as-> buffer $
-            (if (:needs-clojure-refresh? buffer)
-              (-> $
-                  (buffers/parse-clojure-buffer (:mode vim))
-                  (buffers/update-clojure-buffer constants)
-                  (assoc :needs-clojure-refresh? false))
-              $)
-            (buffers/update-cursor $ (:mode vim) font-multiplier text-box constants window)
-            (buffers/update-highlight $ constants)
-            (buffers/update-selection $ constants (:visual-range vim))
-            (buffers/update-search-highlights $ constants vim)
-            (clarax/merge session buffer $)
-            (clara/fire-rules $)))
-    session))
+(defn insert-buffer-refresh [{:keys [osession] :as m} buffer-id]
+  (-> m
+      (update :session
+              (fn [session]
+                (if-let [buffer (session/get-buffer session {:?id buffer-id})]
+                  (let [constants (session/get-constants osession)
+                        vim (session/get-vim osession)
+                        font-multiplier (:multiplier (session/get-font osession))
+                        text-box (session/get-text-box osession (:tab-id buffer))
+                        window (session/get-window osession)]
+                    (as-> buffer $
+                          (if (:needs-clojure-refresh? buffer)
+                            (-> $
+                                (buffers/parse-clojure-buffer (:mode vim))
+                                (buffers/update-clojure-buffer constants)
+                                (assoc :needs-clojure-refresh? false))
+                            $)
+                          (buffers/update-cursor $ (:mode vim) font-multiplier text-box constants window)
+                          (buffers/update-highlight $ constants)
+                          (buffers/update-selection $ constants (:visual-range vim))
+                          (buffers/update-search-highlights $ constants vim)
+                          (clarax/merge session buffer $)
+                          (clara/fire-rules $)))
+                  session)))))
 
 (defn change-font-size [{:keys [osession] :as m} diff-multiplier]
   (let [font (session/get-font osession)
@@ -158,17 +164,20 @@
   (let [font-size (:multiplier (session/get-font (:osession m)))]
     (change-font-size m (- (* font-size n) font-size))))
 
-(defn upsert-buffer [session buffer]
-  (let [total-time (-> session session/get-game :total-time)
-        buffer (assoc buffer :last-update total-time)]
-    (if-let [existing-buffer (session/get-buffer session {:?id (:id buffer)})]
-      (-> session
-          (clarax/merge existing-buffer buffer)
-          clara/fire-rules)
-      (-> session
-          (clara/insert (session/map->Buffer buffer))
-          (clara/insert (session/map->Minimap {:buffer-id (:id buffer)}))
-          clara/fire-rules))))
+(defn upsert-buffer [m buffer]
+  (-> m
+      (update :session
+              (fn [session]
+                (let [total-time (-> session session/get-game :total-time)
+                      buffer (assoc buffer :last-update total-time)]
+                  (if-let [existing-buffer (clara/query session ::session/get-buffer :?id (:id buffer))]
+                    (-> session
+                        (clarax/merge existing-buffer buffer)
+                        clara/fire-rules)
+                    (-> session
+                        (clara/insert (session/map->Buffer buffer))
+                        (clara/insert (session/map->Minimap {:buffer-id (:id buffer)}))
+                        clara/fire-rules)))))))
 
 (defn remove-buffer [session buffer-id]
   (let [buffer (session/get-buffer session {:?id buffer-id})
@@ -220,7 +229,7 @@
         buffer-id (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id buffer-id})]
     (when buffer
-      (swap! session/*session update :session upsert-buffer (merge buffer (scroll/start-scrolling-camera buffer xoffset yoffset))))))
+      (swap! session/*session upsert-buffer (merge buffer (scroll/start-scrolling-camera buffer xoffset yoffset))))))
 
 (defn get-mode []
   (:mode (session/get-vim (:osession @session/*session))))

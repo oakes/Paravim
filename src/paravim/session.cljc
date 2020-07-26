@@ -96,7 +96,31 @@
       [id ::y1 y1]
       [id ::x2 x2]
       [id ::y2 y2]
-      [id ::align align]]}))
+      [id ::align align]]
+     ::get-buffer
+     [:what
+      [id ::tab-id tab-id]
+      [id ::text-entity text-entity]
+      [id ::parinfer-text-entity parinfer-text-entity]
+      [id ::rects-entity rects-entity]
+      [id ::parsed-code parsed-code]
+      [id ::needs-parinfer? needs-parinfer?]
+      [id ::needs-parinfer-init? needs-parinfer-init?]
+      [id ::needs-clojure-refresh? needs-clojure-refresh?]
+      [id ::camera camera]
+      [id ::camera-x camera-x]
+      [id ::camera-y camera-y]
+      [id ::camera-target-x camera-target-x]
+      [id ::camera-target-y camera-target-y]
+      [id ::scroll-speed-x scroll-speed-x]
+      [id ::scroll-speed-y scroll-speed-y]
+      [id ::path path]
+      [id ::file-name file-name]
+      [id ::lines lines]
+      [id ::clojure? clojure]
+      [id ::cursor-line cursor-line]
+      [id ::cursor-column cursor-line]
+      [id ::show-minimap? show-minimap?]]}))
 
 (def orules
   (o/ruleset
