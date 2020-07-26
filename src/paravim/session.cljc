@@ -77,7 +77,13 @@
       [::window ::height height]]
      ::get-current-tab
      [:what
-      [::tab ::current id]]}))
+      [::tab ::current id]]
+     ::get-text-box
+     [:what
+      [id ::left left]
+      [id ::right right]
+      [id ::top top]
+      [id ::bottom bottom]]}))
 
 (def orules
   (o/ruleset
@@ -114,6 +120,12 @@
 
 (defn get-current-tab [session]
   (first (o/query-all session ::get-current-tab)))
+
+(defn get-text-box [session tab-id]
+  (some (fn [text-box]
+          (when (= tab-id (:id text-box))
+            text-box))
+        (o/query-all session ::get-text-box)))
 
 (def queries
   '{::get-game
@@ -249,8 +261,8 @@
                      (or (= (:id buffer) (:buffer-id tab))
                          ;; if we're in the repl, make sure both the input and output are refreshed
                          (= (:tab-id buffer) (case (:id current-tab)
-                                               :repl-in :repl-out
-                                               :repl-out :repl-in
+                                               ::repl-in ::repl-out
+                                               ::repl-out ::repl-in
                                                nil))))
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))]
@@ -353,7 +365,6 @@
     (def get-current-buffer (::get-current-buffer query-fns))
     (def get-tab (::get-tab query-fns))
     (def get-bounding-box (::get-bounding-box query-fns))
-    (def get-text-box (::get-text-box query-fns))
     (def get-buffer (::get-buffer query-fns))
     (def get-minimap (::get-minimap query-fns))))
 

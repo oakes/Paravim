@@ -95,7 +95,7 @@
     (let [constants (session/get-constants osession)
           vim (session/get-vim osession)
           font-multiplier (:multiplier (session/get-font osession))
-          text-box (session/get-text-box session {:?id (:tab-id buffer)})
+          text-box (session/get-text-box osession (:tab-id buffer))
           window (session/get-window osession)]
       (as-> buffer $
             (if (:needs-clojure-refresh? buffer)
@@ -194,9 +194,9 @@
             :font-dec (swap! session/*session font-dec)
             :font-inc (swap! session/*session font-inc)
             :reload-file (when (and buffer (reload-file! buffer (::pipes game) (:id current-tab)))
-                           (new-tab! game session :repl-in))
+                           (new-tab! game session ::session/repl-in))
             :text (when buffer
-                    (let [text-box (session/get-text-box session {:?id (:id current-tab)})
+                    (let [text-box (session/get-text-box osession (:id current-tab))
                           window (session/get-window osession)
                           constants (session/get-constants osession)
                           font-multiplier (:multiplier (session/get-font osession))]
@@ -263,7 +263,7 @@
   (-> path get-extension clojure-exts))
 
 (defn ->buffer [id {:keys [base-font-entity base-text-entity font-height] :as constants} path file-name lines current-tab]
-  (let [clojure? (or (= current-tab :repl-in)
+  (let [clojure? (or (= current-tab ::session/repl-in)
                      (and (clojure-path? path)
                           ;; disable clojure support in large files for now,
                           ;; because it will be too slow to type
@@ -299,7 +299,7 @@
    :scroll-speed-x 0
    :scroll-speed-y 0
    :lines lines
-   :tab-id :files
+   :tab-id ::session/files
    :last-update 0})
 
 (defn assoc-attr-lengths [text-entity]
@@ -332,9 +332,9 @@
                snap-to-bottom (fn [game-height multiplier] (- game-height (* font-height multiplier)))
                repl-in-top (fn [game-height multiplier] (- game-height (* constants/repl-in-lines font-height multiplier)))
                repl-out-bottom (fn [game-height multiplier] (- game-height (* (inc constants/repl-in-lines) font-height multiplier)))
-               text-boxes {:files {:left 0 :right 0 :top snap-to-top :bottom snap-to-bottom}
-                           :repl-in {:left 0 :right 0 :top repl-in-top :bottom snap-to-bottom}
-                           :repl-out {:left 0 :right 0 :top snap-to-top :bottom repl-out-bottom}}]
+               text-boxes {::session/files {:left 0 :right 0 :top snap-to-top :bottom snap-to-bottom}
+                           ::session/repl-in {:left 0 :right 0 :top repl-in-top :bottom snap-to-bottom}
+                           ::session/repl-out {:left 0 :right 0 :top snap-to-top :bottom repl-out-bottom}}]
            (#?(:clj load-font-clj :cljs load-font-cljs) :roboto
             (fn [{:keys [data]} baked-font]
               (let [roboto-font-entity (-> (text/->font-entity game data baked-font)
@@ -412,10 +412,10 @@
               (session/->Window (utils/get-width game) (utils/get-height game))
               (session/->Mouse 0 0)
               (session/->MouseHover nil nil nil)
-              (session/->CurrentTab :files)
-              (session/->Tab :files nil)
-              (session/->Tab :repl-in nil)
-              (session/->Tab :repl-out nil)
+              (session/->CurrentTab ::session/files)
+              (session/->Tab ::session/files nil)
+              (session/->Tab ::session/repl-in nil)
+              (session/->Tab ::session/repl-out nil)
               (session/->Font 0) ;; initialized in the font rule
               (session/->FontMultiplier constants/default-font-multiplier))))
   (swap! session/*session assoc :osession
@@ -436,15 +436,25 @@
                                        ::session/multiplier constants/default-font-multiplier})
              (o/insert ::session/window {::session/width (utils/get-width game)
                                          ::session/height (utils/get-height game)})
-             (o/insert ::session/tab ::session/current :files)))
+             (o/insert ::session/tab ::session/current ::session/files)))
   ;; initialize entities
   (let [callback (fn [{:keys [constants text-boxes bounding-boxes] :as entities}]
                    (reset! *entity-cache entities)
                    (swap! session/*session update :osession
                           (fn [session]
-                            (-> session
-                                (o/insert ::session/constant constants)
-                                o/fire-rules)))
+                            (as-> session $
+                                  (o/insert $ ::session/constant constants)
+                                  (reduce-kv
+                                    (fn [session id text-box]
+                                      (reduce-kv
+                                        (fn [session attr value]
+                                          ;; FIXME: temporary hack
+                                          (o/insert session id (keyword "paravim.session" (name attr)) value))
+                                        session
+                                        text-box))
+                                    $
+                                    text-boxes)
+                                  (o/fire-rules $))))
                    (swap! session/*session update :session
                           (fn [session]
                             (as-> session $
@@ -476,10 +486,10 @@
   {:viewport {:x 0 :y 0 :width 0 :height 0}
    :clear {:color colors/bg-color :depth 1}})
 
-(defn render-buffer [game session constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor? show-minimap?]
+(defn render-buffer [game session osession constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor? show-minimap?]
   (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]
               :as buffer} (session/get-buffer session {:?id buffer-ptr})]
-    (when-let [text-box (session/get-text-box session {:?id current-tab})]
+    (when-let [text-box (session/get-text-box osession current-tab)]
       (let [text-top ((:top text-box) game-height font-size-multiplier)]
         (when (and rects-entity show-cursor?)
           (c/render game (-> rects-entity
@@ -537,14 +547,14 @@
                                           (t/color colors/bg-color)
                                           (t/translate 0 0)
                                           (t/scale game-width game-height))))))
-      (if (and ascii (= current-tab :files))
-        (render-buffer game session constants font-size-multiplier game-width game-height current-tab ascii false false)
-        (render-buffer game session constants font-size-multiplier game-width game-height current-tab current-buffer (not= mode 'COMMAND_LINE) (#{:files :repl-out} current-tab)))
+      (if (and ascii (= current-tab ::session/files))
+        (render-buffer game session osession constants font-size-multiplier game-width game-height current-tab ascii false false)
+        (render-buffer game session osession constants font-size-multiplier game-width game-height current-tab current-buffer (not= mode 'COMMAND_LINE) (#{::session/files ::session/repl-out} current-tab)))
       (case current-tab
-        :repl-in (when-let [buffer-ptr (:buffer-id (session/get-tab session {:?id :repl-out}))]
-                   (render-buffer game session constants font-size-multiplier game-width game-height :repl-out buffer-ptr false true))
-        :repl-out (when-let [buffer-ptr (:buffer-id (session/get-tab session {:?id :repl-in}))]
-                    (render-buffer game session constants font-size-multiplier game-width game-height :repl-in buffer-ptr false false))
+        ::session/repl-in (when-let [buffer-ptr (:buffer-id (session/get-tab session {:?id ::session/repl-out}))]
+                            (render-buffer game session osession constants font-size-multiplier game-width game-height ::session/repl-out buffer-ptr false true))
+        ::session/repl-out (when-let [buffer-ptr (:buffer-id (session/get-tab session {:?id ::session/repl-in}))]
+                             (render-buffer game session osession constants font-size-multiplier game-width game-height ::session/repl-in buffer-ptr false false))
         nil)
       (when (and base-rects-entity base-rect-entity)
         (c/render game (-> base-rects-entity
@@ -566,7 +576,7 @@
                                        (get highlight-text-entities k))]
               ;; hide the reload file button when necessary
               :when (or (not= k :reload-file)
-                        (and (= current-tab :files)
+                        (and (= current-tab ::session/files)
                              (:clojure? buffer)))]
         (c/render game (-> (or highlight-entity entity)
                            (assoc-in [:uniforms 'u_alpha] (if (or (= k current-tab)

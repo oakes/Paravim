@@ -117,7 +117,7 @@
             press?
             (cond
               ;; pressing enter in the repl
-              (and (= current-tab :repl-in)
+              (and (= current-tab ::session/repl-in)
                    (= k :enter)
                    (= mode 'NORMAL))
               (vim/repl-enter! vim m pipes)

@@ -19,7 +19,7 @@
 (defn set-window-size! [vim {:keys [session osession]} width height]
   (let [{:keys [font-height font-width] :as constants} (session/get-constants osession)
         current-tab (:id (session/get-current-tab osession))]
-    (when-let [{:keys [top bottom]} (session/get-text-box session {:?id current-tab})]
+    (when-let [{:keys [top bottom]} (session/get-text-box osession current-tab)]
       (let [font-size-multiplier (:multiplier (session/get-font osession))
             text-height (- (bottom height font-size-multiplier)
                            (top height font-size-multiplier))
@@ -38,7 +38,7 @@
 (defn ready-to-append? [osession vim output]
   (and (seq output)
        (= 'NORMAL (v/get-mode vim))
-       (not= :repl-out (:id (session/get-current-tab osession)))))
+       (not= ::session/repl-out (:id (session/get-current-tab osession)))))
 
 (defn apply-parinfer! [session vim]
   (let [current-buffer (session/get-current-buffer session)
@@ -98,7 +98,7 @@
   (-> m
       (update :session
               (fn [session]
-                (c/new-tab! (session/get-game session) session :files)
+                (c/new-tab! (session/get-game session) session ::session/files)
                 (-> session
                     (c/upsert-buffer (c/->ascii ascii-name constants (read-text-resource (str "ascii/" ascii-name ".txt")))))))
       (update :osession o/insert ::session/vim ::session/ascii ascii-name)))
@@ -257,7 +257,7 @@
       .flush)))
 
 (defn append-to-buffer! [{:keys [::c/vim] :as game} {:keys [session] :as m} input]
-  (when-let [buffer (:buffer-id (session/get-tab session {:?id :repl-out}))]
+  (when-let [buffer (:buffer-id (session/get-tab session {:?id ::session/repl-out}))]
     (let [current-buffer (v/get-current-buffer vim)
           cursor-line (v/get-cursor-line vim)
           cursor-column (v/get-cursor-column vim)
@@ -288,7 +288,7 @@
                                 (when (= canon-path (-> path java.io.File. .getCanonicalPath))
                                   tab))
                               constants/tab->path)
-                            :files)
+                            ::session/files)
             {:keys [session osession]} @session/*session
             constants (session/get-constants osession)
             existing-buffer (session/get-buffer session {:?id buffer-ptr})
@@ -313,7 +313,7 @@
         (when *update-window?*
           (async/put! (::c/command-chan game) [:set-window-title "Paravim"]))
         ;; clear the files tab
-        (swap! session/*session update :session c/update-tab :files nil)))))
+        (swap! session/*session update :session c/update-tab ::session/files nil)))))
 
 (defn on-buf-update [game vim buffer-ptr start-line end-line line-count-change]
   (let [first-line (dec start-line)
@@ -384,7 +384,7 @@
   (v/set-on-message vim (fn [{:keys [message]}]
                           (async/put! (::c/command-chan game) [:update-vim {::session/message message}])))
   (binding [*update-window?* false]
-    (run! #(v/open-buffer vim (constants/tab->path %)) [:repl-in :repl-out :files]))
+    (run! #(v/open-buffer vim (constants/tab->path %)) [::session/repl-in ::session/repl-out ::session/files]))
   (init-ascii!)
   (update-window-size! game))
 

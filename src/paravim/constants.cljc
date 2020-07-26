@@ -13,15 +13,15 @@
                :text "Reload File"
                :shortcut-char 7}])
 
-(def tab->path {:files "scratch.clj"
-                :repl-in "repl.in"
-                :repl-out "repl.out"})
+(def tab->path {:paravim.session/files "scratch.clj"
+                :paravim.session/repl-in "repl.in"
+                :paravim.session/repl-out "repl.out"})
 
-(def tabs [{:id :files
+(def tabs [{:id :paravim.session/files
             :text "Files"}
-           {:id :repl-in
+           {:id :paravim.session/repl-in
             :text "REPL In"}
-           {:id :repl-out
+           {:id :paravim.session/repl-out
             :text "REPL Out"}])
 
 (def tab-ids (mapv :id tabs))
