@@ -319,7 +319,7 @@
       (update buffer :rects-entity assoc-rects base-rect-entity colors/select-color rects))
     buffer))
 
-(defn update-search-highlights [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as constants} {:keys [show-search? highlights]}]
+(defn update-search-highlights [{:keys [text-entity] :as buffer} {:keys [font-width font-height base-rect-entity] :as constants} show-search? highlights]
   (if show-search?
     (let [rects (vec (mapcat (partial range->rects text-entity font-width font-height) highlights))]
       (update buffer :rects-entity assoc-rects base-rect-entity colors/search-color rects))

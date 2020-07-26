@@ -36,6 +36,54 @@
                    last-update])
 (defrecord Minimap [buffer-id show? text-entity rects-entity anchor])
 
+(defn get-constants [session]
+  (first (o/query-all session ::get-constants)))
+
+(defn get-vim [session]
+  (first (o/query-all session ::get-vim)))
+
+(defn get-font [session]
+  (first (o/query-all session ::get-font)))
+
+(defn get-window [session]
+  (first (o/query-all session ::get-window)))
+
+(defn get-current-tab [session]
+  (first (o/query-all session ::get-current-tab)))
+
+(defn get-tab [session tab-id]
+  (some (fn [tab]
+          (when (= tab-id (:id tab))
+            tab))
+        (o/query-all session ::get-tab)))
+
+(defn get-mouse [session]
+  (first (o/query-all session ::get-mouse)))
+
+(defn get-text-box [session tab-id]
+  (some (fn [text-box]
+          (when (= tab-id (:id text-box))
+            text-box))
+        (o/query-all session ::get-text-box)))
+
+(defn get-bounding-box [session box-id]
+  (some (fn [bounding-box]
+          (when (= box-id (:id bounding-box))
+            bounding-box))
+        (o/query-all session ::get-bounding-box)))
+
+(defn get-buffer [session buffer-id]
+  (clara/query session ::get-buffer :?id buffer-id))
+
+(defn get-buffer' [session buffer-id]
+  (some (fn [buffer]
+          (when (= buffer-id (:id buffer))
+            buffer))
+        (o/query-all session ::get-buffer)))
+
+(defn get-current-buffer [session]
+  (first (o/query-all session ::get-current-buffer)))
+
 (def oqueries
   (o/ruleset
     {::get-constants
@@ -119,7 +167,7 @@
       [id ::lines lines]
       [id ::clojure? clojure]
       [id ::cursor-line cursor-line]
-      [id ::cursor-column cursor-line]
+      [id ::cursor-column cursor-column]
       [id ::show-minimap? show-minimap?]]
      ::get-current-buffer
      [:what
@@ -190,54 +238,36 @@
              (<= y1 mouse-y y2)))
       :then
       (o/insert! ::mouse {::target id
-                          ::cursor :hand})]}))
-
-(defn get-constants [session]
-  (first (o/query-all session ::get-constants)))
-
-(defn get-vim [session]
-  (first (o/query-all session ::get-vim)))
-
-(defn get-font [session]
-  (first (o/query-all session ::get-font)))
-
-(defn get-window [session]
-  (first (o/query-all session ::get-window)))
-
-(defn get-current-tab [session]
-  (first (o/query-all session ::get-current-tab)))
-
-(defn get-tab [session tab-id]
-  (some (fn [tab]
-          (when (= tab-id (:id tab))
-            tab))
-        (o/query-all session ::get-tab)))
-
-(defn get-mouse [session]
-  (first (o/query-all session ::get-mouse)))
-
-(defn get-text-box [session tab-id]
-  (some (fn [text-box]
-          (when (= tab-id (:id text-box))
-            text-box))
-        (o/query-all session ::get-text-box)))
-
-(defn get-bounding-box [session box-id]
-  (some (fn [bounding-box]
-          (when (= box-id (:id bounding-box))
-            bounding-box))
-        (o/query-all session ::get-bounding-box)))
-
-(defn get-buffer [session buffer-id]
-  (clara/query session ::get-buffer :?id buffer-id)
-  #_
-  (some (fn [buffer]
-          (when (= buffer-id (:id buffer))
-            buffer))
-        (o/query-all session ::get-buffer)))
-
-(defn get-current-buffer [session]
-  (first (o/query-all session ::get-current-buffer)))
+                          ::cursor :hand})]
+     ::update-buffer-when-font-changes-or-window-resizes
+     [:what
+      [::global ::single-command-chan single-command-chan]
+      [::vim ::mode mode]
+      [::vim ::visual-range visual-range]
+      [::vim ::show-search? show-search?]
+      [::vim ::highlights highlights]
+      [::font ::multiplier multiplier]
+      [::window ::width window-width]
+      [::window ::height window-height]
+      [id ::tab-id tab-id]
+      :when
+      ;; ignore ascii buffers
+      (number? id)
+      :then
+      (let [constants (get-constants o/*session*)
+            buffer (get-buffer' o/*session* id)
+            text-box (get-text-box o/*session* tab-id)
+            window {:width window-width :height window-height}
+            new-buffer (-> buffer
+                          (paravim.buffers/update-cursor mode multiplier text-box constants window)
+                          (paravim.buffers/update-highlight constants)
+                          (paravim.buffers/update-selection constants visual-range)
+                          (paravim.buffers/update-search-highlights constants show-search? highlights))]
+        (doseq [[k v] new-buffer
+                :when (not= v (get buffer k))]
+          ;; FIXME: temporary hack
+          (o/insert! id (keyword "paravim.session" (name k)) v))
+        (async/put! single-command-chan [:resize-window]))]}))
 
 (def queries
   '{::get-game
@@ -300,7 +330,7 @@
               (paravim.buffers/update-cursor (:mode vim) (:size font) text-box constants window)
               (paravim.buffers/update-highlight constants)
               (paravim.buffers/update-selection constants (:visual-range vim))
-              (paravim.buffers/update-search-highlights constants vim)
+              (paravim.buffers/update-search-highlights constants (:show-search? vim) (:highlights vim))
               (assoc :font-anchor font))))
       (clojure.core.async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     ::update-buffer-when-window-resizes
@@ -328,7 +358,7 @@
               (paravim.buffers/update-cursor (:mode vim) (:size font) text-box constants window)
               (paravim.buffers/update-highlight constants)
               (paravim.buffers/update-selection constants (:visual-range vim))
-              (paravim.buffers/update-search-highlights constants vim)
+              (paravim.buffers/update-search-highlights constants (:show-search? vim) (:highlights vim))
               (assoc :window-anchor window))))
       (clojure.core.async/put! (:paravim.core/single-command-chan game) [:resize-window]))
     ::minimap

@@ -123,7 +123,7 @@
                           (buffers/update-cursor $ (:mode vim) font-multiplier text-box constants window)
                           (buffers/update-highlight $ constants)
                           (buffers/update-selection $ constants (:visual-range vim))
-                          (buffers/update-search-highlights $ constants vim)
+                          (buffers/update-search-highlights $ constants (:show-search? vim) (:highlights vim))
                           (clarax/merge session buffer $)
                           (clara/fire-rules $)))
                   session)))))
@@ -461,6 +461,8 @@
               (session/->FontMultiplier constants/default-font-multiplier))))
   (swap! session/*session assoc :osession
          (-> @session/*initial-osession
+             (o/insert ::session/global {::session/command-chan (::command-chan game)
+                                         ::session/single-command-chan (::single-command-chan game)})
              (o/insert ::session/vim {::session/mode 'NORMAL
                                       ::session/ascii nil
                                       ::session/control? false
