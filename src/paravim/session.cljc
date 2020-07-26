@@ -12,6 +12,11 @@
                :cljs [clarax.macros-js :refer-macros [->session]]))
   #?(:cljs (:require-macros [paravim.session :refer [merge-into-session]])))
 
+(defonce *initial-session (atom nil))
+(defonce *initial-osession (atom nil))
+(defonce *session (atom {}))
+(defonce *reload? (atom false))
+
 (defrecord Game [total-time delta-time context])
 (defrecord Window [width height])
 (defrecord Mouse [x y])
@@ -52,9 +57,6 @@
       [::constant ::roboto-text-entity roboto-text-entity]
       [::constant ::toolbar-text-entities toolbar-text-entities]
       [::constant ::highlight-text-entities highlight-text-entities]]}))
-
-(def *osession
-  (atom (reduce o/add-rule (o/->session) oqueries)))
 
 (defn get-constants [session]
   (first (o/query-all session ::get-constants)))
@@ -175,7 +177,7 @@
           vim paravim.session.Vim
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))]
-      (let [constants (get-constants @*osession)]
+      (let [constants (get-constants (:osession @*session))]
         (clarax.rules/merge! buffer
           (-> buffer
               (paravim.buffers/update-cursor (:mode vim) (:size font) text-box constants window)
@@ -202,7 +204,7 @@
           vim paravim.session.Vim
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))]
-      (let [constants (get-constants @*osession)]
+      (let [constants (get-constants (:osession @*session))]
         (clarax.rules/merge! buffer
           (-> buffer
               (paravim.buffers/update-cursor (:mode vim) (:size font) text-box constants window)
@@ -230,7 +232,7 @@
           minimap paravim.session.Minimap
           :when (and (= (:buffer-id minimap) (:id buffer))
                      (not= [window font buffer] (:anchor minimap)))]
-      (let [constants (get-constants @*osession)
+      (let [constants (get-constants (:osession @*session))
             new-minimap (paravim.minimap/->minimap buffer constants (:size font) (:width window) (:height window) text-box)
             new-buffer (assoc buffer :show-minimap? (:show? new-minimap))]
         (when (not= buffer new-buffer)
@@ -245,7 +247,7 @@
           buffer paravim.session.Buffer
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))]
-      (let [constants (get-constants @*osession)]
+      (let [constants (get-constants (:osession @*session))]
         (some->> (paravim.scroll/rubber-band-camera buffer (:size font) text-box constants window)
                  (clarax.rules/merge! buffer))))
     ::move-camera-to-target
@@ -264,7 +266,7 @@
     ::font
     (let [font paravim.session.Font
           font-multiplier paravim.session.FontMultiplier]
-      (let [constants (get-constants @*osession)]
+      (let [constants (get-constants (:osession @*session))]
         (cond
           ;; font needs to be initialized
           (== 0 (:size font))
@@ -273,16 +275,15 @@
           (pos? (:size font))
           (clarax.rules/merge! font-multiplier {:size (/ (:size font) (:font-height constants))}))))})
 
-(defonce *initial-session (atom nil))
-(defonce *session (atom nil))
-(defonce *reload? (atom false))
-
 #?(:clj (defmacro merge-into-session [& args]
           `(do
              (reset! *initial-session (->session ~(->> (apply merge queries rules args)
                                                        ;; remove nil rules (this allows people to disable rules)
                                                        (filter second)
                                                        (into {}))))
+
+             (reset! *initial-osession
+               (reduce o/add-rule (o/->session) oqueries))
              ;; reload the session if it's been created already
              (when @*session
                (reset! *reload? true))
@@ -291,7 +292,7 @@
 ;; create initial session
 (merge-into-session)
 
-(defn def-queries [session]
+(defn def-queries [{:keys [session]}]
   (let [query-fns (clarax/query-fns session)]
     (def get-game (::get-game query-fns))
     (def get-window (::get-window query-fns))

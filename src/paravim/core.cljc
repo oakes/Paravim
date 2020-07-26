@@ -64,9 +64,9 @@
       (clarax/merge (session/get-tab session {:?id id}) {:buffer-id buffer-id})
       clara/fire-rules))
 
-(defn insert-buffer-update [session bu]
+(defn insert-buffer-update [session osession bu]
   (if-let [buffer (session/get-buffer session {:?id (:buffer-id bu)})]
-    (let [constants (session/get-constants @session/*osession)]
+    (let [constants (session/get-constants osession)]
       (as-> buffer $
             (buffers/update-text-buffer $ constants (:lines bu) (:first-line bu) (:line-count-change bu))
             (assoc $ :needs-clojure-refresh? (:clojure? buffer))
@@ -74,9 +74,9 @@
             (clara/fire-rules $)))
     session))
 
-(defn insert-buffer-refresh [session buffer-id]
+(defn insert-buffer-refresh [session osession buffer-id]
   (if-let [buffer (session/get-buffer session {:?id buffer-id})]
-    (let [constants (session/get-constants @session/*osession)
+    (let [constants (session/get-constants osession)
           vim (session/get-vim session)
           font (session/get-font-multiplier session)
           text-box (session/get-text-box session {:?id (:tab-id buffer)})
@@ -96,9 +96,9 @@
             (clara/fire-rules $)))
     session))
 
-(defn change-font-size [session diff-multiplier]
+(defn change-font-size [session osession diff-multiplier]
   (let [font (session/get-font session)
-        font-height (:font-height (session/get-constants @session/*osession))
+        font-height (:font-height (session/get-constants osession))
         diff (* diff-multiplier font-height)
         min-font-size (* constants/min-font-size font-height)
         max-font-size (* constants/max-font-size font-height)
@@ -114,15 +114,15 @@
           clara/fire-rules)
       session)))
 
-(defn font-dec [session]
-  (change-font-size session (- constants/font-size-step)))
+(defn font-dec [m]
+  (update m :session change-font-size (:osession m) (- constants/font-size-step)))
 
-(defn font-inc [session]
-  (change-font-size session constants/font-size-step))
+(defn font-inc [m]
+  (update m :session change-font-size (:osession m) constants/font-size-step))
 
-(defn font-multiply [session n]
-  (let [font-size (:size (session/get-font-multiplier session))]
-    (change-font-size session (- (* font-size n) font-size))))
+(defn font-multiply [m n]
+  (let [font-size (:size (session/get-font-multiplier (:session m)))]
+    (update m :session change-font-size (:osession m) (- (* font-size n) font-size))))
 
 (defn upsert-buffer [session buffer]
   (let [total-time (-> session session/get-game :total-time)
@@ -162,7 +162,7 @@
                  long)]
     [line column]))
 
-(defn click-mouse! [game session button]
+(defn click-mouse! [game {:keys [session osession]} button]
   (let [mouse-hover (session/get-mouse-hover session)
         current-tab (session/get-current-tab session)
         buffer-id (session/get-current-buffer session)
@@ -179,7 +179,7 @@
             :text (when buffer
                     (let [text-box (session/get-text-box session {:?id (:id current-tab)})
                           window (session/get-window session)
-                          constants (session/get-constants @session/*osession)
+                          constants (session/get-constants osession)
                           font (session/get-font-multiplier session)]
                       (async/put! (::command-chan game)
                                   [:move-cursor (mouse->cursor-position buffer (:mouse-anchor mouse-hover) (:size font) text-box constants window)])))
@@ -191,10 +191,10 @@
         buffer-id (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id buffer-id})]
     (when buffer
-      (swap! session/*session upsert-buffer (merge buffer (scroll/start-scrolling-camera buffer xoffset yoffset))))))
+      (swap! session/*session update :session upsert-buffer (merge buffer (scroll/start-scrolling-camera buffer xoffset yoffset))))))
 
 (defn get-mode []
-  (:mode (session/get-vim @session/*session)))
+  (:mode (session/get-vim (:session @session/*session))))
 
 (defn command-text [text completion]
   {:command-text text :command-completion (when (some-> text str/trim seq) completion)})
@@ -385,7 +385,7 @@
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
   ;; initialize session
   (session/def-queries
-    (reset! session/*session
+    (swap! session/*session assoc :session
             (clara/insert @session/*initial-session
               (session/map->Game game)
               (session/->Window (utils/get-width game) (utils/get-height game))
@@ -399,15 +399,16 @@
               (session/->FontMultiplier constants/default-font-multiplier)
               (session/map->Vim {:mode 'NORMAL
                                  :show-search? false}))))
+  (swap! session/*session assoc :osession @session/*initial-osession)
   ;; initialize entities
   (let [callback (fn [{:keys [constants text-boxes bounding-boxes] :as entities}]
                    (reset! *entity-cache entities)
-                   (swap! session/*osession
+                   (swap! session/*session update :osession
                           (fn [session]
                             (-> session
                                 (o/insert ::session/constant constants)
                                 o/fire-rules)))
-                   (swap! session/*session
+                   (swap! session/*session update :session
                           (fn [session]
                             (as-> session $
                                   (reduce-kv
@@ -424,7 +425,7 @@
       (callback entities)
       (init-entities game callback)))
   ;; fire rules
-  (swap! session/*session clara/fire-rules)
+  (swap! session/*session update :session clara/fire-rules)
   ;; init vim
   ;; this should never be nil, but it could be after
   ;; hot code reloading if this function isn't given the
@@ -476,7 +477,7 @@
   (when @session/*reload?
     (reset! session/*reload? false)
     (init game))
-  (let [session @session/*session
+  (let [{:keys [session osession]} @session/*session
         current-tab (:id (session/get-current-tab session))
         current-buffer (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id current-buffer})
@@ -486,7 +487,7 @@
                 base-text-entity base-font-entity
                 font-height
                 toolbar-text-entities highlight-text-entities]
-         :as constants} (session/get-constants @session/*osession)
+         :as constants} (session/get-constants osession)
         {:keys [mode ascii control?
                 command-text-entity command-cursor-entity]
          :as vim} (session/get-vim session)]
@@ -575,7 +576,7 @@
                  ;; because it wasn't passing the latest game map to this function.
                  ((::poll-input! game') (merge game' game)))]
       ;; put new game record in the session
-      (swap! session/*session
+      (swap! session/*session update :session
         (fn [session]
           (when session ;; this could be momentarily nil while reloading the paravim.session ns
             (-> session

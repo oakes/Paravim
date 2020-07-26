@@ -79,8 +79,8 @@
 (defn on-mouse-move! [{:keys [::c/density-ratio] :as game} window xpos ypos]
   (let [x (* xpos density-ratio)
         y (* ypos density-ratio)
-        session (swap! session/*session c/update-mouse x y)
-        mouse-hover (session/get-mouse-hover session)]
+        session (swap! session/*session update :session c/update-mouse x y)
+        mouse-hover (session/get-mouse-hover (:session session))]
     (GLFW/glfwSetCursor window
                         (GLFW/glfwCreateStandardCursor
                           (case (:cursor mouse-hover)
@@ -102,13 +102,13 @@
         release? (= action GLFW/GLFW_RELEASE)
         control-key? (control-keycode? keycode)]
     (when (or press? release?)
-      (swap! session/*session
+      (swap! session/*session update :session
              (fn [session]
                (c/update-vim session
                  {:control? (or (and control? (not control-key?))
                                 (and press? control-key?))}))))
     (when (or press? repeat?)
-      (when-let [session @session/*session]
+      (when-let [session (:session @session/*session)]
         (let [{:keys [mode]} (session/get-vim session)
               k (keycode->keyword keycode)
               current-tab (:id (session/get-current-tab session))
@@ -147,13 +147,13 @@
               (vim/on-input vim session (str "<" key-name ">")))))))))
 
 (defn on-char! [{:keys [::c/vim] :as game} window codepoint]
-  (vim/on-input vim @session/*session (str (char codepoint))))
+  (vim/on-input vim (:session @session/*session) (str (char codepoint))))
 
 (defn on-resize! [game window width height]
-  (swap! session/*session c/update-window-size width height))
+  (swap! session/*session update :session c/update-window-size width height))
 
 (defn on-scroll! [{:keys [::c/density-ratio] :as game} window xoffset yoffset]
-  (c/scroll! @session/*session (/ xoffset density-ratio) (/ yoffset density-ratio)))
+  (c/scroll! (:session @session/*session) (/ xoffset density-ratio) (/ yoffset density-ratio)))
 
 (defn- listen-for-events [game window]
   (doto window
@@ -205,12 +205,14 @@
         :move-cursor (apply vim/update-cursor-position! vim (second input))
         :update-vim (do
                       (swap! session/*session
-                        (fn [session]
-                          (-> session
-                              (c/update-vim (second input))
-                              (c/insert-buffer-refresh (session/get-current-buffer session)))))
+                             (fn [m]
+                               (update m :session
+                                 (fn [session]
+                                   (-> session
+                                       (c/update-vim (second input))
+                                       (c/insert-buffer-refresh (:osession m) (session/get-current-buffer session)))))))
                       nil))
-      (when-let [session @session/*session] ;; this could be momentarily nil while hot code reloading
+      (when-let [session (:session @session/*session)] ;; this could be momentarily nil while hot code reloading
         (when (vim/ready-to-append? session vim repl-output)
           (binding [vim/*update-ui?* false]
             (vim/append-to-buffer! game session (first repl-output)))

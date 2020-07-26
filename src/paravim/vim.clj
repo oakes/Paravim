@@ -16,7 +16,7 @@
 (def ^:dynamic *update-window?* true)
 
 (defn set-window-size! [vim session width height]
-  (let [{:keys [font-height font-width] :as constants} (session/get-constants @session/*osession)
+  (let [{:keys [font-height font-width] :as constants} (session/get-constants (:osession @session/*session))
         current-tab (:id (session/get-current-tab session))]
     (when-let [{:keys [top bottom]} (session/get-text-box session {:?id current-tab})]
       (let [font-size-multiplier (:size (session/get-font-multiplier session))
@@ -31,7 +31,7 @@
 (defn update-window-size! [{:keys [::c/vim] :as game}]
   (let [width (utils/get-width game)
         height (utils/get-height game)]
-    (set-window-size! vim @session/*session width height))
+    (set-window-size! vim (:session @session/*session) width height))
   nil)
 
 (defn ready-to-append? [session vim output]
@@ -75,11 +75,13 @@
           (v/set-cursor-position vim cursor-line cursor-column)
           (v/input vim "<Esc>")))
       (swap! session/*session
-             (fn [session]
-               (-> session
-                   (c/upsert-buffer {:id current-buffer
-                                     :needs-parinfer? false})
-                   (c/insert-buffer-refresh current-buffer)))))))
+             (fn [m]
+               (update m :session
+                       (fn [session]
+                         (-> session
+                             (c/upsert-buffer {:id current-buffer
+                                               :needs-parinfer? false})
+                             (c/insert-buffer-refresh (:osession m) current-buffer)))))))))
 
 (defn read-text-resource [path]
   (-> path io/resource slurp str/split-lines))
@@ -123,8 +125,8 @@
                                ascii-art)
                          "intro")]
       (swap! session/*session
-             (fn [session]
-               (assoc-ascii session (session/get-constants @session/*osession) ascii))))))
+             (fn [m]
+               (update m :session assoc-ascii (session/get-constants (:osession m)) ascii))))))
 
 (defn input [vim session s]
   (if (= 'COMMAND_LINE (v/get-mode vim))
@@ -152,26 +154,30 @@
           (v/input vim s))))
     (v/input vim s)))
 
-(defn update-buffer [session buffer-ptr cursor-line cursor-column]
+(defn update-buffer [session osession buffer-ptr cursor-line cursor-column]
   (if-let [buffer (session/get-buffer session {:?id buffer-ptr})]
     (-> session
         (c/upsert-buffer (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
-        (c/insert-buffer-refresh buffer-ptr))
+        (c/insert-buffer-refresh osession buffer-ptr))
     session))
 
 (defn update-cursor-position! [vim cursor-line cursor-column]
   (v/set-cursor-position vim (inc cursor-line) cursor-column)
-  (swap! session/*session update-buffer (v/get-current-buffer vim) cursor-line cursor-column)
+  (swap! session/*session
+        (fn [m]
+          (update m :session
+                  (fn [session]
+                    (update-buffer session (:osession m) (v/get-current-buffer vim) cursor-line cursor-column)))))
   nil)
 
-(defn update-after-input [session vim s]
+(defn update-after-input [{:keys [session osession] :as m} vim s]
   (let [;; get state from vim
         current-buffer (v/get-current-buffer vim)
         mode (v/get-mode vim)
         cursor-line (dec (v/get-cursor-line vim))
         cursor-column (v/get-cursor-column vim)
         ;; update ascii if necessary
-        constants (session/get-constants @session/*osession)
+        constants (session/get-constants osession)
         session (if s
                   (change-ascii session constants s)
                   session)
@@ -203,12 +209,13 @@
                                {:show-search? true}))))
                        (c/assoc-command constants mode (:size (session/get-font-multiplier session)) (v/get-command-position vim)))
                    (merge vim-info (c/command-text nil nil)))
-        session (c/update-vim session vim-info)]
-    (update-buffer session current-buffer cursor-line cursor-column)))
+        session (c/update-vim session vim-info)
+        m (assoc m :session session)]
+    (update m :session update-buffer osession current-buffer cursor-line cursor-column)))
 
 (defn on-input [vim session s]
   (input vim session s)
-  (let [session (swap! session/*session update-after-input vim s)
+  (let [session (:session (swap! session/*session update-after-input vim s))
         mode (:mode (session/get-vim session))]
     (when (and (= 'NORMAL mode)
                (not= s "u"))
@@ -275,8 +282,8 @@
                                   tab))
                               constants/tab->path)
                             :files)
-            session @session/*session
-            constants (session/get-constants @session/*osession)
+            {:keys [session osession]} @session/*session
+            constants (session/get-constants osession)
             existing-buffer (session/get-buffer session {:?id buffer-ptr})
             buffer (if (and existing-buffer (= (:lines existing-buffer) lines))
                      existing-buffer
@@ -286,31 +293,35 @@
         (when *update-window?*
           (async/put! (::c/command-chan game) [:set-window-title (str file-name " - Paravim")]))
         (swap! session/*session
-          (fn [session]
-            (-> session
-                (c/update-tab current-tab buffer-ptr)
-                (c/update-current-tab current-tab)
-                (c/upsert-buffer buffer)
-                (c/insert-buffer-refresh buffer-ptr)))))
+          (fn [m]
+            (update m :session
+                    (fn [session]
+                      (-> session
+                          (c/update-tab current-tab buffer-ptr)
+                          (c/update-current-tab current-tab)
+                          (c/upsert-buffer buffer)
+                          (c/insert-buffer-refresh (:osession m) buffer-ptr)))))))
       (do
         (when *update-window?*
           (async/put! (::c/command-chan game) [:set-window-title "Paravim"]))
         ;; clear the files tab
-        (swap! session/*session c/update-tab :files nil)))))
+        (swap! session/*session update :session c/update-tab :files nil)))))
 
 (defn on-buf-update [game vim buffer-ptr start-line end-line line-count-change]
   (let [first-line (dec start-line)
         last-line (+ (dec end-line) line-count-change)
         lines (vec (for [i (range first-line last-line)]
                      (v/get-line vim buffer-ptr (inc i))))]
-    (swap! session/*session c/insert-buffer-update
-           {:buffer-id buffer-ptr
-            :lines lines
-            :first-line first-line
-            :line-count-change line-count-change})))
+    (swap! session/*session
+           (fn [m]
+             (update m :session c/insert-buffer-update (:osession m)
+               {:buffer-id buffer-ptr
+                :lines lines
+                :first-line first-line
+                :line-count-change line-count-change})))))
 
 (defn on-buf-delete [buffer-ptr]
-  (swap! session/*session c/remove-buffer buffer-ptr))
+  (swap! session/*session update :session c/remove-buffer buffer-ptr))
 
 (defn ->vim []
   (doto (v/->vim)
@@ -328,7 +339,7 @@
     (v/execute "filetype plugin indent on")))
 
 (defn yank-lines [{:keys [start-line start-column end-line end-column]}]
-  (let [session @session/*session
+  (let [session (:session @session/*session)
         current-buffer (session/get-current-buffer session)]
     (when-let [{:keys [lines]} (session/get-buffer session {:?id current-buffer})]
       (let [yanked-lines (subvec lines (dec start-line) end-line)
