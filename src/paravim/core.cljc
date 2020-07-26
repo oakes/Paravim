@@ -77,7 +77,7 @@
 (defn insert-buffer-refresh [session osession buffer-id]
   (if-let [buffer (session/get-buffer session {:?id buffer-id})]
     (let [constants (session/get-constants osession)
-          vim (session/get-vim session)
+          vim (session/get-vim osession)
           font (session/get-font-multiplier session)
           text-box (session/get-text-box session {:?id (:tab-id buffer)})
           window (session/get-window session)]
@@ -144,11 +144,6 @@
         (cond-> minimap (clara/retract minimap))
         clara/fire-rules)))
 
-(defn update-vim [session m]
-  (-> session
-      (clarax/merge (session/get-vim session) m)
-      clara/fire-rules))
-
 (defn- mouse->cursor-position [buffer mouse font-size-multiplier text-box constants window]
   (let [text-top ((:top text-box) (:height window) font-size-multiplier)
         {:keys [x y]} mouse
@@ -194,15 +189,17 @@
       (swap! session/*session update :session upsert-buffer (merge buffer (scroll/start-scrolling-camera buffer xoffset yoffset))))))
 
 (defn get-mode []
-  (:mode (session/get-vim (:session @session/*session))))
+  (:mode (session/get-vim (:osession @session/*session))))
 
 (defn command-text [text completion]
-  {:command-text text :command-completion (when (some-> text str/trim seq) completion)})
+  {::session/command-text text
+   ::session/command-completion (when (some-> text str/trim seq)
+                                  completion)})
 
 (defn assoc-command-entity [command text-entity cursor-entity]
-  (assoc command :command-text-entity text-entity :command-cursor-entity cursor-entity))
+  (assoc command ::session/command-text-entity text-entity ::session/command-cursor-entity cursor-entity))
 
-(defn assoc-command [{:keys [command-start command-text command-completion] :as command}
+(defn assoc-command [{:keys [::session/command-start ::session/command-text ::session/command-completion] :as command}
                      {:keys [base-text-entity base-font-entity base-rects-entity font-height] :as constants}
                      vim-mode font-size-multiplier position]
   (if command-text
@@ -396,10 +393,21 @@
               (session/->Tab :repl-in nil)
               (session/->Tab :repl-out nil)
               (session/->Font 0) ;; initialized in the font rule
-              (session/->FontMultiplier constants/default-font-multiplier)
-              (session/map->Vim {:mode 'NORMAL
-                                 :show-search? false}))))
-  (swap! session/*session assoc :osession @session/*initial-osession)
+              (session/->FontMultiplier constants/default-font-multiplier))))
+  (swap! session/*session assoc :osession
+         (-> @session/*initial-osession
+             (o/insert ::session/vim {::session/mode 'NORMAL
+                                      ::session/ascii nil
+                                      ::session/control? false
+                                      ::session/show-search? false
+                                      ::session/visual-range nil
+                                      ::session/highlights []
+                                      ::session/message nil
+                                      ::session/command-start nil
+                                      ::session/command-text nil
+                                      ::session/command-completion nil
+                                      ::session/command-text-entity nil
+                                      ::session/command-cursor-entity nil})))
   ;; initialize entities
   (let [callback (fn [{:keys [constants text-boxes bounding-boxes] :as entities}]
                    (reset! *entity-cache entities)
@@ -490,7 +498,7 @@
          :as constants} (session/get-constants osession)
         {:keys [mode ascii control?
                 command-text-entity command-cursor-entity]
-         :as vim} (session/get-vim session)]
+         :as vim} (session/get-vim osession)]
     (when (and window (pos? game-width) (pos? game-height))
       (if (::clear? game)
         (c/render game (update screen-entity :viewport assoc :width game-width :height game-height))

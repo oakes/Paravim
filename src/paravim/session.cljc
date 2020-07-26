@@ -25,10 +25,6 @@
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
 (defrecord FontMultiplier [size])
-(defrecord Vim [mode ascii control? show-search?
-                visual-range highlights message
-                command-start command-text command-completion
-                command-text-entity command-cursor-entity])
 (defrecord CurrentTab [id])
 (defrecord Tab [id buffer-id])
 (defrecord Buffer [id tab-id
@@ -56,10 +52,27 @@
       [::constant ::roboto-font-entity roboto-font-entity]
       [::constant ::roboto-text-entity roboto-text-entity]
       [::constant ::toolbar-text-entities toolbar-text-entities]
-      [::constant ::highlight-text-entities highlight-text-entities]]}))
+      [::constant ::highlight-text-entities highlight-text-entities]]
+     ::get-vim
+     [:what
+      [::vim ::mode mode]
+      [::vim ::ascii ascii]
+      [::vim ::control? control?]
+      [::vim ::show-search? show-search?]
+      [::vim ::visual-range visual-range]
+      [::vim ::highlights highlights]
+      [::vim ::message message]
+      [::vim ::command-start command-start]
+      [::vim ::command-text command-text]
+      [::vim ::command-completion command-completion]
+      [::vim ::command-text-entity command-text-entity]
+      [::vim ::command-cursor-entity command-cursor-entity]]}))
 
 (defn get-constants [session]
   (first (o/query-all session ::get-constants)))
+
+(defn get-vim [session]
+  (first (o/query-all session ::get-vim)))
 
 (def queries
   '{::get-game
@@ -101,10 +114,6 @@
     (fn []
       (let [font paravim.session.FontMultiplier]
         font))
-    ::get-vim
-    (fn []
-      (let [vim paravim.session.Vim]
-        vim))
     ::get-bounding-box
     (fn [?id]
       (let [bounding-box paravim.session.BoundingBox
@@ -174,10 +183,11 @@
           :when (and (not= font (:font-anchor buffer))
                      ;; ignore ascii buffers
                      (number? (:id buffer)))
-          vim paravim.session.Vim
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))]
-      (let [constants (get-constants (:osession @*session))]
+      (let [osession (:osession @*session)
+            constants (get-constants osession)
+            vim (get-vim osession)]
         (clarax.rules/merge! buffer
           (-> buffer
               (paravim.buffers/update-cursor (:mode vim) (:size font) text-box constants window)
@@ -201,10 +211,11 @@
                                                :repl-in :repl-out
                                                :repl-out :repl-in
                                                nil))))
-          vim paravim.session.Vim
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))]
-      (let [constants (get-constants (:osession @*session))]
+      (let [osession (:osession @*session)
+            constants (get-constants osession)
+            vim (get-vim osession)]
         (clarax.rules/merge! buffer
           (-> buffer
               (paravim.buffers/update-cursor (:mode vim) (:size font) text-box constants window)
@@ -300,7 +311,6 @@
     (def get-mouse-hover (::get-mouse-hover query-fns))
     (def get-font (::get-font query-fns))
     (def get-font-multiplier (::get-font-multiplier query-fns))
-    (def get-vim (::get-vim query-fns))
     (def get-current-tab (::get-current-tab query-fns))
     (def get-current-buffer (::get-current-buffer query-fns))
     (def get-tab (::get-tab query-fns))

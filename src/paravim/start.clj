@@ -6,7 +6,8 @@
             [libvim-clj.core :as v]
             [play-cljc.gl.core :as pc]
             [clojure.core.async :as async]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [odoyle.rules :as o])
   (:import  [org.lwjgl.glfw GLFW Callbacks
              GLFWCursorPosCallbackI GLFWKeyCallbackI GLFWMouseButtonCallbackI
              GLFWCharCallbackI GLFWFramebufferSizeCallbackI GLFWWindowCloseCallbackI
@@ -102,14 +103,13 @@
         release? (= action GLFW/GLFW_RELEASE)
         control-key? (control-keycode? keycode)]
     (when (or press? release?)
-      (swap! session/*session update :session
-             (fn [session]
-               (c/update-vim session
-                 {:control? (or (and control? (not control-key?))
-                                (and press? control-key?))}))))
+      (swap! session/*session update :osession o/insert
+             ::session/vim
+             ::session/control? (or (and control? (not control-key?))
+                                    (and press? control-key?))))
     (when (or press? repeat?)
-      (when-let [session (:session @session/*session)]
-        (let [{:keys [mode]} (session/get-vim session)
+      (when-let [{:keys [session osession] :as m} @session/*session]
+        (let [{:keys [mode]} (session/get-vim osession)
               k (keycode->keyword keycode)
               current-tab (:id (session/get-current-tab session))
               current-buffer (session/get-current-buffer session)]
@@ -120,7 +120,7 @@
               (and (= current-tab :repl-in)
                    (= k :enter)
                    (= mode 'NORMAL))
-              (vim/repl-enter! vim session pipes)
+              (vim/repl-enter! vim m pipes)
               ;; all ctrl shortcuts
               control?
               (case k
@@ -132,22 +132,22 @@
                 :v (if (= mode 'INSERT)
                      (let [text (GLFW/glfwGetClipboardString window)]
                        (vim/on-bulk-input vim text false))
-                     (vim/on-input vim session "<C-V>"))
+                     (vim/on-input vim m "<C-V>"))
                 ; else
                 (when-let [key-name (if k
                                       (keyword->name k)
                                       (keycode->char keycode))]
-                  (vim/on-input vim session (str "<C-" (when shift? "S-") key-name ">"))))
+                  (vim/on-input vim m (str "<C-" (when shift? "S-") key-name ">"))))
               ;; all other input
               :else
               (when-let [key-name (keyword->name k)]
-                (vim/on-input vim session (str "<" key-name ">"))))
+                (vim/on-input vim m (str "<" key-name ">"))))
             repeat?
             (when-let [key-name (keyword->name k)]
-              (vim/on-input vim session (str "<" key-name ">")))))))))
+              (vim/on-input vim m (str "<" key-name ">")))))))))
 
 (defn on-char! [{:keys [::c/vim] :as game} window codepoint]
-  (vim/on-input vim (:session @session/*session) (str (char codepoint))))
+  (vim/on-input vim @session/*session (str (char codepoint))))
 
 (defn on-resize! [game window width height]
   (swap! session/*session update :session c/update-window-size width height))
@@ -204,18 +204,18 @@
         :resize-window (vim/update-window-size! game)
         :move-cursor (apply vim/update-cursor-position! vim (second input))
         :update-vim (do
+                      (swap! session/*session update :osession o/insert ::session/vim (second input))
                       (swap! session/*session
                              (fn [m]
                                (update m :session
                                  (fn [session]
                                    (-> session
-                                       (c/update-vim (second input))
                                        (c/insert-buffer-refresh (:osession m) (session/get-current-buffer session)))))))
                       nil))
-      (when-let [session (:session @session/*session)] ;; this could be momentarily nil while hot code reloading
-        (when (vim/ready-to-append? session vim repl-output)
+      (when-let [m @session/*session] ;; this could be momentarily nil while hot code reloading
+        (when (vim/ready-to-append? (:session m) vim repl-output)
           (binding [vim/*update-ui?* false]
-            (vim/append-to-buffer! game session (first repl-output)))
+            (vim/append-to-buffer! game m (first repl-output)))
           (assoc game ::c/repl-output (vec (rest repl-output))))))
     game))
 

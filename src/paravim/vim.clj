@@ -5,6 +5,7 @@
             [paravim.utils :as utils]
             [clara.rules :as clara]
             [clarax.rules :as clarax]
+            [odoyle.rules :as o]
             [libvim-clj.core :as v]
             [clojure.string :as str]
             [clojure.java.io :as io]
@@ -93,29 +94,32 @@
                 "usa" (LocalDate/of current-year 7 4)
                 "christmas" (LocalDate/of current-year 12 25)})
 
-(defn assoc-ascii [session constants ascii-name]
-  (c/new-tab! (session/get-game session) session :files)
-  (-> session
-      (c/upsert-buffer (c/->ascii ascii-name constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
-      (c/update-vim {:ascii ascii-name})))
+(defn assoc-ascii [m constants ascii-name]
+  (-> m
+      (update :session
+              (fn [session]
+                (c/new-tab! (session/get-game session) session :files)
+                (-> session
+                    (c/upsert-buffer (c/->ascii ascii-name constants (read-text-resource (str "ascii/" ascii-name ".txt")))))))
+      (update :osession o/insert ::session/vim ::session/ascii ascii-name)))
 
-(defn dissoc-ascii [session ascii-name]
-  (-> session
-      (c/remove-buffer ascii-name)
-      (c/update-vim {:ascii nil})))
+(defn dissoc-ascii [m ascii-name]
+  (-> m
+      (update :session c/remove-buffer ascii-name)
+      (update :osession o/insert ::session/vim ::session/ascii false)))
 
-(defn change-ascii [session constants s]
-  (let [{:keys [mode ascii command-text command-start]} (session/get-vim session)]
+(defn change-ascii [{:keys [session osession] :as m} constants s]
+  (let [{:keys [mode ascii command-text command-start]} (session/get-vim osession)]
     (cond
       (and ascii *update-ui?*)
-      (dissoc-ascii session ascii)
+      (dissoc-ascii m ascii)
       (and (= mode 'COMMAND_LINE)
            (= s "<Enter>")
            (= command-start ":")
            (contains? ascii-art command-text))
-      (assoc-ascii session constants command-text)
+      (assoc-ascii m constants command-text)
       :else
-      session)))
+      m)))
 
 (defn init-ascii! []
   (let [now (LocalDate/now)]
@@ -126,11 +130,11 @@
                          "intro")]
       (swap! session/*session
              (fn [m]
-               (update m :session assoc-ascii (session/get-constants (:osession m)) ascii))))))
+               (assoc-ascii m (session/get-constants (:osession m)) ascii))))))
 
-(defn input [vim session s]
+(defn input [vim session osession s]
   (if (= 'COMMAND_LINE (v/get-mode vim))
-    (let [{:keys [command-text command-start command-completion]} (session/get-vim session)
+    (let [{:keys [command-text command-start command-completion]} (session/get-vim osession)
           pos (v/get-command-position vim)]
       (case s
         "<Tab>"
@@ -170,53 +174,56 @@
                     (update-buffer session (:osession m) (v/get-current-buffer vim) cursor-line cursor-column)))))
   nil)
 
-(defn update-after-input [{:keys [session osession] :as m} vim s]
+(defn update-after-input [m vim s]
   (let [;; get state from vim
         current-buffer (v/get-current-buffer vim)
         mode (v/get-mode vim)
         cursor-line (dec (v/get-cursor-line vim))
         cursor-column (v/get-cursor-column vim)
         ;; update ascii if necessary
-        constants (session/get-constants osession)
-        session (if s
-                  (change-ascii session constants s)
-                  session)
+        constants (session/get-constants (:osession m))
+        m (if s
+            (change-ascii m constants s)
+            m)
+        {:keys [session osession]} m
         ;; get vim from session
-        vim-info (session/get-vim session)
-        old-mode (:mode vim-info)
+        old-vim-info (session/get-vim osession)
+        old-mode (:mode old-vim-info)
         ;; update vim record
-        vim-info (assoc vim-info
-                   :mode mode
-                   :message nil ;; clear any pre-existing message
-                   :visual-range (when (v/visual-active? vim)
-                                   (-> (v/get-visual-range vim)
-                                       (update :start-line dec)
-                                       (update :end-line dec)
-                                       (assoc :type (v/get-visual-type vim))))
-                   :highlights (mapv (fn [highlight]
-                                       (-> highlight
-                                           (update :start-line dec)
-                                           (update :end-line dec)))
-                                 (v/get-search-highlights vim 1 (v/get-line-count vim current-buffer))))
+        vim-info {::session/mode mode
+                  ::session/command-start (:command-start old-vim-info)
+                  ::session/command-text (:command-text old-vim-info)
+                  ::session/command-completion (:command-completion old-vim-info)
+                  ::session/message nil ;; clear any pre-existing message
+                  ::session/visual-range (when (v/visual-active? vim)
+                                           (-> (v/get-visual-range vim)
+                                               (update :start-line dec)
+                                               (update :end-line dec)
+                                               (assoc :type (v/get-visual-type vim))))
+                  ::session/highlights (mapv (fn [highlight]
+                                               (-> highlight
+                                                   (update :start-line dec)
+                                                   (update :end-line dec)))
+                                         (v/get-search-highlights vim 1 (v/get-line-count vim current-buffer)))}
         vim-info (if (and s (= mode 'COMMAND_LINE))
                    (-> (merge
                          vim-info
                          (c/command-text (v/get-command-text vim) (v/get-command-completion vim))
                          (when (not= old-mode 'COMMAND_LINE)
                            (merge
-                             {:command-start s}
+                             {::session/command-start s}
                              (when (#{"/" "?"} s)
-                               {:show-search? true}))))
+                               {::session/show-search? true}))))
                        (c/assoc-command constants mode (:size (session/get-font-multiplier session)) (v/get-command-position vim)))
                    (merge vim-info (c/command-text nil nil)))
-        session (c/update-vim session vim-info)
-        m (assoc m :session session)]
+        osession (o/insert osession ::session/vim vim-info)
+        m (assoc m :session session :osession osession)]
     (update m :session update-buffer osession current-buffer cursor-line cursor-column)))
 
-(defn on-input [vim session s]
-  (input vim session s)
-  (let [session (:session (swap! session/*session update-after-input vim s))
-        mode (:mode (session/get-vim session))]
+(defn on-input [vim {:keys [session osession]} s]
+  (input vim session osession s)
+  (let [{:keys [session osession]} (swap! session/*session update-after-input vim s)
+        mode (:mode (session/get-vim osession))]
     (when (and (= 'NORMAL mode)
                (not= s "u"))
       (apply-parinfer! session vim))))
@@ -234,14 +241,14 @@
   (v/execute vim "set nopaste")
   (swap! session/*session update-after-input vim nil))
 
-(defn repl-enter! [vim session {:keys [out out-pipe]}]
+(defn repl-enter! [vim {:keys [session] :as m} {:keys [out out-pipe]}]
   (apply-parinfer! session vim)
   (let [buffer-ptr (v/get-current-buffer vim)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
                      (v/get-line vim buffer-ptr (inc i))))
         text (str (str/join \newline lines) \newline)]
     (doseq [s ["g" "g" "d" "G"]]
-      (on-input vim session s))
+      (on-input vim m s))
     (doto out
       (.write text)
       .flush)
@@ -249,7 +256,7 @@
       (.write text)
       .flush)))
 
-(defn append-to-buffer! [{:keys [::c/vim] :as game} session input]
+(defn append-to-buffer! [{:keys [::c/vim] :as game} {:keys [session] :as m} input]
   (when-let [buffer (:buffer-id (session/get-tab session {:?id :repl-out}))]
     (let [current-buffer (v/get-current-buffer vim)
           cursor-line (v/get-cursor-line vim)
@@ -258,10 +265,10 @@
           line-count (v/get-line-count vim buffer)
           char-count (count (v/get-line vim buffer line-count))]
       (v/set-cursor-position vim line-count (dec char-count))
-      (on-input vim session "a")
+      (on-input vim m "a")
       (on-bulk-input vim input true)
       (v/set-cursor-position vim (v/get-cursor-line vim) 0) ;; fix the repl's horiz scroll position after printing output
-      (on-input vim session "<Esc>")
+      (on-input vim m "<Esc>")
       (v/set-current-buffer vim current-buffer)
       (v/set-cursor-position vim cursor-line cursor-column))))
 
@@ -365,16 +372,16 @@
                                  nil)))
   (v/set-on-buffer-update vim (partial on-buf-update game vim))
   (v/set-on-stop-search-highlight vim (fn []
-                                        (async/put! (::c/command-chan game) [:update-vim {:show-search? false}])))
+                                        (async/put! (::c/command-chan game) [:update-vim {::session/show-search? false}])))
   (v/set-on-unhandled-escape vim (fn []
-                                   (async/put! (::c/command-chan game) [:update-vim {:show-search? false}])))
+                                   (async/put! (::c/command-chan game) [:update-vim {::session/show-search? false}])))
   (v/set-on-yank vim (fn [yank-info]
                        (try
                          (when-let [lines (yank-lines yank-info)]
                            (async/put! (::c/command-chan game) [:set-clipboard-string (str/join \newline lines)]))
                          (catch Exception e (.printStackTrace e)))))
   (v/set-on-message vim (fn [{:keys [message]}]
-                          (async/put! (::c/command-chan game) [:update-vim {:message message}])))
+                          (async/put! (::c/command-chan game) [:update-vim {::session/message message}])))
   (binding [*update-window?* false]
     (run! #(v/open-buffer vim (constants/tab->path %)) [:repl-in :repl-out :files]))
   (init-ascii!)
