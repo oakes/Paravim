@@ -112,7 +112,7 @@
         (let [{:keys [mode]} (session/get-vim osession)
               k (keycode->keyword keycode)
               current-tab (:id (session/get-current-tab osession))
-              current-buffer (session/get-current-buffer session)]
+              current-buffer (:buffer-id (session/get-current-buffer osession))]
           (cond
             press?
             (cond
@@ -206,11 +206,8 @@
         :update-vim (do
                       (swap! session/*session update :osession o/insert ::session/vim (second input))
                       (swap! session/*session
-                             (fn [m]
-                               (update m :session
-                                 (fn [session]
-                                   (-> session
-                                       (c/insert-buffer-refresh (:osession m) (session/get-current-buffer session)))))))
+                             (fn [session]
+                               (c/insert-buffer-refresh session (:buffer-id (session/get-current-buffer session)))))
                       nil))
       (when-let [m @session/*session] ;; this could be momentarily nil while hot code reloading
         (when (vim/ready-to-append? (:osession m) vim repl-output)

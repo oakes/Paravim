@@ -41,7 +41,7 @@
        (not= ::session/repl-out (:id (session/get-current-tab osession)))))
 
 (defn apply-parinfer! [session osession vim]
-  (let [current-buffer (session/get-current-buffer session)
+  (let [current-buffer (:buffer-id (session/get-current-buffer osession))
         {:keys [parsed-code needs-parinfer?]} (session/get-buffer session current-buffer)]
     (when needs-parinfer?
       (let [cursor-line (v/get-cursor-line vim)
@@ -339,7 +339,7 @@
 
 (defn yank-lines [{:keys [start-line start-column end-line end-column]}]
   (let [{:keys [session osession]} @session/*session
-        current-buffer (session/get-current-buffer session)]
+        current-buffer (:buffer-id (session/get-current-buffer osession))]
     (when-let [{:keys [lines]} (session/get-buffer session current-buffer)]
       (let [yanked-lines (subvec lines (dec start-line) end-line)
             end-line (dec (count yanked-lines))

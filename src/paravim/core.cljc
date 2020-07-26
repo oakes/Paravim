@@ -210,7 +210,7 @@
 (defn click-mouse! [game {:keys [session osession]} button]
   (let [mouse (session/get-mouse osession)
         current-tab (session/get-current-tab osession)
-        buffer-id (session/get-current-buffer session)
+        buffer-id (:buffer-id (session/get-current-buffer osession))
         buffer (session/get-buffer session buffer-id)]
     (when (= :left button)
       (let [{:keys [target]} mouse]
@@ -233,7 +233,7 @@
 (defn scroll! [{:keys [session osession]} xoffset yoffset]
   (let [current-tab (session/get-current-tab osession)
         tab (session/get-tab osession (:id current-tab))
-        buffer-id (session/get-current-buffer session)
+        buffer-id (:buffer-id (session/get-current-buffer osession))
         buffer (session/get-buffer session buffer-id)]
     (when buffer
       (swap! session/*session upsert-buffer (merge buffer (scroll/start-scrolling-camera buffer xoffset yoffset))))))
@@ -572,7 +572,7 @@
     (init game))
   (let [{:keys [session osession]} @session/*session
         current-tab (:id (session/get-current-tab osession))
-        current-buffer (session/get-current-buffer session)
+        current-buffer (:buffer-id (session/get-current-buffer osession))
         buffer (session/get-buffer session current-buffer)
         font-size-multiplier (:multiplier (session/get-font osession))
         {game-width :width game-height :height :as window} (session/get-window osession)

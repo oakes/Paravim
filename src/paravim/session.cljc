@@ -120,7 +120,11 @@
       [id ::clojure? clojure]
       [id ::cursor-line cursor-line]
       [id ::cursor-column cursor-line]
-      [id ::show-minimap? show-minimap?]]}))
+      [id ::show-minimap? show-minimap?]]
+     ::get-current-buffer
+     [:what
+      [::tab ::current tab-id]
+      [tab-id ::buffer-id buffer-id]]}))
 
 (def orules
   (o/ruleset
@@ -232,6 +236,9 @@
             buffer))
         (o/query-all session ::get-buffer)))
 
+(defn get-current-buffer [session]
+  (first (o/query-all session ::get-current-buffer)))
+
 (def queries
   '{::get-game
     (fn []
@@ -245,12 +252,6 @@
     (fn []
       (let [current-tab paravim.session.CurrentTab]
         current-tab))
-    ::get-current-buffer
-    (fn []
-      (let [current-tab paravim.session.CurrentTab
-            tab paravim.session.Tab
-            :when (= (:id tab) (:id current-tab))]
-        (:buffer-id tab)))
     ::get-tab
     (fn [?id]
       (let [tab paravim.session.Tab
@@ -413,6 +414,5 @@
   (let [query-fns (clarax/query-fns session)]
     (def get-game (::get-game query-fns))
     (def get-font-multiplier (::get-font-multiplier query-fns))
-    (def get-current-buffer (::get-current-buffer query-fns))
     (def get-minimap (::get-minimap query-fns))))
 
