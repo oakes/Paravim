@@ -74,7 +74,10 @@
      ::get-window
      [:what
       [::window ::width width]
-      [::window ::height height]]}))
+      [::window ::height height]]
+     ::get-current-tab
+     [:what
+      [::tab ::current id]]}))
 
 (def orules
   (o/ruleset
@@ -108,6 +111,9 @@
 
 (defn get-window [session]
   (first (o/query-all session ::get-window)))
+
+(defn get-current-tab [session]
+  (first (o/query-all session ::get-current-tab)))
 
 (def queries
   '{::get-game
@@ -344,7 +350,6 @@
     (def get-mouse (::get-mouse query-fns))
     (def get-mouse-hover (::get-mouse-hover query-fns))
     (def get-font-multiplier (::get-font-multiplier query-fns))
-    (def get-current-tab (::get-current-tab query-fns))
     (def get-current-buffer (::get-current-buffer query-fns))
     (def get-tab (::get-tab query-fns))
     (def get-bounding-box (::get-bounding-box query-fns))

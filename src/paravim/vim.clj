@@ -16,11 +16,11 @@
 (def ^:dynamic *update-ui?* true)
 (def ^:dynamic *update-window?* true)
 
-(defn set-window-size! [vim session width height]
-  (let [{:keys [font-height font-width] :as constants} (session/get-constants (:osession @session/*session))
-        current-tab (:id (session/get-current-tab session))]
+(defn set-window-size! [vim {:keys [session osession]} width height]
+  (let [{:keys [font-height font-width] :as constants} (session/get-constants osession)
+        current-tab (:id (session/get-current-tab osession))]
     (when-let [{:keys [top bottom]} (session/get-text-box session {:?id current-tab})]
-      (let [font-size-multiplier (:size (session/get-font-multiplier session))
+      (let [font-size-multiplier (:multiplier (session/get-font osession))
             text-height (- (bottom height font-size-multiplier)
                            (top height font-size-multiplier))
             font-height (* font-height font-size-multiplier)
@@ -32,13 +32,13 @@
 (defn update-window-size! [{:keys [::c/vim] :as game}]
   (let [width (utils/get-width game)
         height (utils/get-height game)]
-    (set-window-size! vim (:session @session/*session) width height))
+    (set-window-size! vim @session/*session width height))
   nil)
 
-(defn ready-to-append? [session vim output]
+(defn ready-to-append? [osession vim output]
   (and (seq output)
        (= 'NORMAL (v/get-mode vim))
-       (not= :repl-out (:id (session/get-current-tab session)))))
+       (not= :repl-out (:id (session/get-current-tab osession)))))
 
 (defn apply-parinfer! [session vim]
   (let [current-buffer (session/get-current-buffer session)
@@ -301,13 +301,14 @@
           (async/put! (::c/command-chan game) [:set-window-title (str file-name " - Paravim")]))
         (swap! session/*session
           (fn [m]
-            (update m :session
-                    (fn [session]
-                      (-> session
-                          (c/update-tab current-tab buffer-ptr)
-                          (c/update-current-tab current-tab)
-                          (c/upsert-buffer buffer)
-                          (c/insert-buffer-refresh (:osession m) buffer-ptr)))))))
+            (-> m
+                (c/update-current-tab current-tab)
+                (update :session
+                        (fn [session]
+                          (-> session
+                              (c/update-tab current-tab buffer-ptr)
+                              (c/upsert-buffer buffer)
+                              (c/insert-buffer-refresh (:osession m) buffer-ptr))))))))
       (do
         (when *update-window?*
           (async/put! (::c/command-chan game) [:set-window-title "Paravim"]))

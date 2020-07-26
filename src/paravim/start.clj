@@ -111,7 +111,7 @@
       (when-let [{:keys [session osession] :as m} @session/*session]
         (let [{:keys [mode]} (session/get-vim osession)
               k (keycode->keyword keycode)
-              current-tab (:id (session/get-current-tab session))
+              current-tab (:id (session/get-current-tab osession))
               current-buffer (session/get-current-buffer session)]
           (cond
             press?
@@ -125,7 +125,7 @@
               control?
               (case k
                 (:tab :backtick)
-                (c/shift-current-tab! game session (if shift? -1 1))
+                (c/shift-current-tab! game session osession (if shift? -1 1))
                 :f (repl/reload-file! (session/get-buffer session {:?id current-buffer}) pipes current-tab)
                 :- (swap! session/*session c/font-dec)
                 := (swap! session/*session c/font-inc)
@@ -153,7 +153,7 @@
   (swap! session/*session c/update-window-size width height))
 
 (defn on-scroll! [{:keys [::c/density-ratio] :as game} window xoffset yoffset]
-  (c/scroll! (:session @session/*session) (/ xoffset density-ratio) (/ yoffset density-ratio)))
+  (c/scroll! @session/*session (/ xoffset density-ratio) (/ yoffset density-ratio)))
 
 (defn- listen-for-events [game window]
   (doto window
@@ -213,7 +213,7 @@
                                        (c/insert-buffer-refresh (:osession m) (session/get-current-buffer session)))))))
                       nil))
       (when-let [m @session/*session] ;; this could be momentarily nil while hot code reloading
-        (when (vim/ready-to-append? (:session m) vim repl-output)
+        (when (vim/ready-to-append? (:osession m) vim repl-output)
           (binding [vim/*update-ui?* false]
             (vim/append-to-buffer! game m (first repl-output)))
           (assoc game ::c/repl-output (vec (rest repl-output))))))

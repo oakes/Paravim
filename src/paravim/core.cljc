@@ -45,10 +45,18 @@
                     (o/insert ::session/window {::session/width width ::session/height height})
                     o/fire-rules)))))
 
-(defn update-current-tab [session id]
-  (-> session
-      (clarax/merge (session/get-current-tab session) {:id id})
-      clara/fire-rules))
+(defn update-current-tab [m id]
+  (-> m
+      (update :session
+              (fn [session]
+                (-> session
+                    (clarax/merge (clara/query session ::session/get-current-tab) {:id id})
+                    clara/fire-rules)))
+      (update :osession
+              (fn [osession]
+                (-> osession
+                    (o/insert ::session/tab ::session/current id)
+                    o/fire-rules)))))
 
 (defn new-tab! [game session tab-id]
   (let [buffer-id-or-path (or (:buffer-id (session/get-tab session {:?id tab-id}))
@@ -56,8 +64,8 @@
                               (get constants/tab->path tab-id))]
     (async/put! (::command-chan game) [:new-buf buffer-id-or-path])))
 
-(defn shift-current-tab! [game session direction]
-  (let [current-tab (session/get-current-tab session)
+(defn shift-current-tab! [game session osession direction]
+  (let [current-tab (session/get-current-tab osession)
         id (:id current-tab)
         index (+ (.indexOf constants/tab-ids id)
                  direction)
@@ -175,7 +183,7 @@
 
 (defn click-mouse! [game {:keys [session osession]} button]
   (let [mouse-hover (session/get-mouse-hover session)
-        current-tab (session/get-current-tab session)
+        current-tab (session/get-current-tab osession)
         buffer-id (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id buffer-id})]
     (when (= :left button)
@@ -196,8 +204,8 @@
                                   [:move-cursor (mouse->cursor-position buffer (:mouse-anchor mouse-hover) font-multiplier text-box constants window)])))
             nil))))))
 
-(defn scroll! [session xoffset yoffset]
-  (let [current-tab (session/get-current-tab session)
+(defn scroll! [{:keys [session osession]} xoffset yoffset]
+  (let [current-tab (session/get-current-tab osession)
         tab (session/get-tab session {:?id (:id current-tab)})
         buffer-id (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id buffer-id})]
@@ -427,7 +435,8 @@
              (o/insert ::session/font {::session/size 0 ;; initialized in the font rule
                                        ::session/multiplier constants/default-font-multiplier})
              (o/insert ::session/window {::session/width (utils/get-width game)
-                                         ::session/height (utils/get-height game)})))
+                                         ::session/height (utils/get-height game)})
+             (o/insert ::session/tab ::session/current :files)))
   ;; initialize entities
   (let [callback (fn [{:keys [constants text-boxes bounding-boxes] :as entities}]
                    (reset! *entity-cache entities)
@@ -506,7 +515,7 @@
     (reset! session/*reload? false)
     (init game))
   (let [{:keys [session osession]} @session/*session
-        current-tab (:id (session/get-current-tab session))
+        current-tab (:id (session/get-current-tab osession))
         current-buffer (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id current-buffer})
         font-size-multiplier (:multiplier (session/get-font osession))
