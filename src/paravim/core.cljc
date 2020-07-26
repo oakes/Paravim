@@ -61,7 +61,7 @@
                     o/fire-rules)))))
 
 (defn new-tab! [game session tab-id]
-  (let [buffer-id-or-path (or (:buffer-id (session/get-tab session {:?id tab-id}))
+  (let [buffer-id-or-path (or (:buffer-id (session/get-tab session tab-id))
                               ;; if no buffer exists, open a new one
                               (get constants/tab->path tab-id))]
     (async/put! (::command-chan game) [:new-buf buffer-id-or-path])))
@@ -75,12 +75,20 @@
                 (neg? index) (dec (count constants/tab-ids))
                 (= index (count constants/tab-ids)) 0
                 :else index)]
-    (new-tab! game session (nth constants/tab-ids index))))
+    (new-tab! game osession (nth constants/tab-ids index))))
 
-(defn update-tab [session id buffer-id]
-  (-> session
-      (clarax/merge (session/get-tab session {:?id id}) {:buffer-id buffer-id})
-      clara/fire-rules))
+(defn update-tab [m id buffer-id]
+  (-> m
+      (update :session
+              (fn [session]
+                (-> session
+                    (clarax/merge (clara/query session ::session/get-tab :?id id) {:buffer-id buffer-id})
+                    clara/fire-rules)))
+      (update :osession
+              (fn [osession]
+                (-> osession
+                    (o/insert id ::session/buffer-id buffer-id)
+                    o/fire-rules)))))
 
 (defn insert-buffer-update [session osession bu]
   (if-let [buffer (session/get-buffer session {:?id (:buffer-id bu)})]
@@ -191,12 +199,12 @@
     (when (= :left button)
       (let [{:keys [target]} mouse]
         (if (constants/tab? target)
-          (new-tab! game session target)
+          (new-tab! game osession target)
           (case target
             ::session/font-dec (swap! session/*session font-dec)
             ::session/font-inc (swap! session/*session font-inc)
             ::session/reload-file (when (and buffer (reload-file! buffer (::pipes game) (:id current-tab)))
-                                    (new-tab! game session ::session/repl-in))
+                                    (new-tab! game osession ::session/repl-in))
             :text (when buffer
                     (let [text-box (session/get-text-box osession (:id current-tab))
                           window (session/get-window osession)
@@ -208,7 +216,7 @@
 
 (defn scroll! [{:keys [session osession]} xoffset yoffset]
   (let [current-tab (session/get-current-tab osession)
-        tab (session/get-tab session {:?id (:id current-tab)})
+        tab (session/get-tab osession (:id current-tab))
         buffer-id (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id buffer-id})]
     (when buffer
@@ -556,9 +564,9 @@
         (render-buffer game session osession constants font-size-multiplier game-width game-height current-tab ascii false false)
         (render-buffer game session osession constants font-size-multiplier game-width game-height current-tab current-buffer (not= mode 'COMMAND_LINE) (#{::session/files ::session/repl-out} current-tab)))
       (case current-tab
-        ::session/repl-in (when-let [buffer-ptr (:buffer-id (session/get-tab session {:?id ::session/repl-out}))]
+        ::session/repl-in (when-let [buffer-ptr (:buffer-id (session/get-tab osession ::session/repl-out))]
                             (render-buffer game session osession constants font-size-multiplier game-width game-height ::session/repl-out buffer-ptr false true))
-        ::session/repl-out (when-let [buffer-ptr (:buffer-id (session/get-tab session {:?id ::session/repl-in}))]
+        ::session/repl-out (when-let [buffer-ptr (:buffer-id (session/get-tab osession ::session/repl-in))]
                              (render-buffer game session osession constants font-size-multiplier game-width game-height ::session/repl-in buffer-ptr false false))
         nil)
       (when (and base-rects-entity base-rect-entity)

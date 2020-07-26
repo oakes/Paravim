@@ -98,10 +98,13 @@
   (-> m
       (update :session
               (fn [session]
-                (c/new-tab! (session/get-game session) session ::session/files)
                 (-> session
                     (c/upsert-buffer (c/->ascii ascii-name constants (read-text-resource (str "ascii/" ascii-name ".txt")))))))
-      (update :osession o/insert ::session/vim ::session/ascii ascii-name)))
+      (update :osession
+              (fn [osession]
+                (c/new-tab! (session/get-game (:session m)) osession ::session/files)
+                (-> osession
+                    (o/insert ::session/vim ::session/ascii ascii-name))))))
 
 (defn dissoc-ascii [m ascii-name]
   (-> m
@@ -256,8 +259,8 @@
       (.write text)
       .flush)))
 
-(defn append-to-buffer! [{:keys [::c/vim] :as game} {:keys [session] :as m} input]
-  (when-let [buffer (:buffer-id (session/get-tab session {:?id ::session/repl-out}))]
+(defn append-to-buffer! [{:keys [::c/vim] :as game} {:keys [session osession] :as m} input]
+  (when-let [buffer (:buffer-id (session/get-tab osession ::session/repl-out))]
     (let [current-buffer (v/get-current-buffer vim)
           cursor-line (v/get-cursor-line vim)
           cursor-column (v/get-cursor-column vim)
@@ -302,18 +305,18 @@
         (swap! session/*session
           (fn [m]
             (-> m
+                (c/update-tab current-tab buffer-ptr)
                 (c/update-current-tab current-tab)
                 (update :session
                         (fn [session]
                           (-> session
-                              (c/update-tab current-tab buffer-ptr)
                               (c/upsert-buffer buffer)
                               (c/insert-buffer-refresh (:osession m) buffer-ptr))))))))
       (do
         (when *update-window?*
           (async/put! (::c/command-chan game) [:set-window-title "Paravim"]))
         ;; clear the files tab
-        (swap! session/*session update :session c/update-tab ::session/files nil)))))
+        (swap! session/*session c/update-tab ::session/files nil)))))
 
 (defn on-buf-update [game vim buffer-ptr start-line end-line line-count-change]
   (let [first-line (dec start-line)

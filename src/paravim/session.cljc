@@ -75,6 +75,9 @@
      ::get-current-tab
      [:what
       [::tab ::current id]]
+     ::get-tab
+     [:what
+      [id ::buffer-id buffer-id]]
      ::get-mouse
      [:what
       [::mouse ::x x]
@@ -175,6 +178,12 @@
 
 (defn get-current-tab [session]
   (first (o/query-all session ::get-current-tab)))
+
+(defn get-tab [session tab-id]
+  (some (fn [tab]
+          (when (= tab-id (:id tab))
+            tab))
+        (o/query-all session ::get-tab)))
 
 (defn get-mouse [session]
   (first (o/query-all session ::get-mouse)))
@@ -373,7 +382,6 @@
     (def get-game (::get-game query-fns))
     (def get-font-multiplier (::get-font-multiplier query-fns))
     (def get-current-buffer (::get-current-buffer query-fns))
-    (def get-tab (::get-tab query-fns))
     (def get-buffer (::get-buffer query-fns))
     (def get-minimap (::get-minimap query-fns))))
 
