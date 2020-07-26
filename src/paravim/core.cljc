@@ -463,8 +463,7 @@
                                         session
                                         bounding-box))
                                     $
-                                    bounding-boxes)
-                                  (o/fire-rules $))))
+                                    bounding-boxes))))
                    (swap! session/*session update :session
                           (fn [session]
                             (as-> session $
@@ -472,17 +471,13 @@
                                     (fn [session id text-box]
                                       (clara/insert session (session/map->TextBox (assoc text-box :id id))))
                                     $
-                                    text-boxes)
-                                  (reduce-kv
-                                    (fn [session id bounding-box]
-                                      (clara/insert session (session/map->BoundingBox (assoc bounding-box :id id))))
-                                    $
-                                    bounding-boxes)))))]
+                                    text-boxes)))))]
     (if-let [entities @*entity-cache]
       (callback entities)
       (init-entities game callback)))
   ;; fire rules
   (swap! session/*session update :session clara/fire-rules)
+  (swap! session/*session update :osession o/fire-rules)
   ;; init vim
   ;; this should never be nil, but it could be after
   ;; hot code reloading if this function isn't given the
@@ -581,7 +576,7 @@
                                           (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                                           (t/scale game-width (* font-size-multiplier font-height)))))))
       (doseq [[k entity] toolbar-text-entities
-              :let [bounding-box (session/get-bounding-box session {:?id k})
+              :let [bounding-box (session/get-bounding-box osession k)
                     highlight-entity (when control?
                                        (get highlight-text-entities k))]
               ;; hide the reload file button when necessary

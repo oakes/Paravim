@@ -20,7 +20,6 @@
 (defrecord Game [total-time delta-time context])
 (defrecord Window [width height])
 (defrecord TextBox [id left right top bottom])
-(defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
 (defrecord FontMultiplier [size])
 (defrecord CurrentTab [id])
@@ -76,18 +75,25 @@
      ::get-current-tab
      [:what
       [::tab ::current id]]
+     ::get-mouse
+     [:what
+      [::mouse ::x x]
+      [::mouse ::y y]
+      [::mouse ::target target]
+      [::mouse ::cursor cursor]]
      ::get-text-box
      [:what
       [id ::left left]
       [id ::right right]
       [id ::top top]
       [id ::bottom bottom]]
-     ::get-mouse
+     ::get-bounding-box
      [:what
-      [::mouse ::x x]
-      [::mouse ::y y]
-      [::mouse ::target target]
-      [::mouse ::cursor cursor]]}))
+      [id ::x1 x1]
+      [id ::y1 y1]
+      [id ::x2 x2]
+      [id ::y2 y2]
+      [id ::align align]]}))
 
 (def orules
   (o/ruleset
@@ -170,14 +176,20 @@
 (defn get-current-tab [session]
   (first (o/query-all session ::get-current-tab)))
 
+(defn get-mouse [session]
+  (first (o/query-all session ::get-mouse)))
+
 (defn get-text-box [session tab-id]
   (some (fn [text-box]
           (when (= tab-id (:id text-box))
             text-box))
         (o/query-all session ::get-text-box)))
 
-(defn get-mouse [session]
-  (first (o/query-all session ::get-mouse)))
+(defn get-bounding-box [session box-id]
+  (some (fn [bounding-box]
+          (when (= box-id (:id bounding-box))
+            bounding-box))
+        (o/query-all session ::get-bounding-box)))
 
 (def queries
   '{::get-game
@@ -211,11 +223,6 @@
     (fn []
       (let [font paravim.session.FontMultiplier]
         font))
-    ::get-bounding-box
-    (fn [?id]
-      (let [bounding-box paravim.session.BoundingBox
-            :when (= (:id bounding-box) ?id)]
-        bounding-box))
     ::get-text-box
     (fn [?id]
       (let [text-box paravim.session.TextBox
@@ -367,7 +374,6 @@
     (def get-font-multiplier (::get-font-multiplier query-fns))
     (def get-current-buffer (::get-current-buffer query-fns))
     (def get-tab (::get-tab query-fns))
-    (def get-bounding-box (::get-bounding-box query-fns))
     (def get-buffer (::get-buffer query-fns))
     (def get-minimap (::get-minimap query-fns))))
 
