@@ -32,10 +32,18 @@
       (clarax/merge (session/get-mouse session) {:x x :y y})
       clara/fire-rules))
 
-(defn update-window-size [session width height]
-  (-> session
-      (clarax/merge (session/get-window session) {:width width :height height})
-      clara/fire-rules))
+(defn update-window-size [m width height]
+  (-> m
+      (update :session
+              (fn [session]
+                (-> session
+                    (clarax/merge (clara/query session ::session/get-window) {:width width :height height})
+                    clara/fire-rules)))
+      (update :osession
+              (fn [osession]
+                (-> osession
+                    (o/insert ::session/window {::session/width width ::session/height height})
+                    o/fire-rules)))))
 
 (defn update-current-tab [session id]
   (-> session
@@ -78,9 +86,9 @@
   (if-let [buffer (session/get-buffer session {:?id buffer-id})]
     (let [constants (session/get-constants osession)
           vim (session/get-vim osession)
-          font (session/get-font-multiplier session)
+          font-multiplier (:multiplier (session/get-font osession))
           text-box (session/get-text-box session {:?id (:tab-id buffer)})
-          window (session/get-window session)]
+          window (session/get-window osession)]
       (as-> buffer $
             (if (:needs-clojure-refresh? buffer)
               (-> $
@@ -88,7 +96,7 @@
                   (buffers/update-clojure-buffer constants)
                   (assoc :needs-clojure-refresh? false))
               $)
-            (buffers/update-cursor $ (:mode vim) (:size font) text-box constants window)
+            (buffers/update-cursor $ (:mode vim) font-multiplier text-box constants window)
             (buffers/update-highlight $ constants)
             (buffers/update-selection $ constants (:visual-range vim))
             (buffers/update-search-highlights $ constants vim)
@@ -181,11 +189,11 @@
                            (new-tab! game session :repl-in))
             :text (when buffer
                     (let [text-box (session/get-text-box session {:?id (:id current-tab)})
-                          window (session/get-window session)
+                          window (session/get-window osession)
                           constants (session/get-constants osession)
-                          font (session/get-font-multiplier session)]
+                          font-multiplier (:multiplier (session/get-font osession))]
                       (async/put! (::command-chan game)
-                                  [:move-cursor (mouse->cursor-position buffer (:mouse-anchor mouse-hover) (:size font) text-box constants window)])))
+                                  [:move-cursor (mouse->cursor-position buffer (:mouse-anchor mouse-hover) font-multiplier text-box constants window)])))
             nil))))))
 
 (defn scroll! [session xoffset yoffset]
@@ -417,7 +425,9 @@
                                       ::session/command-text-entity nil
                                       ::session/command-cursor-entity nil})
              (o/insert ::session/font {::session/size 0 ;; initialized in the font rule
-                                       ::session/multiplier constants/default-font-multiplier})))
+                                       ::session/multiplier constants/default-font-multiplier})
+             (o/insert ::session/window {::session/width (utils/get-width game)
+                                         ::session/height (utils/get-height game)})))
   ;; initialize entities
   (let [callback (fn [{:keys [constants text-boxes bounding-boxes] :as entities}]
                    (reset! *entity-cache entities)
@@ -500,7 +510,7 @@
         current-buffer (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id current-buffer})
         font-size-multiplier (:multiplier (session/get-font osession))
-        {game-width :width game-height :height :as window} (session/get-window session)
+        {game-width :width game-height :height :as window} (session/get-window osession)
         {:keys [base-rect-entity base-rects-entity
                 base-text-entity base-font-entity
                 font-height

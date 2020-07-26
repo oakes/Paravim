@@ -70,7 +70,11 @@
      ::get-font
      [:what
       [::font ::size size]
-      [::font ::multiplier multiplier]]}))
+      [::font ::multiplier multiplier]]
+     ::get-window
+     [:what
+      [::window ::width width]
+      [::window ::height height]]}))
 
 (def orules
   (o/ruleset
@@ -101,6 +105,9 @@
 
 (defn get-font [session]
   (first (o/query-all session ::get-font)))
+
+(defn get-window [session]
+  (first (o/query-all session ::get-window)))
 
 (def queries
   '{::get-game
@@ -334,7 +341,6 @@
 (defn def-queries [{:keys [session]}]
   (let [query-fns (clarax/query-fns session)]
     (def get-game (::get-game query-fns))
-    (def get-window (::get-window query-fns))
     (def get-mouse (::get-mouse query-fns))
     (def get-mouse-hover (::get-mouse-hover query-fns))
     (def get-font-multiplier (::get-font-multiplier query-fns))

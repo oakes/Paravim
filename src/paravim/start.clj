@@ -150,7 +150,7 @@
   (vim/on-input vim @session/*session (str (char codepoint))))
 
 (defn on-resize! [game window width height]
-  (swap! session/*session update :session c/update-window-size width height))
+  (swap! session/*session c/update-window-size width height))
 
 (defn on-scroll! [{:keys [::c/density-ratio] :as game} window xoffset yoffset]
   (c/scroll! (:session @session/*session) (/ xoffset density-ratio) (/ yoffset density-ratio)))
