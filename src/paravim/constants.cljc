@@ -3,13 +3,13 @@
 
 (def orig-camera (e/->camera))
 
-(def buttons [{:id :font-inc
+(def buttons [{:id :paravim.session/font-inc
                :text "Font +"
                :shortcut-char 5}
-              {:id :font-dec
+              {:id :paravim.session/font-dec
                :text "Font -"
                :shortcut-char 5}
-              {:id :reload-file
+              {:id :paravim.session/reload-file
                :text "Reload File"
                :shortcut-char 7}])
 

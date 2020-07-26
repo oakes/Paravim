@@ -19,8 +19,6 @@
 
 (defrecord Game [total-time delta-time context])
 (defrecord Window [width height])
-(defrecord Mouse [x y])
-(defrecord MouseHover [target cursor mouse-anchor])
 (defrecord TextBox [id left right top bottom])
 (defrecord BoundingBox [id x1 y1 x2 y2 align])
 (defrecord Font [size])
@@ -83,7 +81,13 @@
       [id ::left left]
       [id ::right right]
       [id ::top top]
-      [id ::bottom bottom]]}))
+      [id ::bottom bottom]]
+     ::get-mouse
+     [:what
+      [::mouse ::x x]
+      [::mouse ::y y]
+      [::mouse ::target target]
+      [::mouse ::cursor cursor]]}))
 
 (def orules
   (o/ruleset
@@ -124,7 +128,32 @@
           (bottom window-height font-multiplier))
       :then
       (o/insert! ::mouse {::target :text
-                          ::cursor :ibeam})]}))
+                          ::cursor :ibeam})]
+     ::mouse-hovers-over-bounding-box
+     [:what
+      [::window ::width window-width]
+      [::mouse ::x mouse-x]
+      [::mouse ::y mouse-y]
+      [::font ::multiplier font-multiplier]
+      [id ::x1 x1]
+      [id ::y1 y1]
+      [id ::x2 x2]
+      [id ::y2 y2]
+      [id ::align align]
+      :when
+      (let [x1 (cond->> (* x1 font-multiplier)
+                        (= :right align)
+                        (- window-width))
+            y1 (* y1 font-multiplier)
+            x2 (cond->> (* x2 font-multiplier)
+                        (= :right align)
+                        (- window-width))
+            y2 (* y2 font-multiplier)]
+        (and (<= x1 mouse-x x2)
+             (<= y1 mouse-y y2)))
+      :then
+      (o/insert! ::mouse {::target id
+                          ::cursor :hand})]}))
 
 (defn get-constants [session]
   (first (o/query-all session ::get-constants)))
@@ -147,6 +176,9 @@
             text-box))
         (o/query-all session ::get-text-box)))
 
+(defn get-mouse [session]
+  (first (o/query-all session ::get-mouse)))
+
 (def queries
   '{::get-game
     (fn []
@@ -156,10 +188,6 @@
     (fn []
       (let [window paravim.session.Window]
         window))
-    ::get-mouse
-    (fn []
-      (let [mouse paravim.session.Mouse]
-        mouse))
     ::get-current-tab
     (fn []
       (let [current-tab paravim.session.CurrentTab]
@@ -175,10 +203,6 @@
       (let [tab paravim.session.Tab
             :when (= (:id tab) ?id)]
         tab))
-    ::get-mouse-hover
-    (fn []
-      (let [mouse-hover paravim.session.MouseHover]
-        mouse-hover))
     ::get-font
     (fn []
       (let [font paravim.session.Font]
@@ -209,46 +233,7 @@
         minimap))})
 
 (def rules
-  '{::mouse-hovers-over-text
-    (let [window paravim.session.Window
-          mouse paravim.session.Mouse
-          mouse-hover paravim.session.MouseHover
-          :when (not= mouse (:mouse-anchor mouse-hover))
-          current-tab paravim.session.CurrentTab
-          :when (not= nil (:id current-tab))
-          font paravim.session.FontMultiplier
-          {:keys [id left right top bottom] :as text-box} paravim.session.TextBox
-          :when (and (= id (:id current-tab))
-                     (<= left (:x mouse) (- (:width window) right))
-                     (<= (top (:height window) (:size font))
-                         (:y mouse)
-                         (bottom (:height window) (:size font))))]
-      (clarax.rules/merge! mouse-hover {:target :text
-                                        :cursor :ibeam
-                                        :mouse-anchor mouse}))
-    ::mouse-hovers-over-bounding-box
-    (let [window paravim.session.Window
-          mouse paravim.session.Mouse
-          mouse-hover paravim.session.MouseHover
-          :when (not= mouse (:mouse-anchor mouse-hover))
-          font paravim.session.FontMultiplier
-          {:keys [x1 y1 x2 y2 align] :as bounding-box} paravim.session.BoundingBox
-          :when (let [font-size (:size font)
-                      game-width (:width window)
-                      x1 (cond->> (* x1 font-size)
-                                  (= :right align)
-                                  (- game-width))
-                      y1 (* y1 font-size)
-                      x2 (cond->> (* x2 font-size)
-                                  (= :right align)
-                                  (- game-width))
-                      y2 (* y2 font-size)]
-                  (and (<= x1 (:x mouse) x2)
-                       (<= y1 (:y mouse) y2)))]
-      (clarax.rules/merge! mouse-hover {:target (:id bounding-box)
-                                        :cursor :hand
-                                        :mouse-anchor mouse}))
-    ::update-buffer-when-font-changes
+  '{::update-buffer-when-font-changes
     (let [game paravim.session.Game
           window paravim.session.Window
           font paravim.session.FontMultiplier
@@ -379,8 +364,6 @@
 (defn def-queries [{:keys [session]}]
   (let [query-fns (clarax/query-fns session)]
     (def get-game (::get-game query-fns))
-    (def get-mouse (::get-mouse query-fns))
-    (def get-mouse-hover (::get-mouse-hover query-fns))
     (def get-font-multiplier (::get-font-multiplier query-fns))
     (def get-current-buffer (::get-current-buffer query-fns))
     (def get-tab (::get-tab query-fns))

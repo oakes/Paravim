@@ -26,22 +26,13 @@
             #?(:clj [paravim.text :refer [load-font-clj]]))
   #?(:cljs (:require-macros [paravim.text :refer [load-font-cljs]])))
 
-(defn update-mouse [m x y]
-  (-> m
-      (update :session
-              (fn [session]
-                (-> session
-                    (clarax/merge (session/get-mouse-hover session) {:target nil :cursor nil})
-                    (clarax/merge (session/get-mouse session) {:x x :y y})
-                    clara/fire-rules)))
-      (update :osession
-              (fn [osession]
-                (-> osession
-                    (o/insert ::session/mouse {::session/x x
-                                               ::session/y y
-                                               ::session/target nil
-                                               ::session/cursor nil})
-                    o/fire-rules)))))
+(defn update-mouse [session x y]
+  (-> session
+      (o/insert ::session/mouse {::session/x x
+                                 ::session/y y
+                                 ::session/target nil
+                                 ::session/cursor nil})
+      o/fire-rules))
 
 (defn update-window-size [m width height]
   (-> m
@@ -193,26 +184,26 @@
     [line column]))
 
 (defn click-mouse! [game {:keys [session osession]} button]
-  (let [mouse-hover (session/get-mouse-hover session)
+  (let [mouse (session/get-mouse osession)
         current-tab (session/get-current-tab osession)
         buffer-id (session/get-current-buffer session)
         buffer (session/get-buffer session {:?id buffer-id})]
     (when (= :left button)
-      (let [{:keys [target]} mouse-hover]
+      (let [{:keys [target]} mouse]
         (if (constants/tab? target)
           (new-tab! game session target)
           (case target
-            :font-dec (swap! session/*session font-dec)
-            :font-inc (swap! session/*session font-inc)
-            :reload-file (when (and buffer (reload-file! buffer (::pipes game) (:id current-tab)))
-                           (new-tab! game session ::session/repl-in))
+            ::session/font-dec (swap! session/*session font-dec)
+            ::session/font-inc (swap! session/*session font-inc)
+            ::session/reload-file (when (and buffer (reload-file! buffer (::pipes game) (:id current-tab)))
+                                    (new-tab! game session ::session/repl-in))
             :text (when buffer
                     (let [text-box (session/get-text-box osession (:id current-tab))
                           window (session/get-window osession)
                           constants (session/get-constants osession)
                           font-multiplier (:multiplier (session/get-font osession))]
                       (async/put! (::command-chan game)
-                                  [:move-cursor (mouse->cursor-position buffer (:mouse-anchor mouse-hover) font-multiplier text-box constants window)])))
+                                  [:move-cursor (mouse->cursor-position buffer mouse font-multiplier text-box constants window)])))
             nil))))))
 
 (defn scroll! [{:keys [session osession]} xoffset yoffset]
@@ -367,7 +358,7 @@
                                        (let [last-tab (some->> (get constants/tabs (dec i)) :id (get m))
                                              left (if last-tab (+ (:x2 last-tab) tab-spacing) 0)
                                              right (-> tab-entities (get id) :characters first last :x-total (+ left))]
-                                         (assoc m id {:x1 left :y1 0 :x2 right :y2 font-height})))
+                                         (assoc m id {:x1 left :y1 0 :x2 right :y2 font-height :align :left})))
                                      {}
                                      constants/tabs)
                     button-entities (reduce
@@ -421,8 +412,6 @@
             (clara/insert @session/*initial-session
               (session/map->Game game)
               (session/->Window (utils/get-width game) (utils/get-height game))
-              (session/->Mouse 0 0)
-              (session/->MouseHover nil nil nil)
               (session/->CurrentTab ::session/files)
               (session/->Tab ::session/files nil)
               (session/->Tab ::session/repl-in nil)
@@ -465,6 +454,16 @@
                                         text-box))
                                     $
                                     text-boxes)
+                                  (reduce-kv
+                                    (fn [session id bounding-box]
+                                      (reduce-kv
+                                        (fn [session attr value]
+                                          ;; FIXME: temporary hack
+                                          (o/insert session id (keyword "paravim.session" (name attr)) value))
+                                        session
+                                        bounding-box))
+                                    $
+                                    bounding-boxes)
                                   (o/fire-rules $))))
                    (swap! session/*session update :session
                           (fn [session]
@@ -586,7 +585,7 @@
                     highlight-entity (when control?
                                        (get highlight-text-entities k))]
               ;; hide the reload file button when necessary
-              :when (or (not= k :reload-file)
+              :when (or (not= k ::session/reload-file)
                         (and (= current-tab ::session/files)
                              (:clojure? buffer)))]
         (c/render game (-> (or highlight-entity entity)
