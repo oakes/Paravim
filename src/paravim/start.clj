@@ -126,7 +126,7 @@
               (case k
                 (:tab :backtick)
                 (c/shift-current-tab! game session osession (if shift? -1 1))
-                :f (repl/reload-file! (session/get-buffer session {:?id current-buffer}) pipes current-tab)
+                :f (repl/reload-file! (session/get-buffer session current-buffer) pipes current-tab)
                 :- (swap! session/*session c/font-dec)
                 := (swap! session/*session c/font-inc)
                 :v (if (= mode 'INSERT)

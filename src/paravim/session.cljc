@@ -224,6 +224,14 @@
             bounding-box))
         (o/query-all session ::get-bounding-box)))
 
+(defn get-buffer [session buffer-id]
+  (clara/query session ::get-buffer :?id buffer-id)
+  #_
+  (some (fn [buffer]
+          (when (= buffer-id (:id buffer))
+            buffer))
+        (o/query-all session ::get-buffer)))
+
 (def queries
   '{::get-game
     (fn []
@@ -406,6 +414,5 @@
     (def get-game (::get-game query-fns))
     (def get-font-multiplier (::get-font-multiplier query-fns))
     (def get-current-buffer (::get-current-buffer query-fns))
-    (def get-buffer (::get-buffer query-fns))
     (def get-minimap (::get-minimap query-fns))))
 

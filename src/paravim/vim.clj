@@ -40,9 +40,9 @@
        (= 'NORMAL (v/get-mode vim))
        (not= ::session/repl-out (:id (session/get-current-tab osession)))))
 
-(defn apply-parinfer! [session vim]
+(defn apply-parinfer! [session osession vim]
   (let [current-buffer (session/get-current-buffer session)
-        {:keys [parsed-code needs-parinfer?]} (session/get-buffer session {:?id current-buffer})]
+        {:keys [parsed-code needs-parinfer?]} (session/get-buffer session current-buffer)]
     (when needs-parinfer?
       (let [cursor-line (v/get-cursor-line vim)
             cursor-column (v/get-cursor-column vim)
@@ -93,13 +93,15 @@
                 "christmas" (LocalDate/of current-year 12 25)})
 
 (defn assoc-ascii [m constants ascii-name]
-  (-> m
-      (c/upsert-buffer (c/->ascii ascii-name constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
-      (update :osession
-              (fn [osession]
-                (c/new-tab! (session/get-game (:session m)) osession ::session/files)
-                (-> osession
-                    (o/insert ::session/vim ::session/ascii ascii-name))))))
+  ;; FIXME: temporary hack
+  (let [ascii-key (keyword "paravim.session" ascii-name)]
+    (-> m
+        (c/upsert-buffer (c/->ascii ascii-key constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
+        (update :osession
+                (fn [osession]
+                  (c/new-tab! (session/get-game (:session m)) osession ::session/files)
+                  (-> osession
+                      (o/insert ::session/vim ::session/ascii ascii-key)))))))
 
 (defn dissoc-ascii [m ascii-name]
   (-> m
@@ -157,7 +159,7 @@
     (v/input vim s)))
 
 (defn update-buffer [m buffer-ptr cursor-line cursor-column]
-  (if-let [buffer (session/get-buffer (:session m) {:?id buffer-ptr})]
+  (if-let [buffer (session/get-buffer (:session m) buffer-ptr)]
     (-> m
         (c/upsert-buffer (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
         (c/insert-buffer-refresh buffer-ptr))
@@ -220,7 +222,7 @@
         mode (:mode (session/get-vim osession))]
     (when (and (= 'NORMAL mode)
                (not= s "u"))
-      (apply-parinfer! session vim))))
+      (apply-parinfer! session osession vim))))
 
 (def ^:const max-line-length 100)
 
@@ -235,8 +237,8 @@
   (v/execute vim "set nopaste")
   (swap! session/*session update-after-input vim nil))
 
-(defn repl-enter! [vim {:keys [session] :as m} {:keys [out out-pipe]}]
-  (apply-parinfer! session vim)
+(defn repl-enter! [vim {:keys [session osession] :as m} {:keys [out out-pipe]}]
+  (apply-parinfer! session osession vim)
   (let [buffer-ptr (v/get-current-buffer vim)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
                      (v/get-line vim buffer-ptr (inc i))))
@@ -285,7 +287,7 @@
                             ::session/files)
             {:keys [session osession]} @session/*session
             constants (session/get-constants osession)
-            existing-buffer (session/get-buffer session {:?id buffer-ptr})
+            existing-buffer (session/get-buffer session buffer-ptr)
             buffer (if (and existing-buffer (= (:lines existing-buffer) lines))
                      existing-buffer
                      (assoc (c/->buffer buffer-ptr constants path file-name lines current-tab)
@@ -336,9 +338,9 @@
     (v/execute "filetype plugin indent on")))
 
 (defn yank-lines [{:keys [start-line start-column end-line end-column]}]
-  (let [session (:session @session/*session)
+  (let [{:keys [session osession]} @session/*session
         current-buffer (session/get-current-buffer session)]
-    (when-let [{:keys [lines]} (session/get-buffer session {:?id current-buffer})]
+    (when-let [{:keys [lines]} (session/get-buffer session current-buffer)]
       (let [yanked-lines (subvec lines (dec start-line) end-line)
             end-line (dec (count yanked-lines))
             end-column (cond-> end-column

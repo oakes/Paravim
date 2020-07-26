@@ -94,7 +94,7 @@
   (-> m
       (update :session
               (fn [session]
-                (if-let [buffer (session/get-buffer session {:?id (:buffer-id bu)})]
+                (if-let [buffer (clara/query session ::session/get-buffer :?id (:buffer-id bu))]
                   (let [constants (session/get-constants osession)]
                     (as-> buffer $
                           (buffers/update-text-buffer $ constants (:lines bu) (:first-line bu) (:line-count-change bu))
@@ -107,7 +107,7 @@
   (-> m
       (update :session
               (fn [session]
-                (if-let [buffer (session/get-buffer session {:?id buffer-id})]
+                (if-let [buffer (clara/query session ::session/get-buffer :?id buffer-id)]
                   (let [constants (session/get-constants osession)
                         vim (session/get-vim osession)
                         font-multiplier (:multiplier (session/get-font osession))
@@ -177,10 +177,17 @@
                     (-> session
                         (clara/insert (session/map->Buffer buffer))
                         (clara/insert (session/map->Minimap {:buffer-id (:id buffer)}))
-                        clara/fire-rules)))))))
+                        clara/fire-rules)))))
+      (update :osession o/insert (:id buffer)
+              (reduce-kv
+                (fn [m k v]
+                  ;; FIXME: temporary hack
+                  (assoc m (keyword "paravim.session" (name k)) v))
+                {}
+                buffer))))
 
 (defn remove-buffer [session buffer-id]
-  (let [buffer (session/get-buffer session {:?id buffer-id})
+  (let [buffer (clara/query session ::session/get-buffer :?id buffer-id)
         minimap (session/get-minimap session {:?id buffer-id})]
     (-> session
         (cond-> buffer (clara/retract buffer))
@@ -204,7 +211,7 @@
   (let [mouse (session/get-mouse osession)
         current-tab (session/get-current-tab osession)
         buffer-id (session/get-current-buffer session)
-        buffer (session/get-buffer session {:?id buffer-id})]
+        buffer (session/get-buffer session buffer-id)]
     (when (= :left button)
       (let [{:keys [target]} mouse]
         (if (constants/tab? target)
@@ -227,7 +234,7 @@
   (let [current-tab (session/get-current-tab osession)
         tab (session/get-tab osession (:id current-tab))
         buffer-id (session/get-current-buffer session)
-        buffer (session/get-buffer session {:?id buffer-id})]
+        buffer (session/get-buffer session buffer-id)]
     (when buffer
       (swap! session/*session upsert-buffer (merge buffer (scroll/start-scrolling-camera buffer xoffset yoffset))))))
 
@@ -288,37 +295,54 @@
                           ;; because it will be too slow to type
                           (< (count lines) constants/max-clojure-lines)))]
     {:id id
+     :tab-id current-tab
      :text-entity (buffers/assoc-lines base-text-entity base-font-entity font-height lines)
+     :parinfer-text-entity nil
+     :rects-entity nil
+     :parsed-code nil
+     :needs-parinfer? false
+     :needs-parinfer-init? clojure?
+     :needs-clojure-refresh? clojure?
      :camera (t/translate constants/orig-camera 0 0)
      :camera-x 0
      :camera-y 0
      :camera-target-x 0
      :camera-target-y 0
-     :camera-animation-time 0
      :scroll-speed-x 0
      :scroll-speed-y 0
      :path path
      :file-name file-name
      :lines lines
-     :tab-id current-tab
      :clojure? clojure?
-     :needs-clojure-refresh? clojure?
-     :needs-parinfer-init? clojure?
+     :cursor-line 0
+     :cursor-column 0
+     :show-minimap? false
      :last-update 0}))
 
 (defn ->ascii [id {:keys [base-font-entity base-text-entity font-height] :as constants} lines]
   {:id id
+   :tab-id ::session/files
    :text-entity (buffers/assoc-lines base-text-entity base-font-entity font-height lines)
+   :parinfer-text-entity nil
+   :rects-entity nil
+   :parsed-code nil
+   :needs-parinfer? false
+   :needs-parinfer-init? false
+   :needs-clojure-refresh? false
    :camera (t/translate constants/orig-camera 0 0)
    :camera-x 0
    :camera-y 0
    :camera-target-x 0
    :camera-target-y 0
-   :camera-animation-time 0
    :scroll-speed-x 0
    :scroll-speed-y 0
+   :path nil
+   :file-name nil
    :lines lines
-   :tab-id ::session/files
+   :clojure? false
+   :cursor-line 0
+   :cursor-column 0
+   :show-minimap? false
    :last-update 0})
 
 (defn assoc-attr-lengths [text-entity]
@@ -510,7 +534,7 @@
 
 (defn render-buffer [game session osession constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor? show-minimap?]
   (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]
-              :as buffer} (session/get-buffer session {:?id buffer-ptr})]
+              :as buffer} (session/get-buffer session buffer-ptr)]
     (when-let [text-box (session/get-text-box osession current-tab)]
       (let [text-top ((:top text-box) game-height font-size-multiplier)]
         (when (and rects-entity show-cursor?)
@@ -549,7 +573,7 @@
   (let [{:keys [session osession]} @session/*session
         current-tab (:id (session/get-current-tab osession))
         current-buffer (session/get-current-buffer session)
-        buffer (session/get-buffer session {:?id current-buffer})
+        buffer (session/get-buffer session current-buffer)
         font-size-multiplier (:multiplier (session/get-font osession))
         {game-width :width game-height :height :as window} (session/get-window osession)
         {:keys [base-rect-entity base-rects-entity
