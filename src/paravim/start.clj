@@ -80,7 +80,7 @@
 (defn on-mouse-move! [{:keys [::c/density-ratio] :as game} window xpos ypos]
   (let [x (* xpos density-ratio)
         y (* ypos density-ratio)
-        session (swap! session/*session update :session c/update-mouse x y)
+        session (swap! session/*session c/update-mouse x y)
         mouse-hover (session/get-mouse-hover (:session session))]
     (GLFW/glfwSetCursor window
                         (GLFW/glfwCreateStandardCursor

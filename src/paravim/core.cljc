@@ -26,11 +26,22 @@
             #?(:clj [paravim.text :refer [load-font-clj]]))
   #?(:cljs (:require-macros [paravim.text :refer [load-font-cljs]])))
 
-(defn update-mouse [session x y]
-  (-> session
-      (clarax/merge (session/get-mouse-hover session) {:target nil :cursor nil})
-      (clarax/merge (session/get-mouse session) {:x x :y y})
-      clara/fire-rules))
+(defn update-mouse [m x y]
+  (-> m
+      (update :session
+              (fn [session]
+                (-> session
+                    (clarax/merge (session/get-mouse-hover session) {:target nil :cursor nil})
+                    (clarax/merge (session/get-mouse session) {:x x :y y})
+                    clara/fire-rules)))
+      (update :osession
+              (fn [osession]
+                (-> osession
+                    (o/insert ::session/mouse {::session/x x
+                                               ::session/y y
+                                               ::session/target nil
+                                               ::session/cursor nil})
+                    o/fire-rules)))))
 
 (defn update-window-size [m width height]
   (-> m

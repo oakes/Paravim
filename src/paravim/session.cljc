@@ -104,7 +104,27 @@
       :when
       (pos? size)
       :then
-      (o/insert! ::font ::multiplier (/ size font-height))]}))
+      (o/insert! ::font ::multiplier (/ size font-height))]
+     ::mouse-hovers-over-text
+     [:what
+      [::window ::width window-width]
+      [::window ::height window-height]
+      [::mouse ::x mouse-x]
+      [::mouse ::y mouse-y]
+      [::tab ::current tab-id]
+      [::font ::multiplier font-multiplier]
+      [tab-id ::left left]
+      [tab-id ::right right]
+      [tab-id ::top top]
+      [tab-id ::bottom bottom]
+      :when
+      (<= left mouse-x (- window-width right))
+      (<= (top window-height font-multiplier)
+          mouse-y
+          (bottom window-height font-multiplier))
+      :then
+      (o/insert! ::mouse {::target :text
+                          ::cursor :ibeam})]}))
 
 (defn get-constants [session]
   (first (o/query-all session ::get-constants)))
