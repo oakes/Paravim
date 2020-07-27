@@ -80,7 +80,13 @@
 (defn on-mouse-move! [{:keys [::c/density-ratio] :as game} window xpos ypos]
   (let [x (* xpos density-ratio)
         y (* ypos density-ratio)
-        session (swap! session/*session c/update-mouse x y)
+        session (swap! session/*session
+                       (fn [session]
+                         (-> session
+                             (c/update-mouse x y)
+                             ;; fire rules will make the mouse hover rules run,
+                             ;; so the `get-mouse` call will have the correct data
+                             o/fire-rules)))
         mouse (session/get-mouse session)]
     (GLFW/glfwSetCursor window
                         (GLFW/glfwCreateStandardCursor
