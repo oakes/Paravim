@@ -31,8 +31,7 @@
       (o/insert ::session/mouse {::session/x x
                                  ::session/y y
                                  ::session/target nil
-                                 ::session/cursor nil})
-      o/fire-rules))
+                                 ::session/cursor nil})))
 
 (defn update-window-size [m width height]
   (-> m
@@ -44,8 +43,7 @@
       (update :osession
               (fn [osession]
                 (-> osession
-                    (o/insert ::session/window {::session/width width ::session/height height})
-                    o/fire-rules)))))
+                    (o/insert ::session/window {::session/width width ::session/height height}))))))
 
 (defn update-current-tab [m id]
   (-> m
@@ -57,8 +55,7 @@
       (update :osession
               (fn [osession]
                 (-> osession
-                    (o/insert ::session/tab ::session/current id)
-                    o/fire-rules)))))
+                    (o/insert ::session/tab ::session/current id))))))
 
 (defn new-tab! [game session tab-id]
   (let [buffer-id-or-path (or (:buffer-id (session/get-tab session tab-id))
@@ -87,8 +84,7 @@
       (update :osession
               (fn [osession]
                 (-> osession
-                    (o/insert id ::session/buffer-id buffer-id)
-                    o/fire-rules)))))
+                    (o/insert id ::session/buffer-id buffer-id))))))
 
 (defn insert-buffer-update [{:keys [osession] :as m} bu]
   (-> m
@@ -101,7 +97,18 @@
                           (assoc $ :needs-clojure-refresh? (:clojure? buffer))
                           (clarax/merge session buffer $)
                           (clara/fire-rules $)))
-                  session)))))
+                  session)))
+      ((fn [{:keys [session osession] :as m}]
+         (let [buffer (clara/query session ::session/get-buffer :?id (:buffer-id bu))
+               constants (session/get-constants osession)]
+           (update m :osession
+                   (fn [osession]
+                     (reduce-kv
+                       (fn [session k v]
+                         ;; FIXME: temporary hack
+                         (o/insert session (:buffer-id bu) (keyword "paravim.session" (name k)) v))
+                       osession
+                       buffer))))))))
 
 (defn insert-buffer-refresh [{:keys [osession] :as m} buffer-id]
   (-> m
@@ -126,7 +133,18 @@
                           (buffers/update-search-highlights $ constants (:show-search? vim) (:highlights vim))
                           (clarax/merge session buffer $)
                           (clara/fire-rules $)))
-                  session)))))
+                  session)))
+      ((fn [{:keys [session osession] :as m}]
+         (let [buffer (clara/query session ::session/get-buffer :?id buffer-id)
+               constants (session/get-constants osession)]
+           (update m :osession
+                   (fn [osession]
+                     (reduce-kv
+                       (fn [session k v]
+                         ;; FIXME: temporary hack
+                         (o/insert session buffer-id (keyword "paravim.session" (name k)) v))
+                       osession
+                       buffer))))))))
 
 (defn change-font-size [{:keys [osession] :as m} diff-multiplier]
   (let [font (session/get-font osession)
@@ -150,8 +168,7 @@
           (update :osession
                   (fn [osession]
                     (-> osession
-                        (o/insert ::session/font ::session/size new-val)
-                        o/fire-rules))))
+                        (o/insert ::session/font ::session/size new-val)))))
       m)))
 
 (defn font-dec [m]
@@ -677,6 +694,7 @@
             (-> session
                 (clarax/merge game' game)
                 clara/fire-rules))))
+      (swap! session/*session update :osession o/fire-rules)
       ;; return new game record
       game)))
 
