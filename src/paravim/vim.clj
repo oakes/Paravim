@@ -157,7 +157,7 @@
 (defn update-buffer [session buffer-ptr cursor-line cursor-column]
   (if-let [buffer (session/get-buffer session buffer-ptr)]
     (-> session
-        (c/upsert-buffer (:id buffer) (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
+        (c/upsert-buffer buffer-ptr (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
         (c/insert-buffer-refresh buffer-ptr))
     session))
 
@@ -294,7 +294,7 @@
             (-> m
                 (c/update-tab current-tab buffer-ptr)
                 (c/update-current-tab current-tab)
-                (c/upsert-buffer (:id buffer) buffer)
+                (c/upsert-buffer buffer-ptr buffer)
                 (c/insert-buffer-refresh buffer-ptr)))))
       (do
         (when *update-window?*

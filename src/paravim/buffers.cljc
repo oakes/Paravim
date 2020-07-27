@@ -356,8 +356,7 @@
                           ;; disable clojure support in large files for now,
                           ;; because it will be too slow to type
                           (< (count lines) constants/max-clojure-lines)))]
-    {:id id
-     :tab-id current-tab
+    {:tab-id current-tab
      :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
      :parinfer-text-entity nil
      :rects-entity nil
@@ -382,8 +381,7 @@
      :last-update 0}))
 
 (defn ->ascii [id {:keys [base-font-entity base-text-entity font-height] :as constants} lines]
-  {:id id
-   :tab-id ::constants/files
+  {:tab-id ::constants/files
    :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
    :parinfer-text-entity nil
    :rects-entity nil
