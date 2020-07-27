@@ -314,7 +314,7 @@
             :line-count-change line-count-change})))
 
 (defn on-buf-delete [buffer-ptr]
-  (swap! session/*session update :session c/remove-buffer buffer-ptr))
+  (swap! session/*session c/remove-buffer buffer-ptr))
 
 (defn ->vim []
   (doto (v/->vim)
