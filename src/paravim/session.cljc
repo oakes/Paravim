@@ -99,6 +99,7 @@
       [::constant ::roboto-text-entity roboto-text-entity]
       [::constant ::toolbar-text-entities toolbar-text-entities]
       [::constant ::highlight-text-entities highlight-text-entities]]
+
      ::get-vim
      [:what
       [::vim ::mode mode]
@@ -113,32 +114,39 @@
       [::vim ::command-completion command-completion]
       [::vim ::command-text-entity command-text-entity]
       [::vim ::command-cursor-entity command-cursor-entity]]
+
      ::get-font
      [:what
       [::font ::size size]
       [::font ::multiplier multiplier]]
+
      ::get-window
      [:what
       [::window ::width width]
       [::window ::height height]]
+
      ::get-current-tab
      [:what
       [::tab ::current id]]
+
      ::get-tab
      [:what
       [id ::buffer-id buffer-id]]
+
      ::get-mouse
      [:what
       [::mouse ::x x]
       [::mouse ::y y]
       [::mouse ::target target]
       [::mouse ::cursor cursor]]
+
      ::get-text-box
      [:what
       [id ::left left]
       [id ::right right]
       [id ::top top]
       [id ::bottom bottom]]
+
      ::get-bounding-box
      [:what
       [id ::x1 x1]
@@ -146,6 +154,7 @@
       [id ::x2 x2]
       [id ::y2 y2]
       [id ::align align]]
+
      ::get-buffer
      [:what
       [id ::tab-id tab-id]
@@ -170,6 +179,7 @@
       [id ::cursor-line cursor-line]
       [id ::cursor-column cursor-column]
       [id ::show-minimap? show-minimap?]]
+
      ::get-current-buffer
      [:what
       [::tab ::current tab-id]
@@ -186,6 +196,7 @@
       (== 0 size)
       :then
       (o/insert! ::font ::size (* multiplier font-height))]
+
      ::update-font-multiplier
      [:what
       [::constant ::font-height font-height]
@@ -195,6 +206,7 @@
       (pos? size)
       :then
       (o/insert! ::font ::multiplier (/ size font-height))]
+
      ::mouse-hovers-over-text
      [:what
       [::window ::width window-width]
@@ -215,6 +227,7 @@
       :then
       (o/insert! ::mouse {::target :text
                           ::cursor :ibeam})]
+
      ::mouse-hovers-over-bounding-box
      [:what
       [::window ::width window-width]
@@ -240,6 +253,7 @@
       :then
       (o/insert! ::mouse {::target id
                           ::cursor :hand})]
+
      ::update-buffer-when-font-changes-or-window-resizes
      [:what
       [::global ::single-command-chan single-command-chan]
@@ -269,6 +283,7 @@
           ;; FIXME: temporary hack
           (o/insert! id (keyword "paravim.session" (name k)) v))
         (async/put! single-command-chan [:resize-window]))]
+
      ::move-camera-to-target
      [:what
       [::time ::delta delta-time]
@@ -290,6 +305,7 @@
         (doseq [[k v] new-buffer]
           ;; FIXME: temporary hack
           (o/insert! id (keyword "paravim.session" (name k)) v)))]
+
      ::rubber-band-effect
      [:what
       [::font ::multiplier multiplier]
