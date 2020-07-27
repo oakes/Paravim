@@ -5,11 +5,10 @@
             [paravim.minimap :as minimap]
             [odoyle.rules :as o #?(:clj :refer :cljs :refer-macros) [ruleset]]
             [clojure.string :as str]
-            [clojure.core.async :as async])
-  #?(:cljs (:require-macros [paravim.session :refer [merge-into-session]])))
+            [clojure.core.async :as async]))
 
 (defonce *initial-session (atom nil))
-(defonce *session (atom {}))
+(defonce *session (atom nil))
 (defonce *reload? (atom false))
 
 (defn get-constants [session]
@@ -350,15 +349,29 @@
         (when (not= show? show-minimap?)
           (o/insert! id ::show-minimap? show?)))]}))
 
-#?(:clj (defmacro merge-into-session [& args]
-          `(do
-             (reset! *initial-session
-               (reduce o/add-rule (o/->session) (concat queries rules)))
-             ;; reload the session if it's been created already
-             (when @*session
-               (reset! *reload? true))
-             nil)))
+(defn reload! [callback]
+  (reset! *initial-session
+    (-> (reduce o/add-rule (o/->session) (concat queries rules))
+        (o/insert ::vim {::mode 'NORMAL
+                         ::ascii nil
+                         ::control? false
+                         ::show-search? false
+                         ::visual-range nil
+                         ::highlights []
+                         ::message nil
+                         ::command-start nil
+                         ::command-text nil
+                         ::command-completion nil
+                         ::command-text-entity nil
+                         ::command-cursor-entity nil})
+        (o/insert ::font {::size 0 ;; initialized in the font rule
+                          ::multiplier constants/default-font-multiplier})
+        (o/insert ::tab ::current ::files)
+        callback))
+  ;; reload the session if it's been created already
+  (when @*session
+    (reset! *reload? true)))
 
 ;; create initial session
-(merge-into-session)
+(reload! identity)
 

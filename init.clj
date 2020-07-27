@@ -4,31 +4,10 @@
 ;; you can do that with the clojure CLI tool like this:
 ;;
 ;; :jvm-opts ["-Dparavim.init=init.clj"]
+(ns example.init
+  (:require [paravim.session :as session]
+            [odoyle.rules :as o]))
 
-(require
-  '[paravim.session :as session]
-  '[clara.rules :as clara]
-  '[clarax.rules :as clarax])
-
-(import '[paravim.session Font])
-
-(let [*first-run? (atom true)]
-  (defn run-only-once [body-fn]
-    (when @*first-run?
-      (reset! *first-run? false)
-      (body-fn))))
-
-(session/merge-into-session
-  {;; a custom rule
-   :init
-   (let [font Font]
-     ;; `run-only-once` is a hacky way to
-     ;; only change things on init.
-     ;; without it, it would be impossible
-     ;; to change the font afterwards!
-     (run-only-once
-       (fn []
-         (clarax/merge! font {:size 24}))))
-   ;; this overwrites paravim's minimap rule,
-   ;; which has the effect of disabling it
-   :paravim.session/minimap nil})
+(session/reload!
+  (fn [session]
+    (o/insert session ::session/font ::session/size 24)))

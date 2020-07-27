@@ -399,23 +399,8 @@
     (-> @session/*initial-session
         (o/insert ::session/global (select-keys game [:paravim.start/command-chan
                                                       :paravim.start/single-command-chan]))
-        (o/insert ::session/vim {::session/mode 'NORMAL
-                                 ::session/ascii nil
-                                 ::session/control? false
-                                 ::session/show-search? false
-                                 ::session/visual-range nil
-                                 ::session/highlights []
-                                 ::session/message nil
-                                 ::session/command-start nil
-                                 ::session/command-text nil
-                                 ::session/command-completion nil
-                                 ::session/command-text-entity nil
-                                 ::session/command-cursor-entity nil})
-        (o/insert ::session/font {::session/size 0 ;; initialized in the font rule
-                                  ::session/multiplier constants/default-font-multiplier})
         (o/insert ::session/window {::session/width (utils/get-width game)
-                                    ::session/height (utils/get-height game)})
-        (o/insert ::session/tab ::session/current ::session/files)))
+                                    ::session/height (utils/get-height game)})))
   ;; initialize entities
   (let [callback (fn [{:keys [constants text-boxes bounding-boxes] :as entities}]
                    (reset! *entity-cache entities)
