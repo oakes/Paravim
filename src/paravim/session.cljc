@@ -272,24 +272,45 @@
      ::move-camera-to-target
      [:what
       [::time ::delta delta-time]
-      [::font ::multiplier multiplier]
-      [id ::tab-id tab-id]
       [id ::camera-x camera-x {:then false}]
       [id ::camera-y camera-y {:then false}]
-      [id ::camera-target-x camera-target-x]
-      [id ::camera-target-y camera-target-y]
+      [id ::camera-target-x camera-target-x {:then false}]
+      [id ::camera-target-y camera-target-y {:then false}]
       [id ::scroll-speed-x scroll-speed-x {:then false}]
       [id ::scroll-speed-y scroll-speed-y {:then false}]
       :when
       (or (not (== camera-x camera-target-x))
           (not (== camera-y camera-target-y)))
       :then
-      (let [text-box (get-text-box o/*session* tab-id)
-            new-buffer (scroll/animate-camera
+      (let [new-buffer (scroll/animate-camera
                          camera-x camera-y
                          camera-target-x camera-target-y
                          scroll-speed-x scroll-speed-y
-                         multiplier text-box delta-time)]
+                         delta-time)]
+        (doseq [[k v] new-buffer]
+          ;; FIXME: temporary hack
+          (o/insert! id (keyword "paravim.session" (name k)) v)))]
+     ::rubber-band-effect
+     [:what
+      [::font ::multiplier multiplier]
+      [::window ::width window-width]
+      [::window ::height window-height]
+      [id ::tab-id tab-id]
+      [id ::text-entity text-entity]
+      [id ::show-minimap? show-minimap?]
+      [id ::camera-target-x camera-target-x]
+      [id ::camera-target-y camera-target-y]
+      [id ::scroll-speed-x scroll-speed-x]
+      [id ::scroll-speed-y scroll-speed-y]
+      :then
+      (let [constants (get-constants o/*session*)
+            text-box (get-text-box o/*session* tab-id)
+            window {:width window-width :height window-height}
+            new-buffer (scroll/rubber-band-camera
+                         text-entity show-minimap?
+                         camera-target-x camera-target-y
+                         scroll-speed-x scroll-speed-y
+                         multiplier text-box constants window)]
         (doseq [[k v] new-buffer]
           ;; FIXME: temporary hack
           (o/insert! id (keyword "paravim.session" (name k)) v)))]}))
@@ -337,56 +358,7 @@
         minimap))})
 
 (def rules
-  '{::update-buffer-when-font-changes
-    (let [game paravim.session.Game
-          window paravim.session.Window
-          font paravim.session.FontMultiplier
-          buffer paravim.session.Buffer
-          :when (and (not= font (:font-anchor buffer))
-                     ;; ignore ascii buffers
-                     (number? (:id buffer)))
-          text-box paravim.session.TextBox
-          :when (= (:id text-box) (:tab-id buffer))]
-      (let [osession (:osession @*session)
-            constants (get-constants osession)
-            vim (get-vim osession)]
-        (clarax.rules/merge! buffer
-          (-> buffer
-              (paravim.buffers/update-cursor (:mode vim) (:size font) text-box constants window)
-              (paravim.buffers/update-highlight constants)
-              (paravim.buffers/update-selection constants (:visual-range vim))
-              (paravim.buffers/update-search-highlights constants (:show-search? vim) (:highlights vim))
-              (assoc :font-anchor font))))
-      (clojure.core.async/put! (:paravim.core/single-command-chan game) [:resize-window]))
-    ::update-buffer-when-window-resizes
-    (let [game paravim.session.Game
-          window paravim.session.Window
-          font paravim.session.FontMultiplier
-          current-tab paravim.session.CurrentTab
-          tab paravim.session.Tab
-          :when (= (:id tab) (:id current-tab))
-          buffer paravim.session.Buffer
-          :when (and (not= window (:window-anchor buffer))
-                     (or (= (:id buffer) (:buffer-id tab))
-                         ;; if we're in the repl, make sure both the input and output are refreshed
-                         (= (:tab-id buffer) (case (:id current-tab)
-                                               ::repl-in ::repl-out
-                                               ::repl-out ::repl-in
-                                               nil))))
-          text-box paravim.session.TextBox
-          :when (= (:id text-box) (:tab-id buffer))]
-      (let [osession (:osession @*session)
-            constants (get-constants osession)
-            vim (get-vim osession)]
-        (clarax.rules/merge! buffer
-          (-> buffer
-              (paravim.buffers/update-cursor (:mode vim) (:size font) text-box constants window)
-              (paravim.buffers/update-highlight constants)
-              (paravim.buffers/update-selection constants (:visual-range vim))
-              (paravim.buffers/update-search-highlights constants (:show-search? vim) (:highlights vim))
-              (assoc :window-anchor window))))
-      (clojure.core.async/put! (:paravim.core/single-command-chan game) [:resize-window]))
-    ::minimap
+  '{::minimap
     (let [game paravim.session.Game
           :when (:total-time game)
           window paravim.session.Window
@@ -413,39 +385,7 @@
         (clarax.rules/merge! minimap
           (assoc new-minimap
                  ;; this prevents the rule from firing if none of these three things have changed
-                 :anchor [window font new-buffer]))))
-    ::rubber-band-effect
-    (let [window paravim.session.Window
-          font paravim.session.FontMultiplier
-          buffer paravim.session.Buffer
-          text-box paravim.session.TextBox
-          :when (= (:id text-box) (:tab-id buffer))]
-      (let [constants (get-constants (:osession @*session))]
-        (some->> (paravim.scroll/rubber-band-camera buffer (:size font) text-box constants window)
-                 (clarax.rules/merge! buffer))))
-    ::move-camera-to-target
-    (let [{:keys [delta-time total-time] :as game} paravim.session.Game
-          font paravim.session.FontMultiplier
-          {:keys [camera-x camera-y camera-target-x camera-target-y scroll-speed-x scroll-speed-y total-time-anchor] :as buffer} paravim.session.Buffer
-          :when (and (not= total-time total-time-anchor)
-                     (or (not (== camera-x camera-target-x))
-                         (not (== camera-y camera-target-y))))
-          text-box paravim.session.TextBox
-          :when (= (:id text-box) (:tab-id buffer))]
-      (clarax.rules/merge! buffer
-        (assoc (paravim.scroll/animate-camera camera-x camera-y camera-target-x camera-target-y scroll-speed-x scroll-speed-y (:size font) text-box delta-time)
-          :total-time-anchor total-time)))
-    ::font
-    (let [font paravim.session.Font
-          font-multiplier paravim.session.FontMultiplier]
-      (let [constants (get-constants (:osession @*session))]
-        (cond
-          ;; font needs to be initialized
-          (== 0 (:size font))
-          (clarax.rules/merge! font {:size (* (:size font-multiplier) (:font-height constants))})
-          ;; change the multiplier to match the font size
-          (pos? (:size font))
-          (clarax.rules/merge! font-multiplier {:size (/ (:size font) (:font-height constants))}))))})
+                 :anchor [window font new-buffer]))))})
 
 #?(:clj (defmacro merge-into-session [& args]
           `(do

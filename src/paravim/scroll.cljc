@@ -33,17 +33,17 @@
      :scroll-speed-x (+ scroll-speed-x (math abs (long xdiff)))
      :scroll-speed-y (+ scroll-speed-y (math abs (long ydiff)))}))
 
-(defn adjust-camera [buffer camera-x camera-y font-size text-box {:keys [font-width font-height] :as constants} window]
+(defn adjust-camera [text-entity show-minimap? camera-x camera-y font-size text-box {:keys [font-width font-height] :as constants} window]
   (let [{game-width :width game-height :height} window
         text-top ((:top text-box) game-height font-size)
         text-bottom ((:bottom text-box) game-height font-size)
-        char-counts (get-in buffer [:text-entity :uniforms 'u_char_counts])
+        char-counts (get-in text-entity [:uniforms 'u_char_counts])
         max-char-count (if (seq char-counts)
                          (apply max char-counts)
                          0)
         text-width (* max-char-count font-size font-width)
         text-height (* (count char-counts) font-size font-height)
-        text-view-width (if (:show-minimap? buffer)
+        text-view-width (if show-minimap?
                           (- game-width (/ game-width constants/minimap-scale))
                           game-width)
         max-x (- text-width text-view-width)
@@ -51,8 +51,11 @@
     [(-> camera-x (min max-x) (max 0))
      (-> camera-y (min max-y) (max 0))]))
 
-(defn rubber-band-camera [{:keys [camera-target-x camera-target-y scroll-speed-x scroll-speed-y] :as buffer} font-size text-box constants window]
-  (let [[new-x new-y] (adjust-camera buffer camera-target-x camera-target-y font-size text-box constants window)]
+(defn rubber-band-camera [text-entity show-minimap?
+                          camera-target-x camera-target-y
+                          scroll-speed-x scroll-speed-y
+                          font-size text-box constants window]
+  (let [[new-x new-y] (adjust-camera text-entity show-minimap? camera-target-x camera-target-y font-size text-box constants window)]
     (when (or (not (== camera-target-x new-x))
               (not (== camera-target-y new-y)))
       {:camera-target-x new-x
@@ -67,7 +70,7 @@
 (defn animate-camera [camera-x camera-y
                       camera-target-x camera-target-y
                       scroll-speed-x scroll-speed-y
-                      font-size text-box delta-time]
+                      delta-time]
   (let [min-diff 1
         x-diff (long (- camera-target-x camera-x))
         y-diff (long (- camera-target-y camera-y))

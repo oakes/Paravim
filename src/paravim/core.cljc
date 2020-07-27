@@ -204,8 +204,7 @@
                           ;; FIXME: temporary hack
                           (assoc m (keyword "paravim.session" (name k)) v))
                         {}
-                        buffer))
-                    o/fire-rules)))))
+                        buffer)))))))
 
 (defn remove-buffer [session buffer-id]
   (let [buffer (clara/query session ::session/get-buffer :?id buffer-id)
