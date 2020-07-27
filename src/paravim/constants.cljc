@@ -3,25 +3,25 @@
 
 (def orig-camera (e/->camera))
 
-(def buttons [{:id :paravim.session/font-inc
+(def buttons [{:id ::font-inc
                :text "Font +"
                :shortcut-char 5}
-              {:id :paravim.session/font-dec
+              {:id ::font-dec
                :text "Font -"
                :shortcut-char 5}
-              {:id :paravim.session/reload-file
+              {:id ::reload-file
                :text "Reload File"
                :shortcut-char 7}])
 
-(def tab->path {:paravim.session/files "scratch.clj"
-                :paravim.session/repl-in "repl.in"
-                :paravim.session/repl-out "repl.out"})
+(def tab->path {::files "scratch.clj"
+                ::repl-in "repl.in"
+                ::repl-out "repl.out"})
 
-(def tabs [{:id :paravim.session/files
+(def tabs [{:id ::files
             :text "Files"}
-           {:id :paravim.session/repl-in
+           {:id ::repl-in
             :text "REPL In"}
-           {:id :paravim.session/repl-out
+           {:id ::repl-out
             :text "REPL Out"}])
 
 (def tab-ids (mapv :id tabs))

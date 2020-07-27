@@ -3,6 +3,7 @@
             [paravim.repl :as repl]
             [paravim.vim :as vim]
             [paravim.session :as session]
+            [paravim.constants :as constants]
             [libvim-clj.core :as v]
             [play-cljc.gl.core :as pc]
             [clojure.core.async :as async]
@@ -123,7 +124,7 @@
             press?
             (cond
               ;; pressing enter in the repl
-              (and (= current-tab ::session/repl-in)
+              (and (= current-tab ::constants/repl-in)
                    (= k :enter)
                    (= mode 'NORMAL))
               (vim/repl-enter! vim session pipes)

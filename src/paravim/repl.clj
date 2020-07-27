@@ -56,7 +56,7 @@
   pipes)
 
 (defn reload-file! [{:keys [lines file-name clojure?] :as buffer} pipes current-tab]
-  (when (and clojure? (= current-tab :paravim.session/files))
+  (when (and clojure? (= current-tab :paravim.constants/files))
     (let [{:keys [out-pipe]} pipes
           content (str/join \newline lines)
           first-form (try (read-string {:read-cond :allow} content)

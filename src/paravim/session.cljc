@@ -366,7 +366,7 @@
                          ::command-cursor-entity nil})
         (o/insert ::font {::size 0 ;; initialized in the font rule
                           ::multiplier constants/default-font-multiplier})
-        (o/insert ::tab ::current ::files)
+        (o/insert ::tab ::current ::constants/files)
         callback))
   ;; reload the session if it's been created already
   (when @*session

@@ -2,6 +2,7 @@
   (:require [paravim.chars :as chars]
             [paravim.colors :as colors]
             [paravim.scroll :as scroll]
+            [paravim.constants :as constants]
             [parinferish.core :as ps]
             [play-cljc.transforms :as t]
             [play-cljc.instances :as i]
@@ -336,4 +337,73 @@
               'u_char_counts char-counts
               'u_start_line lines-to-skip-count)
       (:attribute-lengths text-entity))))
+
+(defn get-extension
+  [path]
+  (some->> (str/last-index-of path ".")
+           (+ 1)
+           (subs path)
+           str/lower-case))
+
+(def clojure-exts #{"clj" "cljs" "cljc" "edn"})
+
+(defn clojure-path? [path]
+  (-> path get-extension clojure-exts))
+
+(defn ->buffer [id {:keys [base-font-entity base-text-entity font-height]} path file-name lines current-tab]
+  (let [clojure? (or (= current-tab ::constants/repl-in)
+                     (and (clojure-path? path)
+                          ;; disable clojure support in large files for now,
+                          ;; because it will be too slow to type
+                          (< (count lines) constants/max-clojure-lines)))]
+    {:id id
+     :tab-id current-tab
+     :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
+     :parinfer-text-entity nil
+     :rects-entity nil
+     :parsed-code nil
+     :needs-parinfer? false
+     :needs-parinfer-init? clojure?
+     :needs-clojure-refresh? clojure?
+     :camera (t/translate constants/orig-camera 0 0)
+     :camera-x 0
+     :camera-y 0
+     :camera-target-x 0
+     :camera-target-y 0
+     :scroll-speed-x 0
+     :scroll-speed-y 0
+     :path path
+     :file-name file-name
+     :lines lines
+     :clojure? clojure?
+     :cursor-line 0
+     :cursor-column 0
+     :show-minimap? false
+     :last-update 0}))
+
+(defn ->ascii [id {:keys [base-font-entity base-text-entity font-height] :as constants} lines]
+  {:id id
+   :tab-id ::constants/files
+   :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
+   :parinfer-text-entity nil
+   :rects-entity nil
+   :parsed-code nil
+   :needs-parinfer? false
+   :needs-parinfer-init? false
+   :needs-clojure-refresh? false
+   :camera (t/translate constants/orig-camera 0 0)
+   :camera-x 0
+   :camera-y 0
+   :camera-target-x 0
+   :camera-target-y 0
+   :scroll-speed-x 0
+   :scroll-speed-y 0
+   :path nil
+   :file-name nil
+   :lines lines
+   :clojure? false
+   :cursor-line 0
+   :cursor-column 0
+   :show-minimap? false
+   :last-update 0})
 

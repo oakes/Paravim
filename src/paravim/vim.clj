@@ -3,6 +3,7 @@
             [paravim.session :as session]
             [paravim.constants :as constants]
             [paravim.utils :as utils]
+            [paravim.buffers :as buffers]
             [odoyle.rules :as o]
             [libvim-clj.core :as v]
             [clojure.string :as str]
@@ -36,7 +37,7 @@
 (defn ready-to-append? [session vim output]
   (and (seq output)
        (= 'NORMAL (v/get-mode vim))
-       (not= ::session/repl-out (:id (session/get-current-tab session)))))
+       (not= ::constants/repl-out (:id (session/get-current-tab session)))))
 
 (defn apply-parinfer! [session vim]
   (let [current-buffer (:buffer-id (session/get-current-buffer session))
@@ -91,11 +92,11 @@
                 "christmas" (LocalDate/of current-year 12 25)})
 
 (defn assoc-ascii [session constants ascii-name]
-  (c/new-tab! (:command-chan (session/get-globals session)) session ::session/files)
+  (c/new-tab! (:command-chan (session/get-globals session)) session ::constants/files)
   ;; FIXME: temporary hack
   (let [ascii-key (keyword "paravim.session" ascii-name)]
     (-> session
-        (c/upsert-buffer ascii-key (c/->ascii ascii-key constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
+        (c/upsert-buffer ascii-key (buffers/->ascii ascii-key constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
         (o/insert ::session/vim ::session/ascii ascii-key))))
 
 (defn dissoc-ascii [session ascii-name]
@@ -246,7 +247,7 @@
       .flush)))
 
 (defn append-to-buffer! [{:keys [:paravim.start/vim] :as game} session input]
-  (when-let [buffer (:buffer-id (session/get-tab session ::session/repl-out))]
+  (when-let [buffer (:buffer-id (session/get-tab session ::constants/repl-out))]
     (let [current-buffer (v/get-current-buffer vim)
           cursor-line (v/get-cursor-line vim)
           cursor-column (v/get-cursor-column vim)
@@ -277,13 +278,13 @@
                                 (when (= canon-path (-> path java.io.File. .getCanonicalPath))
                                   tab))
                               constants/tab->path)
-                            ::session/files)
+                            ::constants/files)
             session @session/*session
             constants (session/get-constants session)
             existing-buffer (session/get-buffer session buffer-ptr)
             buffer (if (and existing-buffer (= (:lines existing-buffer) lines))
                      existing-buffer
-                     (assoc (c/->buffer buffer-ptr constants path file-name lines current-tab)
+                     (assoc (buffers/->buffer buffer-ptr constants path file-name lines current-tab)
                        :cursor-line (dec (v/get-cursor-line vim))
                        :cursor-column (v/get-cursor-column vim)))]
         (when *update-window?*
@@ -299,7 +300,7 @@
         (when *update-window?*
           (async/put! (:paravim.start/command-chan game) [:set-window-title "Paravim"]))
         ;; clear the files tab
-        (swap! session/*session c/update-tab ::session/files nil)))))
+        (swap! session/*session c/update-tab ::constants/files nil)))))
 
 (defn on-buf-update [game vim buffer-ptr start-line end-line line-count-change]
   (let [first-line (dec start-line)
@@ -368,7 +369,7 @@
   (v/set-on-message vim (fn [{:keys [message]}]
                           (async/put! (:paravim.start/command-chan game) [:update-vim {::session/message message}])))
   (binding [*update-window?* false]
-    (run! #(v/open-buffer vim (constants/tab->path %)) [::session/repl-in ::session/repl-out ::session/files]))
+    (run! #(v/open-buffer vim (constants/tab->path %)) [::constants/repl-in ::constants/repl-out ::constants/files]))
   (init-ascii!)
   (update-window-size! game))
 
