@@ -195,13 +195,17 @@
                         (clara/insert (session/map->Buffer buffer))
                         (clara/insert (session/map->Minimap {:buffer-id (:id buffer)}))
                         clara/fire-rules)))))
-      (update :osession o/insert (:id buffer)
-              (reduce-kv
-                (fn [m k v]
-                  ;; FIXME: temporary hack
-                  (assoc m (keyword "paravim.session" (name k)) v))
-                {}
-                buffer))))
+      (update :osession
+              (fn [osession]
+                (-> osession
+                    (o/insert (:id buffer)
+                      (reduce-kv
+                        (fn [m k v]
+                          ;; FIXME: temporary hack
+                          (assoc m (keyword "paravim.session" (name k)) v))
+                        {}
+                        buffer))
+                    o/fire-rules)))))
 
 (defn remove-buffer [session buffer-id]
   (let [buffer (clara/query session ::session/get-buffer :?id buffer-id)

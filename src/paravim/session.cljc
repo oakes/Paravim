@@ -272,24 +272,25 @@
      ::move-camera-to-target
      [:what
       [::time ::delta delta-time]
-      [::window ::width window-width]
-      [::window ::height window-height]
       [::font ::multiplier multiplier]
       [id ::tab-id tab-id]
       [id ::camera-x camera-x {:then false}]
       [id ::camera-y camera-y {:then false}]
-      [id ::camera-target-x camera-target-x {:then false}]
-      [id ::camera-target-y camera-target-y {:then false}]
+      [id ::camera-target-x camera-target-x]
+      [id ::camera-target-y camera-target-y]
+      [id ::scroll-speed-x scroll-speed-x {:then false}]
+      [id ::scroll-speed-y scroll-speed-y {:then false}]
       :when
       (or (not (== camera-x camera-target-x))
           (not (== camera-y camera-target-y)))
       :then
-      (let [buffer (get-buffer' o/*session* id)
-            text-box (get-text-box o/*session* tab-id)
-            window {:width window-width :height window-height}
-            new-buffer (scroll/animate-camera buffer multiplier text-box window delta-time)]
-        (doseq [[k v] new-buffer
-                :when (not= v (get buffer k))]
+      (let [text-box (get-text-box o/*session* tab-id)
+            new-buffer (scroll/animate-camera
+                         camera-x camera-y
+                         camera-target-x camera-target-y
+                         scroll-speed-x scroll-speed-y
+                         multiplier text-box delta-time)]
+        (doseq [[k v] new-buffer]
           ;; FIXME: temporary hack
           (o/insert! id (keyword "paravim.session" (name k)) v)))]}))
 
@@ -424,16 +425,15 @@
                  (clarax.rules/merge! buffer))))
     ::move-camera-to-target
     (let [{:keys [delta-time total-time] :as game} paravim.session.Game
-          window paravim.session.Window
           font paravim.session.FontMultiplier
-          {:keys [camera-x camera-y camera-target-x camera-target-y total-time-anchor] :as buffer} paravim.session.Buffer
+          {:keys [camera-x camera-y camera-target-x camera-target-y scroll-speed-x scroll-speed-y total-time-anchor] :as buffer} paravim.session.Buffer
           :when (and (not= total-time total-time-anchor)
                      (or (not (== camera-x camera-target-x))
                          (not (== camera-y camera-target-y))))
           text-box paravim.session.TextBox
           :when (= (:id text-box) (:tab-id buffer))]
       (clarax.rules/merge! buffer
-        (assoc (paravim.scroll/animate-camera buffer (:size font) text-box window delta-time)
+        (assoc (paravim.scroll/animate-camera camera-x camera-y camera-target-x camera-target-y scroll-speed-x scroll-speed-y (:size font) text-box delta-time)
           :total-time-anchor total-time)))
     ::font
     (let [font paravim.session.Font

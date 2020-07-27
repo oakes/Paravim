@@ -64,10 +64,10 @@
                          min-scroll-speed
                          scroll-speed-y)})))
 
-(defn animate-camera [{:keys [camera-x camera-y
-                              camera-target-x camera-target-y
-                              scroll-speed-x scroll-speed-y] :as buffer}
-                      font-size text-box window delta-time]
+(defn animate-camera [camera-x camera-y
+                      camera-target-x camera-target-y
+                      scroll-speed-x scroll-speed-y
+                      font-size text-box delta-time]
   (let [min-diff 1
         x-diff (long (- camera-target-x camera-x))
         y-diff (long (- camera-target-y camera-y))
