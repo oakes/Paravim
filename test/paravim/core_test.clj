@@ -16,13 +16,13 @@
 (def inited-game (start/init game vim chan))
 
 (defn get-characters [buffer-ptr entity-key]
-  (get-in (session/get-buffer @session/*session {:?id buffer-ptr}) [entity-key :characters]))
+  (get-in (session/get-buffer @session/*session buffer-ptr) [entity-key :characters]))
 
 (defn count-lines [buffer-ptr]
   (count (get-characters buffer-ptr :text-entity)))
 
 (defn get-line [buffer-ptr line-num]
-  (get-in (session/get-buffer @session/*session {:?id buffer-ptr}) [:lines line-num]))
+  (get-in (session/get-buffer @session/*session buffer-ptr) [:lines line-num]))
 
 (def core-buffer (v/open-buffer vim "test/resources/core.clj"))
 (def bad-indent-buffer (v/open-buffer vim "test/resources/bad_indent.clj"))
