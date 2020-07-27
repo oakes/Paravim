@@ -85,6 +85,12 @@
 (defn get-current-buffer [session]
   (first (o/query-all session ::get-current-buffer)))
 
+(defn get-minimap [session buffer-id]
+  (some (fn [minimap]
+          (when (= buffer-id (:id minimap))
+            minimap))
+        (o/query-all session ::get-minimap)))
+
 (def oqueries
   (o/ruleset
     {::get-constants
@@ -183,7 +189,13 @@
      ::get-current-buffer
      [:what
       [::tab ::current tab-id]
-      [tab-id ::buffer-id buffer-id]]}))
+      [tab-id ::buffer-id buffer-id]]
+
+     ::get-minimap
+     [:what
+      [id ::minimap/show? show?]
+      [id ::minimap/rects-entity rects-entity]
+      [id ::minimap/text-entity text-entity]]}))
 
 (def orules
   (o/ruleset
@@ -329,7 +341,37 @@
                          multiplier text-box constants window)]
         (doseq [[k v] new-buffer]
           ;; FIXME: temporary hack
-          (o/insert! id (keyword "paravim.session" (name k)) v)))]}))
+          (o/insert! id (keyword "paravim.session" (name k)) v)))]
+
+     ::minimap
+     [:what
+      [::time ::delta delta-time]
+      [::font ::multiplier multiplier]
+      [::window ::width window-width]
+      [::window ::height window-height]
+      [id ::tab-id tab-id]
+      [id ::text-entity text-entity]
+      [id ::lines lines]
+      [id ::camera-x camera-x {:then false}]
+      [id ::camera-y camera-y {:then false}]
+      [id ::show-minimap? show-minimap? {:then false}]
+      :when
+      ;; ignore ascii buffers
+      (number? id)
+      :then
+      (let [text-box (get-text-box o/*session* tab-id)
+            constants (get-constants o/*session*)
+            new-minimap (paravim.minimap/->minimap
+                          text-entity lines camera-x camera-y
+                          constants multiplier
+                          window-width window-height text-box)
+            show? (::minimap/show? new-minimap)]
+        (o/insert! id new-minimap)
+        (when (not= show? show-minimap?)
+          (o/insert! id ::show-minimap? show?)))]}))
+
+(def rules
+  '{})
 
 (def queries
   '{::get-game
@@ -373,36 +415,6 @@
             :when (= (:buffer-id minimap) ?id)]
         minimap))})
 
-(def rules
-  '{::minimap
-    (let [game paravim.session.Game
-          :when (:total-time game)
-          window paravim.session.Window
-          font paravim.session.FontMultiplier
-          {:keys [last-update] :as buffer} paravim.session.Buffer
-          ;; wait until the next tick after the buffer was updated.
-          ;; this makes scrolling a lot faster, because the buffer record
-          ;; can be updated multiple times per tick if multiple
-          ;; scroll events are fired back-to-back.
-          ;; this condition ensures that this rule will only fire
-          ;; once per tick.
-          :when (and (some? last-update)
-                     (> (:total-time game) last-update))
-          text-box paravim.session.TextBox
-          :when (= (:id text-box) (:tab-id buffer))
-          minimap paravim.session.Minimap
-          :when (and (= (:buffer-id minimap) (:id buffer))
-                     (not= [window font buffer] (:anchor minimap)))]
-      (let [constants (get-constants (:osession @*session))
-            new-minimap (paravim.minimap/->minimap buffer constants (:size font) (:width window) (:height window) text-box)
-            new-buffer (assoc buffer :show-minimap? (:show? new-minimap))]
-        (when (not= buffer new-buffer)
-          (clarax.rules/merge! buffer new-buffer))
-        (clarax.rules/merge! minimap
-          (assoc new-minimap
-                 ;; this prevents the rule from firing if none of these three things have changed
-                 :anchor [window font new-buffer]))))})
-
 #?(:clj (defmacro merge-into-session [& args]
           `(do
              (reset! *initial-session (->session ~(->> (apply merge queries rules args)
@@ -423,6 +435,5 @@
 (defn def-queries [{:keys [session]}]
   (let [query-fns (clarax/query-fns session)]
     (def get-game (::get-game query-fns))
-    (def get-font-multiplier (::get-font-multiplier query-fns))
-    (def get-minimap (::get-minimap query-fns))))
+    (def get-font-multiplier (::get-font-multiplier query-fns))))
 

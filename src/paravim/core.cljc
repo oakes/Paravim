@@ -207,11 +207,9 @@
                         buffer)))))))
 
 (defn remove-buffer [session buffer-id]
-  (let [buffer (clara/query session ::session/get-buffer :?id buffer-id)
-        minimap (session/get-minimap session {:?id buffer-id})]
+  (let [buffer (clara/query session ::session/get-buffer :?id buffer-id)]
     (-> session
         (cond-> buffer (clara/retract buffer))
-        (cond-> minimap (clara/retract minimap))
         clara/fire-rules)))
 
 (defn- mouse->cursor-position [buffer mouse font-size-multiplier text-box constants window]
@@ -582,7 +580,7 @@
                              (t/translate 0 text-top)
                              (t/scale font-size-multiplier font-size-multiplier)))
           (when (and show-minimap? (:show-minimap? buffer))
-            (when-let [minimap (session/get-minimap session {:?id buffer-ptr})]
+            (when-let [minimap (session/get-minimap osession buffer-ptr)]
               (c/render game (:rects-entity minimap))
               (c/render game (-> (:text-entity minimap)
                                  (cond-> (not show-cursor?)

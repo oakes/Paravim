@@ -5,7 +5,7 @@
             [play-cljc.instances :as i]
             [play-cljc.transforms :as t]))
 
-(defn ->minimap [{:keys [text-entity lines camera-x camera-y] :as buffer}
+(defn ->minimap [text-entity lines camera-x camera-y
                  {:keys [base-rects-entity base-rect-entity] :as constants}
                  font-size-multiplier game-width game-height text-box]
   (let [text-top ((:top text-box) game-height font-size-multiplier)
@@ -32,10 +32,9 @@
         end-line (min line-count minimap-line-count)
         start-column (int (/ camera-x font-width))
         visible-lines (int (/ minimap-height font-height))]
-    {:buffer-id (:id buffer)
-     :show? (and (> minimap-chars constants/minimap-min-chars)
-                 (> line-count visible-lines))
-     :rects-entity
+    {::show? (and (> minimap-chars constants/minimap-min-chars)
+                  (> line-count visible-lines))
+     ::rects-entity
      (-> base-rects-entity
          (t/project game-width game-height)
          (i/assoc 0 (-> base-rect-entity
@@ -48,7 +47,7 @@
                         (t/translate 0 (- (/ camera-y constants/minimap-scale)
                                           (* start-line minimap-font-height)))
                         (t/scale minimap-width (/ minimap-height constants/minimap-scale)))))
-     :text-entity
+     ::text-entity
      (-> text-entity
          (cond-> minimap-is-overflowing
                  (buffers/crop-text-entity
