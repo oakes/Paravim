@@ -224,11 +224,11 @@
                  long)]
     [line column]))
 
-(defn click-mouse! [game {:keys [session osession]} button]
+(defn click-mouse! [game {:keys [session osession] :as m} button]
   (let [mouse (session/get-mouse osession)
         current-tab (session/get-current-tab osession)
         buffer-id (:buffer-id (session/get-current-buffer osession))
-        buffer (session/get-buffer session buffer-id)]
+        buffer (session/get-buffer m buffer-id)]
     (when (= :left button)
       (let [{:keys [target]} mouse]
         (if (constants/tab? target)
@@ -247,11 +247,11 @@
                                   [:move-cursor (mouse->cursor-position buffer mouse font-multiplier text-box constants window)])))
             nil))))))
 
-(defn scroll! [{:keys [session osession]} xoffset yoffset]
+(defn scroll! [{:keys [session osession] :as m} xoffset yoffset]
   (let [current-tab (session/get-current-tab osession)
         tab (session/get-tab osession (:id current-tab))
         buffer-id (:buffer-id (session/get-current-buffer osession))
-        buffer (session/get-buffer session buffer-id)]
+        buffer (session/get-buffer m buffer-id)]
     (when buffer
       (swap! session/*session upsert-buffer (merge buffer (scroll/start-scrolling-camera buffer xoffset yoffset))))))
 
@@ -551,9 +551,9 @@
   {:viewport {:x 0 :y 0 :width 0 :height 0}
    :clear {:color colors/bg-color :depth 1}})
 
-(defn render-buffer [game session osession constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor? show-minimap?]
+(defn render-buffer [game {:keys [session osession] :as m} constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor? show-minimap?]
   (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]
-              :as buffer} (session/get-buffer session buffer-ptr)]
+              :as buffer} (session/get-buffer m buffer-ptr)]
     (when-let [text-box (session/get-text-box osession current-tab)]
       (let [text-top ((:top text-box) game-height font-size-multiplier)]
         (when (and rects-entity show-cursor?)
@@ -589,10 +589,10 @@
   (when @session/*reload?
     (reset! session/*reload? false)
     (init game))
-  (let [{:keys [session osession]} @session/*session
+  (let [{:keys [session osession] :as m} @session/*session
         current-tab (:id (session/get-current-tab osession))
         current-buffer (:buffer-id (session/get-current-buffer osession))
-        buffer (session/get-buffer session current-buffer)
+        buffer (session/get-buffer m current-buffer)
         font-size-multiplier (:multiplier (session/get-font osession))
         {game-width :width game-height :height :as window} (session/get-window osession)
         {:keys [base-rect-entity base-rects-entity
@@ -613,13 +613,13 @@
                                           (t/translate 0 0)
                                           (t/scale game-width game-height))))))
       (if (and ascii (= current-tab ::session/files))
-        (render-buffer game session osession constants font-size-multiplier game-width game-height current-tab ascii false false)
-        (render-buffer game session osession constants font-size-multiplier game-width game-height current-tab current-buffer (not= mode 'COMMAND_LINE) (#{::session/files ::session/repl-out} current-tab)))
+        (render-buffer game m constants font-size-multiplier game-width game-height current-tab ascii false false)
+        (render-buffer game m constants font-size-multiplier game-width game-height current-tab current-buffer (not= mode 'COMMAND_LINE) (#{::session/files ::session/repl-out} current-tab)))
       (case current-tab
         ::session/repl-in (when-let [buffer-ptr (:buffer-id (session/get-tab osession ::session/repl-out))]
-                            (render-buffer game session osession constants font-size-multiplier game-width game-height ::session/repl-out buffer-ptr false true))
+                            (render-buffer game m constants font-size-multiplier game-width game-height ::session/repl-out buffer-ptr false true))
         ::session/repl-out (when-let [buffer-ptr (:buffer-id (session/get-tab osession ::session/repl-in))]
-                             (render-buffer game session osession constants font-size-multiplier game-width game-height ::session/repl-in buffer-ptr false false))
+                             (render-buffer game m constants font-size-multiplier game-width game-height ::session/repl-in buffer-ptr false false))
         nil)
       (when (and base-rects-entity base-rect-entity)
         (c/render game (-> base-rects-entity

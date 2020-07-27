@@ -40,9 +40,9 @@
        (= 'NORMAL (v/get-mode vim))
        (not= ::session/repl-out (:id (session/get-current-tab osession)))))
 
-(defn apply-parinfer! [session osession vim]
+(defn apply-parinfer! [{:keys [session osession] :as m} vim]
   (let [current-buffer (:buffer-id (session/get-current-buffer osession))
-        {:keys [parsed-code needs-parinfer?]} (session/get-buffer session current-buffer)]
+        {:keys [parsed-code needs-parinfer?]} (session/get-buffer m current-buffer)]
     (when needs-parinfer?
       (let [cursor-line (v/get-cursor-line vim)
             cursor-column (v/get-cursor-column vim)
@@ -159,7 +159,7 @@
     (v/input vim s)))
 
 (defn update-buffer [m buffer-ptr cursor-line cursor-column]
-  (if-let [buffer (session/get-buffer (:session m) buffer-ptr)]
+  (if-let [buffer (session/get-buffer m buffer-ptr)]
     (-> m
         (c/upsert-buffer (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
         (c/insert-buffer-refresh buffer-ptr))
@@ -218,11 +218,11 @@
 
 (defn on-input [vim {:keys [session osession]} s]
   (input vim session osession s)
-  (let [{:keys [session osession]} (swap! session/*session update-after-input vim s)
+  (let [{:keys [session osession] :as m} (swap! session/*session update-after-input vim s)
         mode (:mode (session/get-vim osession))]
     (when (and (= 'NORMAL mode)
                (not= s "u"))
-      (apply-parinfer! session osession vim))))
+      (apply-parinfer! m vim))))
 
 (def ^:const max-line-length 100)
 
@@ -238,7 +238,7 @@
   (swap! session/*session update-after-input vim nil))
 
 (defn repl-enter! [vim {:keys [session osession] :as m} {:keys [out out-pipe]}]
-  (apply-parinfer! session osession vim)
+  (apply-parinfer! m vim)
   (let [buffer-ptr (v/get-current-buffer vim)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
                      (v/get-line vim buffer-ptr (inc i))))
@@ -285,9 +285,9 @@
                                   tab))
                               constants/tab->path)
                             ::session/files)
-            {:keys [session osession]} @session/*session
+            {:keys [session osession] :as m} @session/*session
             constants (session/get-constants osession)
-            existing-buffer (session/get-buffer session buffer-ptr)
+            existing-buffer (session/get-buffer m buffer-ptr)
             buffer (if (and existing-buffer (= (:lines existing-buffer) lines))
                      existing-buffer
                      (assoc (c/->buffer buffer-ptr constants path file-name lines current-tab)
@@ -338,9 +338,9 @@
     (v/execute "filetype plugin indent on")))
 
 (defn yank-lines [{:keys [start-line start-column end-line end-column]}]
-  (let [{:keys [session osession]} @session/*session
+  (let [{:keys [session osession] :as m} @session/*session
         current-buffer (:buffer-id (session/get-current-buffer osession))]
-    (when-let [{:keys [lines]} (session/get-buffer session current-buffer)]
+    (when-let [{:keys [lines]} (session/get-buffer m current-buffer)]
       (let [yanked-lines (subvec lines (dec start-line) end-line)
             end-line (dec (count yanked-lines))
             end-column (cond-> end-column

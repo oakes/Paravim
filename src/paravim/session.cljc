@@ -72,14 +72,15 @@
             bounding-box))
         (o/query-all session ::get-bounding-box)))
 
-(defn get-buffer [session buffer-id]
-  (clara/query session ::get-buffer :?id buffer-id))
-
 (defn get-buffer' [session buffer-id]
   (some (fn [buffer]
           (when (= buffer-id (:id buffer))
             buffer))
         (o/query-all session ::get-buffer)))
+
+(defn get-buffer [{:keys [session osession]} buffer-id]
+  #_(clara/query session ::get-buffer :?id buffer-id)
+  (get-buffer' osession buffer-id))
 
 (defn get-current-buffer [session]
   (first (o/query-all session ::get-current-buffer)))
