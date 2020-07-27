@@ -589,7 +589,12 @@
   (when @session/*reload?
     (reset! session/*reload? false)
     (init game))
-  (let [{:keys [session osession] :as m} @session/*session
+  (let [{:keys [session osession] :as m}
+        (swap! session/*session update :osession
+          (fn [osession]
+            (-> osession
+                (o/insert ::session/time ::session/delta (:delta-time game))
+                o/fire-rules)))
         current-tab (:id (session/get-current-tab osession))
         current-buffer (:buffer-id (session/get-current-buffer osession))
         buffer (session/get-buffer m current-buffer)
@@ -694,11 +699,6 @@
             (-> session
                 (clarax/merge game' game)
                 clara/fire-rules))))
-      (swap! session/*session update :osession
-             (fn [osession]
-               (-> osession
-                   (o/insert ::session/time ::session/delta (:delta-time game))
-                   o/fire-rules)))
       ;; return new game record
       game)))
 
