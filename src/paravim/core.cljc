@@ -63,12 +63,7 @@
           new-buffer (-> buffer
                          (buffers/update-text-buffer constants (:lines bu) (:first-line bu) (:line-count-change bu))
                          (assoc :needs-clojure-refresh? (:clojure? buffer)))]
-      (reduce-kv
-        (fn [session k v]
-          ;; FIXME: temporary hack
-          (o/insert session (:buffer-id bu) (keyword "paravim.session" (name k)) v))
-        session
-        new-buffer))
+      (session/insert session (:buffer-id bu) new-buffer))
     session))
 
 (defn insert-buffer-refresh [session buffer-id]
@@ -89,12 +84,7 @@
                            (buffers/update-highlight $ constants)
                            (buffers/update-selection $ constants (:visual-range vim))
                            (buffers/update-search-highlights $ constants (:show-search? vim) (:highlights vim)))]
-      (reduce-kv
-        (fn [session k v]
-          ;; FIXME: temporary hack
-          (o/insert session buffer-id (keyword "paravim.session" (name k)) v))
-        session
-        new-buffer))
+      (session/insert session buffer-id new-buffer))
     session))
 
 (defn change-font-size [session diff-multiplier]
@@ -122,15 +112,6 @@
 (defn font-multiply [session n]
   (let [font-size (:multiplier (session/get-font session))]
     (change-font-size session (- (* font-size n) font-size))))
-
-(defn upsert-buffer [session buffer-id buffer]
-  (o/insert session buffer-id
-    (reduce-kv
-      (fn [m k v]
-        ;; FIXME: temporary hack
-        (assoc m (keyword "paravim.session" (name k)) v))
-      {}
-      buffer)))
 
 (defn remove-buffer [session buffer-id]
   (if-not (session/get-buffer session buffer-id)
@@ -204,7 +185,7 @@
         buffer-id (:buffer-id (session/get-current-buffer session))
         buffer (session/get-buffer session buffer-id)]
     (when buffer
-      (swap! session/*session upsert-buffer buffer-id (scroll/start-scrolling-camera buffer xoffset yoffset)))))
+      (swap! session/*session session/insert buffer-id (scroll/start-scrolling-camera buffer xoffset yoffset)))))
 
 (defn get-mode []
   (:mode (session/get-vim @session/*session)))
@@ -366,26 +347,8 @@
                           (fn [session]
                             (as-> session $
                                   (o/insert $ ::session/constant constants)
-                                  (reduce-kv
-                                    (fn [session id text-box]
-                                      (reduce-kv
-                                        (fn [session attr value]
-                                          ;; FIXME: temporary hack
-                                          (o/insert session id (keyword "paravim.session" (name attr)) value))
-                                        session
-                                        text-box))
-                                    $
-                                    text-boxes)
-                                  (reduce-kv
-                                    (fn [session id bounding-box]
-                                      (reduce-kv
-                                        (fn [session attr value]
-                                          ;; FIXME: temporary hack
-                                          (o/insert session id (keyword "paravim.session" (name attr)) value))
-                                        session
-                                        bounding-box))
-                                    $
-                                    bounding-boxes)))))]
+                                  (reduce-kv session/insert $ text-boxes)
+                                  (reduce-kv session/insert $ bounding-boxes)))))]
     (if-let [entities @*entity-cache]
       (callback entities)
       (init-entities game callback)))

@@ -65,6 +65,27 @@
 (defn get-globals [session]
   (first (o/query-all session ::get-globals)))
 
+(defn insert
+  ([session id attr->value]
+   (o/insert session id
+             (reduce-kv
+               (fn [m k v]
+                 (assoc m (keyword "paravim.session" (name k)) v))
+               {}
+               attr->value)))
+  ([session id attr value]
+   (o/insert session id (keyword "paravim.session" (name attr)) value)))
+
+(defn insert!
+  ([id attr->value]
+   (o/insert! id (reduce-kv
+                   (fn [m k v]
+                     (assoc m (keyword "paravim.session" (name k)) v))
+                   {}
+                   attr->value)))
+  ([id attr value]
+   (o/insert! id (keyword "paravim.session" (name attr)) value)))
+
 (def queries
   (o/ruleset
     {::get-constants
@@ -269,10 +290,7 @@
                           (paravim.buffers/update-highlight constants)
                           (paravim.buffers/update-selection constants visual-range)
                           (paravim.buffers/update-search-highlights constants show-search? highlights))]
-        (doseq [[k v] new-buffer
-                :when (not= v (get buffer k))]
-          ;; FIXME: temporary hack
-          (o/insert! id (keyword "paravim.session" (name k)) v))
+        (insert! id new-buffer)
         (async/put! single-command-chan [:resize-window]))]
      
      ::move-camera-to-target
@@ -293,9 +311,7 @@
                          camera-target-x camera-target-y
                          scroll-speed-x scroll-speed-y
                          delta-time)]
-        (doseq [[k v] new-buffer]
-          ;; FIXME: temporary hack
-          (o/insert! id (keyword "paravim.session" (name k)) v)))]
+        (insert! id new-buffer))]
      
      ::rubber-band-effect
      [:what
@@ -318,9 +334,7 @@
                          camera-target-x camera-target-y
                          scroll-speed-x scroll-speed-y
                          multiplier text-box constants window)]
-        (doseq [[k v] new-buffer]
-          ;; FIXME: temporary hack
-          (o/insert! id (keyword "paravim.session" (name k)) v)))]
+        (insert! id new-buffer))]
      
      ::minimap
      [:what

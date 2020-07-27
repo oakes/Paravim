@@ -77,8 +77,7 @@
       (swap! session/*session
              (fn [m]
                (-> m
-                   (c/upsert-buffer current-buffer
-                                    {:needs-parinfer? false})
+                   (session/insert current-buffer :needs-parinfer? false)
                    (c/insert-buffer-refresh current-buffer)))))))
 
 (defn read-text-resource [path]
@@ -93,10 +92,9 @@
 
 (defn assoc-ascii [session constants ascii-name]
   (c/new-tab! (:command-chan (session/get-globals session)) session ::constants/files)
-  ;; FIXME: temporary hack
   (let [ascii-key (keyword "paravim.session" ascii-name)]
     (-> session
-        (c/upsert-buffer ascii-key (buffers/->ascii ascii-key constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
+        (session/insert ascii-key (buffers/->ascii ascii-key constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
         (o/insert ::session/vim ::session/ascii ascii-key))))
 
 (defn dissoc-ascii [session ascii-name]
@@ -157,7 +155,7 @@
 (defn update-buffer [session buffer-ptr cursor-line cursor-column]
   (if-let [buffer (session/get-buffer session buffer-ptr)]
     (-> session
-        (c/upsert-buffer buffer-ptr (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
+        (session/insert buffer-ptr (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
         (c/insert-buffer-refresh buffer-ptr))
     session))
 
@@ -294,7 +292,7 @@
             (-> m
                 (c/update-tab current-tab buffer-ptr)
                 (c/update-current-tab current-tab)
-                (c/upsert-buffer buffer-ptr buffer)
+                (session/insert buffer-ptr buffer)
                 (c/insert-buffer-refresh buffer-ptr)))))
       (do
         (when *update-window?*
