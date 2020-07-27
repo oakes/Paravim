@@ -243,14 +243,14 @@
      ::update-buffer-when-font-changes-or-window-resizes
      [:what
       [::global ::single-command-chan single-command-chan]
-      [::vim ::mode mode]
-      [::vim ::visual-range visual-range]
-      [::vim ::show-search? show-search?]
-      [::vim ::highlights highlights]
+      [::vim ::mode mode {:then false}]
+      [::vim ::visual-range visual-range {:then false}]
+      [::vim ::show-search? show-search? {:then false}]
+      [::vim ::highlights highlights {:then false}]
       [::font ::multiplier multiplier]
       [::window ::width window-width]
       [::window ::height window-height]
-      [id ::tab-id tab-id]
+      [id ::tab-id tab-id {:then false}]
       :when
       ;; ignore ascii buffers
       (number? id)
