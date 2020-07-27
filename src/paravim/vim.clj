@@ -27,7 +27,7 @@
           (v/set-window-width (/ width font-width))
           (v/set-window-height (/ (max 0 text-height) font-height)))))))
 
-(defn update-window-size! [{:keys [::c/vim] :as game}]
+(defn update-window-size! [{:keys [:paravim.start/vim] :as game}]
   (let [width (utils/get-width game)
         height (utils/get-height game)]
     (set-window-size! vim @session/*session width height))
@@ -245,7 +245,7 @@
       (.write text)
       .flush)))
 
-(defn append-to-buffer! [{:keys [::c/vim] :as game} session input]
+(defn append-to-buffer! [{:keys [:paravim.start/vim] :as game} session input]
   (when-let [buffer (:buffer-id (session/get-tab session ::session/repl-out))]
     (let [current-buffer (v/get-current-buffer vim)
           cursor-line (v/get-cursor-line vim)
@@ -263,7 +263,7 @@
 
 (defn on-buf-enter [game vim buffer-ptr]
   (when *update-window?*
-    (async/put! (::c/command-chan game) [:resize-window]))
+    (async/put! (:paravim.start/command-chan game) [:resize-window]))
   (let [path (v/get-file-name vim buffer-ptr)
         lines (vec (for [i (range (v/get-line-count vim buffer-ptr))]
                      (v/get-line vim buffer-ptr (inc i))))]
@@ -287,7 +287,7 @@
                        :cursor-line (dec (v/get-cursor-line vim))
                        :cursor-column (v/get-cursor-column vim)))]
         (when *update-window?*
-          (async/put! (::c/command-chan game) [:set-window-title (str file-name " - Paravim")]))
+          (async/put! (:paravim.start/command-chan game) [:set-window-title (str file-name " - Paravim")]))
         (swap! session/*session
           (fn [m]
             (-> m
@@ -297,7 +297,7 @@
                 (c/insert-buffer-refresh buffer-ptr)))))
       (do
         (when *update-window?*
-          (async/put! (::c/command-chan game) [:set-window-title "Paravim"]))
+          (async/put! (:paravim.start/command-chan game) [:set-window-title "Paravim"]))
         ;; clear the files tab
         (swap! session/*session c/update-tab ::session/files nil)))))
 
@@ -344,7 +344,7 @@
             (update end-line subs 0 end-column)
             (update 0 subs start-column))))))
 
-(defn init [{:keys [::c/vim] :as game}]
+(defn init [{:keys [:paravim.start/vim] :as game}]
   (v/set-on-quit vim (fn [buffer-ptr force?]
                        (System/exit 0)))
   (v/set-on-auto-command vim (fn [buffer-ptr event]
@@ -357,16 +357,16 @@
                                  nil)))
   (v/set-on-buffer-update vim (partial on-buf-update game vim))
   (v/set-on-stop-search-highlight vim (fn []
-                                        (async/put! (::c/command-chan game) [:update-vim {::session/show-search? false}])))
+                                        (async/put! (:paravim.start/command-chan game) [:update-vim {::session/show-search? false}])))
   (v/set-on-unhandled-escape vim (fn []
-                                   (async/put! (::c/command-chan game) [:update-vim {::session/show-search? false}])))
+                                   (async/put! (:paravim.start/command-chan game) [:update-vim {::session/show-search? false}])))
   (v/set-on-yank vim (fn [yank-info]
                        (try
                          (when-let [lines (yank-lines yank-info)]
-                           (async/put! (::c/command-chan game) [:set-clipboard-string (str/join \newline lines)]))
+                           (async/put! (:paravim.start/command-chan game) [:set-clipboard-string (str/join \newline lines)]))
                          (catch Exception e (.printStackTrace e)))))
   (v/set-on-message vim (fn [{:keys [message]}]
-                          (async/put! (::c/command-chan game) [:update-vim {::session/message message}])))
+                          (async/put! (:paravim.start/command-chan game) [:update-vim {::session/message message}])))
   (binding [*update-window?* false]
     (run! #(v/open-buffer vim (constants/tab->path %)) [::session/repl-in ::session/repl-out ::session/files]))
   (init-ascii!)

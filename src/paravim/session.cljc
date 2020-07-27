@@ -174,9 +174,8 @@
      
      ::get-globals
      [:what
-      [::global ::command-chan command-chan]
-      [::global ::single-command-chan single-command-chan]
-      [::global ::poll-input! poll-input!]]}))
+      [::global :paravim.start/command-chan command-chan]
+      [::global :paravim.start/single-command-chan single-command-chan]]}))
 
 (def rules
   (o/ruleset

@@ -52,7 +52,7 @@
                 (neg? index) (dec (count constants/tab-ids))
                 (= index (count constants/tab-ids)) 0
                 :else index)]
-    (new-tab! (::command-chan game) session (nth constants/tab-ids index))))
+    (new-tab! (:paravim.start/command-chan game) session (nth constants/tab-ids index))))
 
 (defn update-tab [session id buffer-id]
   (o/insert session id ::session/buffer-id buffer-id))
@@ -156,18 +156,18 @@
     (when (= :left button)
       (let [{:keys [target]} mouse]
         (if (constants/tab? target)
-          (new-tab! (::command-chan game) session target)
+          (new-tab! (:paravim.start/command-chan game) session target)
           (case target
             ::session/font-dec (swap! session/*session font-dec)
             ::session/font-inc (swap! session/*session font-inc)
             ::session/reload-file (when (and buffer (reload-file! buffer (::pipes game) (:id current-tab)))
-                                    (new-tab! (::command-chan game) session ::session/repl-in))
+                                    (new-tab! (:paravim.start/command-chan game) session ::session/repl-in))
             :text (when buffer
                     (let [text-box (session/get-text-box session (:id current-tab))
                           window (session/get-window session)
                           constants (session/get-constants session)
                           font-multiplier (:multiplier (session/get-font session))]
-                      (async/put! (::command-chan game)
+                      (async/put! (:paravim.start/command-chan game)
                                   [:move-cursor (mouse->cursor-position buffer mouse font-multiplier text-box constants window)])))
             nil))))))
 
@@ -381,19 +381,24 @@
                    :text-boxes text-boxes
                    :bounding-boxes bounding-boxes})))))))))
 
-; cache the entities so they aren't recaculated after reloading the session
+;; cache the entities so they aren't recaculated after reloading the session
 (defonce ^:private *entity-cache (atom nil))
+
+;; store the game map (this is a fix for a problem in old versions of the play-cljc template)
+(defonce ^:private *game (atom nil))
 
 (defn init [game]
   ;; allow transparency in images
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
+  ;; save game map
+  (when-not @*game
+    (reset! *game game))
   ;; initialize session
   (reset! session/*session
     (-> @session/*initial-session
-        (o/insert ::session/global {::session/command-chan (::command-chan game)
-                                    ::session/single-command-chan (::single-command-chan game)
-                                    ::session/poll-input! (:poll-input! game)})
+        (o/insert ::session/global (select-keys game [:paravim.start/command-chan
+                                                      :paravim.start/single-command-chan]))
         (o/insert ::session/vim {::session/mode 'NORMAL
                                  ::session/ascii nil
                                  ::session/control? false
@@ -587,12 +592,15 @@
                            (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                            (t/scale font-size-multiplier font-size-multiplier)))))
     ;; update the game record
-    (let [poll-input! (or (::poll-input! game)
-                          ;; if `game` has no poll-input, use the one from the session.
-                          ;; this would only happen in old versions of the play-cljc template
-                          ;; because it wasn't passing the latest game map to this function.
-                          (:poll-input! (session/get-globals session)))
-          game (poll-input! game)]
+    (let [poll-input! (:paravim.start/poll-input! game)
+          game (if poll-input!
+                 (poll-input! game)
+                 ;; if `game` has no poll input fn, use the one from the atom.
+                 ;; this would only happen in old versions of the play-cljc template
+                 ;; because it wasn't passing the latest game map to this function.
+                 (let [poll-input!' (:paravim.start/poll-input! @*game)
+                       game' (merge @*game game)]
+                   (reset! *game (poll-input!' game'))))]
       ;; return new game record
       game)))
 

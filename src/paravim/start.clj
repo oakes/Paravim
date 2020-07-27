@@ -77,7 +77,7 @@
    :home "Home"
    :end "End"})
 
-(defn on-mouse-move! [{:keys [::c/density-ratio] :as game} window xpos ypos]
+(defn on-mouse-move! [{:keys [::density-ratio] :as game} window xpos ypos]
   (let [x (* xpos density-ratio)
         y (* ypos density-ratio)
         session (swap! session/*session
@@ -100,7 +100,7 @@
              (= action GLFW/GLFW_PRESS))
     (c/click-mouse! game @session/*session :left)))
 
-(defn on-key! [{:keys [::c/vim ::c/pipes] :as game} window keycode scancode action mods]
+(defn on-key! [{:keys [::vim ::pipes] :as game} window keycode scancode action mods]
   (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
         ;alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
         shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))
@@ -152,13 +152,13 @@
             (when-let [key-name (keyword->name k)]
               (vim/on-input vim session (str "<" key-name ">")))))))))
 
-(defn on-char! [{:keys [::c/vim] :as game} window codepoint]
+(defn on-char! [{:keys [::vim] :as game} window codepoint]
   (vim/on-input vim @session/*session (str (char codepoint))))
 
 (defn on-resize! [game window width height]
   (swap! session/*session c/update-window-size width height))
 
-(defn on-scroll! [{:keys [::c/density-ratio] :as game} window xoffset yoffset]
+(defn on-scroll! [{:keys [::density-ratio] :as game} window xoffset yoffset]
   (c/scroll! @session/*session (/ xoffset density-ratio) (/ yoffset density-ratio)))
 
 (defn- listen-for-events [game window]
@@ -192,12 +192,12 @@
         (invoke [this window]
           (System/exit 0))))))
 
-(defn- poll-input! [{:keys [context ::c/vim ::c/command-chan ::c/single-command-chan ::c/repl-output] :as game}]
+(defn- poll-input! [{:keys [context ::vim ::command-chan ::single-command-chan ::repl-output] :as game}]
   (or
     (if-let [input (or (async/poll! command-chan)
                        (async/poll! single-command-chan))]
       (case (first input)
-        :append (assoc game ::c/repl-output (conj repl-output (second input)))
+        :append (assoc game ::repl-output (conj repl-output (second input)))
         :new-buf (let [id-or-path (second input)]
                    (cond
                      (integer? id-or-path)
@@ -220,7 +220,7 @@
         (when (vim/ready-to-append? session vim repl-output)
           (binding [vim/*update-ui?* false]
             (vim/append-to-buffer! game session (first repl-output)))
-          (assoc game ::c/repl-output (vec (rest repl-output))))))
+          (assoc game ::repl-output (vec (rest repl-output))))))
     game))
 
 (defn ->window []
@@ -248,14 +248,14 @@
    (let [pipes (repl/create-pipes)
          density-ratio (get-density-ratio (:context game))
          game (assoc game
-                ::c/density-ratio density-ratio
-                ::c/pipes pipes
-                ::c/poll-input! poll-input!
-                ::c/vim vim
-                ::c/command-chan command-chan
+                ::density-ratio density-ratio
+                ::pipes pipes
+                ::poll-input! poll-input!
+                ::vim vim
+                ::command-chan command-chan
                 ;; single-command-chan is like command-chan but can only contain one command
-                ::c/single-command-chan (async/chan (async/sliding-buffer 1))
-                ::c/repl-output []
+                ::single-command-chan (async/chan (async/sliding-buffer 1))
+                ::repl-output []
                 ::vim/init vim/init)]
      (c/init game)
      (swap! session/*session c/font-multiply density-ratio)
