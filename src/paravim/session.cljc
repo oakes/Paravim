@@ -268,7 +268,7 @@
      
      ::update-buffer-when-font-changes-or-window-resizes
      [:what
-      [::global ::single-command-chan single-command-chan]
+      [::global :paravim.start/single-command-chan single-command-chan]
       [::vim ::mode mode {:then false}]
       [::vim ::visual-range visual-range {:then false}]
       [::vim ::show-search? show-search? {:then false}]
