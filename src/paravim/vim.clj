@@ -28,7 +28,7 @@
           (v/set-window-width (/ width font-width))
           (v/set-window-height (/ (max 0 text-height) font-height)))))))
 
-(defn update-window-size! [{:keys [:paravim.start/vim] :as game}]
+(defn update-window-size! [{:keys [::vim] :as game}]
   (let [width (utils/get-width game)
         height (utils/get-height game)]
     (set-window-size! vim @session/*session width height))
@@ -244,7 +244,7 @@
       (.write text)
       .flush)))
 
-(defn append-to-buffer! [{:keys [:paravim.start/vim] :as game} session input]
+(defn append-to-buffer! [{:keys [::vim] :as game} session input]
   (when-let [buffer (:buffer-id (session/get-tab session ::constants/repl-out))]
     (let [current-buffer (v/get-current-buffer vim)
           cursor-line (v/get-cursor-line vim)
@@ -343,7 +343,7 @@
             (update end-line subs 0 end-column)
             (update 0 subs start-column))))))
 
-(defn init [{:keys [:paravim.start/vim] :as game}]
+(defn init [{:keys [::vim] :as game}]
   (v/set-on-quit vim (fn [buffer-ptr force?]
                        (System/exit 0)))
   (v/set-on-auto-command vim (fn [buffer-ptr event]

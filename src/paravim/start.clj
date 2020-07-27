@@ -101,7 +101,7 @@
              (= action GLFW/GLFW_PRESS))
     (c/click-mouse! game @session/*session :left)))
 
-(defn on-key! [{:keys [::vim ::pipes] :as game} window keycode scancode action mods]
+(defn on-key! [{:keys [::vim/vim ::pipes] :as game} window keycode scancode action mods]
   (let [control? (not= 0 (bit-and mods GLFW/GLFW_MOD_CONTROL))
         ;alt? (not= 0 (bit-and mods GLFW/GLFW_MOD_ALT))
         shift? (not= 0 (bit-and mods GLFW/GLFW_MOD_SHIFT))
@@ -153,7 +153,7 @@
             (when-let [key-name (keyword->name k)]
               (vim/on-input vim session (str "<" key-name ">")))))))))
 
-(defn on-char! [{:keys [::vim] :as game} window codepoint]
+(defn on-char! [{:keys [::vim/vim] :as game} window codepoint]
   (vim/on-input vim @session/*session (str (char codepoint))))
 
 (defn on-resize! [game window width height]
@@ -193,7 +193,7 @@
         (invoke [this window]
           (System/exit 0))))))
 
-(defn- poll-input! [{:keys [context ::vim ::command-chan ::single-command-chan ::repl-output] :as game}]
+(defn- poll-input! [{:keys [context ::vim/vim ::command-chan ::single-command-chan ::repl-output] :as game}]
   (or
     (if-let [input (or (async/poll! command-chan)
                        (async/poll! single-command-chan))]
@@ -252,11 +252,11 @@
                 ::density-ratio density-ratio
                 ::pipes pipes
                 ::poll-input! poll-input!
-                ::vim vim
                 ::command-chan command-chan
                 ;; single-command-chan is like command-chan but can only contain one command
                 ::single-command-chan (async/chan (async/sliding-buffer 1))
                 ::repl-output []
+                ::vim/vim vim
                 ::vim/init vim/init)]
      (c/init game)
      (swap! session/*session c/font-multiply density-ratio)
