@@ -3,8 +3,6 @@
             [paravim.session :as session]
             [paravim.constants :as constants]
             [paravim.utils :as utils]
-            [clara.rules :as clara]
-            [clarax.rules :as clarax]
             [odoyle.rules :as o]
             [libvim-clj.core :as v]
             [clojure.string :as str]
@@ -42,7 +40,7 @@
 
 (defn apply-parinfer! [{:keys [session osession] :as m} vim]
   (let [current-buffer (:buffer-id (session/get-current-buffer osession))
-        {:keys [parsed-code needs-parinfer?]} (session/get-buffer m current-buffer)]
+        {:keys [parsed-code needs-parinfer?]} (session/get-buffer osession current-buffer)]
     (when needs-parinfer?
       (let [cursor-line (v/get-cursor-line vim)
             cursor-column (v/get-cursor-column vim)
@@ -99,7 +97,7 @@
         (c/upsert-buffer ascii-key (c/->ascii ascii-key constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
         (update :osession
                 (fn [osession]
-                  (c/new-tab! (session/get-game (:session m)) osession ::session/files)
+                  (c/new-tab! (:command-chan (session/get-globals (:osession m))) osession ::session/files)
                   (-> osession
                       (o/insert ::session/vim ::session/ascii ascii-key)))))))
 
@@ -159,7 +157,7 @@
     (v/input vim s)))
 
 (defn update-buffer [m buffer-ptr cursor-line cursor-column]
-  (if-let [buffer (session/get-buffer m buffer-ptr)]
+  (if-let [buffer (session/get-buffer (:osession m) buffer-ptr)]
     (-> m
         (c/upsert-buffer (:id buffer) (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
         (c/insert-buffer-refresh buffer-ptr))
@@ -210,7 +208,7 @@
                              {::session/command-start s}
                              (when (#{"/" "?"} s)
                                {::session/show-search? true}))))
-                       (c/assoc-command constants mode (:size (session/get-font-multiplier session)) (v/get-command-position vim)))
+                       (c/assoc-command constants mode (:multiplier (session/get-font osession)) (v/get-command-position vim)))
                    (merge vim-info (c/command-text nil nil)))
         osession (o/insert osession ::session/vim vim-info)
         m (assoc m :session session :osession osession)]
@@ -287,7 +285,7 @@
                             ::session/files)
             {:keys [session osession] :as m} @session/*session
             constants (session/get-constants osession)
-            existing-buffer (session/get-buffer m buffer-ptr)
+            existing-buffer (session/get-buffer osession buffer-ptr)
             buffer (if (and existing-buffer (= (:lines existing-buffer) lines))
                      existing-buffer
                      (assoc (c/->buffer buffer-ptr constants path file-name lines current-tab)
@@ -340,7 +338,7 @@
 (defn yank-lines [{:keys [start-line start-column end-line end-column]}]
   (let [{:keys [session osession] :as m} @session/*session
         current-buffer (:buffer-id (session/get-current-buffer osession))]
-    (when-let [{:keys [lines]} (session/get-buffer m current-buffer)]
+    (when-let [{:keys [lines]} (session/get-buffer osession current-buffer)]
       (let [yanked-lines (subvec lines (dec start-line) end-line)
             end-line (dec (count yanked-lines))
             end-column (cond-> end-column

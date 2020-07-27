@@ -3,38 +3,14 @@
             [paravim.scroll :as scroll]
             [paravim.constants :as constants]
             [paravim.minimap :as minimap]
-            [clara.rules :as clara]
-            [clarax.rules :as clarax]
             [odoyle.rules :as o #?(:clj :refer :cljs :refer-macros) [ruleset]]
             [clojure.string :as str]
-            [clojure.core.async :as async]
-            #?(:clj  [clarax.macros-java :refer [->session]]
-               :cljs [clarax.macros-js :refer-macros [->session]]))
+            [clojure.core.async :as async])
   #?(:cljs (:require-macros [paravim.session :refer [merge-into-session]])))
 
 (defonce *initial-session (atom nil))
-(defonce *initial-osession (atom nil))
 (defonce *session (atom {}))
 (defonce *reload? (atom false))
-
-(defrecord Game [total-time delta-time context])
-(defrecord Window [width height])
-(defrecord TextBox [id left right top bottom])
-(defrecord Font [size])
-(defrecord FontMultiplier [size])
-(defrecord CurrentTab [id])
-(defrecord Tab [id buffer-id])
-(defrecord Buffer [id tab-id
-                   text-entity parinfer-text-entity rects-entity
-                   parsed-code needs-parinfer? needs-parinfer-init? needs-clojure-refresh?
-                   camera camera-x camera-y camera-target-x camera-target-y total-time-anchor
-                   scroll-speed-x scroll-speed-y
-                   path file-name
-                   lines clojure?
-                   cursor-line cursor-column
-                   font-anchor window-anchor show-minimap?
-                   last-update])
-(defrecord Minimap [buffer-id show? text-entity rects-entity anchor])
 
 (defn get-constants [session]
   (first (o/query-all session ::get-constants)))
@@ -72,15 +48,11 @@
             bounding-box))
         (o/query-all session ::get-bounding-box)))
 
-(defn get-buffer' [session buffer-id]
+(defn get-buffer [session buffer-id]
   (some (fn [buffer]
           (when (= buffer-id (:id buffer))
             buffer))
         (o/query-all session ::get-buffer)))
-
-(defn get-buffer [{:keys [session osession]} buffer-id]
-  #_(clara/query session ::get-buffer :?id buffer-id)
-  (get-buffer' osession buffer-id))
 
 (defn get-current-buffer [session]
   (first (o/query-all session ::get-current-buffer)))
@@ -91,7 +63,10 @@
             minimap))
         (o/query-all session ::get-minimap)))
 
-(def oqueries
+(defn get-globals [session]
+  (first (o/query-all session ::get-globals)))
+
+(def queries
   (o/ruleset
     {::get-constants
      [:what
@@ -181,7 +156,7 @@
       [id ::path path]
       [id ::file-name file-name]
       [id ::lines lines]
-      [id ::clojure? clojure]
+      [id ::clojure? clojure?]
       [id ::cursor-line cursor-line]
       [id ::cursor-column cursor-column]
       [id ::show-minimap? show-minimap?]]
@@ -195,9 +170,15 @@
      [:what
       [id ::minimap/show? show?]
       [id ::minimap/rects-entity rects-entity]
-      [id ::minimap/text-entity text-entity]]}))
+      [id ::minimap/text-entity text-entity]]
 
-(def orules
+     ::get-globals
+     [:what
+      [::global ::command-chan command-chan]
+      [::global ::single-command-chan single-command-chan]
+      [::global ::poll-input! poll-input!]]}))
+
+(def rules
   (o/ruleset
     {::init-font-size
      [:what
@@ -282,7 +263,7 @@
       (number? id)
       :then
       (let [constants (get-constants o/*session*)
-            buffer (get-buffer' o/*session* id)
+            buffer (get-buffer o/*session* id)
             text-box (get-text-box o/*session* tab-id)
             window {:width window-width :height window-height}
             new-buffer (-> buffer
@@ -370,60 +351,10 @@
         (when (not= show? show-minimap?)
           (o/insert! id ::show-minimap? show?)))]}))
 
-(def rules
-  '{})
-
-(def queries
-  '{::get-game
-    (fn []
-      (let [game paravim.session.Game]
-        game))
-    ::get-window
-    (fn []
-      (let [window paravim.session.Window]
-        window))
-    ::get-current-tab
-    (fn []
-      (let [current-tab paravim.session.CurrentTab]
-        current-tab))
-    ::get-tab
-    (fn [?id]
-      (let [tab paravim.session.Tab
-            :when (= (:id tab) ?id)]
-        tab))
-    ::get-font
-    (fn []
-      (let [font paravim.session.Font]
-        font))
-    ::get-font-multiplier
-    (fn []
-      (let [font paravim.session.FontMultiplier]
-        font))
-    ::get-text-box
-    (fn [?id]
-      (let [text-box paravim.session.TextBox
-            :when (= (:id text-box) ?id)]
-        text-box))
-    ::get-buffer
-    (fn [?id]
-      (let [buffer paravim.session.Buffer
-            :when (= (:id buffer) ?id)]
-        buffer))
-    ::get-minimap
-    (fn [?id]
-      (let [minimap paravim.session.Minimap
-            :when (= (:buffer-id minimap) ?id)]
-        minimap))})
-
 #?(:clj (defmacro merge-into-session [& args]
           `(do
-             (reset! *initial-session (->session ~(->> (apply merge queries rules args)
-                                                       ;; remove nil rules (this allows people to disable rules)
-                                                       (filter second)
-                                                       (into {}))))
-
-             (reset! *initial-osession
-               (reduce o/add-rule (o/->session) (concat oqueries orules)))
+             (reset! *initial-session
+               (reduce o/add-rule (o/->session) (concat queries rules)))
              ;; reload the session if it's been created already
              (when @*session
                (reset! *reload? true))
@@ -431,9 +362,4 @@
 
 ;; create initial session
 (merge-into-session)
-
-(defn def-queries [{:keys [session]}]
-  (let [query-fns (clarax/query-fns session)]
-    (def get-game (::get-game query-fns))
-    (def get-font-multiplier (::get-font-multiplier query-fns))))
 

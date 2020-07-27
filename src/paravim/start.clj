@@ -126,7 +126,7 @@
               (case k
                 (:tab :backtick)
                 (c/shift-current-tab! game session osession (if shift? -1 1))
-                :f (repl/reload-file! (session/get-buffer m current-buffer) pipes current-tab)
+                :f (repl/reload-file! (session/get-buffer osession current-buffer) pipes current-tab)
                 :- (swap! session/*session c/font-dec)
                 := (swap! session/*session c/font-inc)
                 :v (if (= mode 'INSERT)
@@ -206,8 +206,8 @@
         :update-vim (do
                       (swap! session/*session update :osession o/insert ::session/vim (second input))
                       (swap! session/*session
-                             (fn [session]
-                               (c/insert-buffer-refresh session (:buffer-id (session/get-current-buffer session)))))
+                             (fn [m]
+                               (c/insert-buffer-refresh m (:buffer-id (session/get-current-buffer (:osession m))))))
                       nil))
       (when-let [m @session/*session] ;; this could be momentarily nil while hot code reloading
         (when (vim/ready-to-append? (:osession m) vim repl-output)

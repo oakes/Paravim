@@ -7,8 +7,6 @@
             [paravim.constants :as constants]
             [paravim.scroll :as scroll]
             #?(:clj [paravim.repl :refer [reload-file!]])
-            [clara.rules :as clara]
-            [clarax.rules :as clarax]
             [odoyle.rules :as o]
             [clojure.string :as str]
             [clojure.set :as set]
@@ -35,11 +33,6 @@
 
 (defn update-window-size [m width height]
   (-> m
-      (update :session
-              (fn [session]
-                (-> session
-                    (clarax/merge (clara/query session ::session/get-window) {:width width :height height})
-                    clara/fire-rules)))
       (update :osession
               (fn [osession]
                 (-> osession
@@ -47,21 +40,16 @@
 
 (defn update-current-tab [m id]
   (-> m
-      (update :session
-              (fn [session]
-                (-> session
-                    (clarax/merge (clara/query session ::session/get-current-tab) {:id id})
-                    clara/fire-rules)))
       (update :osession
               (fn [osession]
                 (-> osession
                     (o/insert ::session/tab ::session/current id))))))
 
-(defn new-tab! [game session tab-id]
+(defn new-tab! [command-chan session tab-id]
   (let [buffer-id-or-path (or (:buffer-id (session/get-tab session tab-id))
                               ;; if no buffer exists, open a new one
                               (get constants/tab->path tab-id))]
-    (async/put! (::command-chan game) [:new-buf buffer-id-or-path])))
+    (async/put! command-chan [:new-buf buffer-id-or-path])))
 
 (defn shift-current-tab! [game session osession direction]
   (let [current-tab (session/get-current-tab osession)
@@ -72,15 +60,10 @@
                 (neg? index) (dec (count constants/tab-ids))
                 (= index (count constants/tab-ids)) 0
                 :else index)]
-    (new-tab! game osession (nth constants/tab-ids index))))
+    (new-tab! (::command-chan game) osession (nth constants/tab-ids index))))
 
 (defn update-tab [m id buffer-id]
   (-> m
-      (update :session
-              (fn [session]
-                (-> session
-                    (clarax/merge (clara/query session ::session/get-tab :?id id) {:buffer-id buffer-id})
-                    clara/fire-rules)))
       (update :osession
               (fn [osession]
                 (-> osession
@@ -88,63 +71,49 @@
 
 (defn insert-buffer-update [{:keys [osession] :as m} bu]
   (-> m
-      (update :session
-              (fn [session]
-                (if-let [buffer (clara/query session ::session/get-buffer :?id (:buffer-id bu))]
-                  (let [constants (session/get-constants osession)]
-                    (as-> buffer $
-                          (buffers/update-text-buffer $ constants (:lines bu) (:first-line bu) (:line-count-change bu))
-                          (assoc $ :needs-clojure-refresh? (:clojure? buffer))
-                          (clarax/merge session buffer $)
-                          (clara/fire-rules $)))
-                  session)))
-      ((fn [{:keys [session osession] :as m}]
-         (let [buffer (clara/query session ::session/get-buffer :?id (:buffer-id bu))
-               constants (session/get-constants osession)]
-           (update m :osession
-                   (fn [osession]
-                     (reduce-kv
-                       (fn [session k v]
-                         ;; FIXME: temporary hack
-                         (o/insert session (:buffer-id bu) (keyword "paravim.session" (name k)) v))
-                       osession
-                       buffer))))))))
+      (update :osession
+              (fn [osession]
+                (if-let [buffer (session/get-buffer osession (:buffer-id bu))]
+                  (let [constants (session/get-constants osession)
+                        new-buffer (-> buffer
+                                       (buffers/update-text-buffer constants (:lines bu) (:first-line bu) (:line-count-change bu))
+                                       (assoc :needs-clojure-refresh? (:clojure? buffer)))]
+                    (reduce-kv
+                      (fn [session k v]
+                        ;; FIXME: temporary hack
+                        (o/insert session (:buffer-id bu) (keyword "paravim.session" (name k)) v))
+                      osession
+                      new-buffer))
+                  osession)))))
 
 (defn insert-buffer-refresh [{:keys [osession] :as m} buffer-id]
   (-> m
-      (update :session
-              (fn [session]
-                (if-let [buffer (clara/query session ::session/get-buffer :?id buffer-id)]
+      (update :osession
+              (fn [osession]
+                (if-let [buffer (session/get-buffer osession buffer-id)]
                   (let [constants (session/get-constants osession)
                         vim (session/get-vim osession)
                         font-multiplier (:multiplier (session/get-font osession))
                         text-box (session/get-text-box osession (:tab-id buffer))
-                        window (session/get-window osession)]
-                    (as-> buffer $
-                          (if (:needs-clojure-refresh? buffer)
-                            (-> $
-                                (buffers/parse-clojure-buffer (:mode vim))
-                                (buffers/update-clojure-buffer constants)
-                                (assoc :needs-clojure-refresh? false))
-                            $)
-                          (buffers/update-cursor $ (:mode vim) font-multiplier text-box constants window)
-                          (buffers/update-highlight $ constants)
-                          (buffers/update-selection $ constants (:visual-range vim))
-                          (buffers/update-search-highlights $ constants (:show-search? vim) (:highlights vim))
-                          (clarax/merge session buffer $)
-                          (clara/fire-rules $)))
-                  session)))
-      ((fn [{:keys [session osession] :as m}]
-         (let [buffer (clara/query session ::session/get-buffer :?id buffer-id)
-               constants (session/get-constants osession)]
-           (update m :osession
-                   (fn [osession]
-                     (reduce-kv
-                       (fn [session k v]
-                         ;; FIXME: temporary hack
-                         (o/insert session buffer-id (keyword "paravim.session" (name k)) v))
-                       osession
-                       buffer))))))))
+                        window (session/get-window osession)
+                        new-buffer (as-> buffer $
+                                         (if (:needs-clojure-refresh? buffer)
+                                           (-> $
+                                               (buffers/parse-clojure-buffer (:mode vim))
+                                               (buffers/update-clojure-buffer constants)
+                                               (assoc :needs-clojure-refresh? false))
+                                           $)
+                                         (buffers/update-cursor $ (:mode vim) font-multiplier text-box constants window)
+                                         (buffers/update-highlight $ constants)
+                                         (buffers/update-selection $ constants (:visual-range vim))
+                                         (buffers/update-search-highlights $ constants (:show-search? vim) (:highlights vim)))]
+                    (reduce-kv
+                      (fn [session k v]
+                        ;; FIXME: temporary hack
+                        (o/insert session buffer-id (keyword "paravim.session" (name k)) v))
+                      osession
+                      new-buffer))
+                  osession)))))
 
 (defn change-font-size [{:keys [osession] :as m} diff-multiplier]
   (let [font (session/get-font osession)
@@ -160,11 +129,6 @@
             (< curr-val min-font-size)
             (> curr-val max-font-size))
       (-> m
-          (update :session
-                  (fn [session]
-                    (-> session
-                        (clarax/merge (clara/query session ::session/get-font) {:size new-val})
-                        clara/fire-rules)))
           (update :osession
                   (fn [osession]
                     (-> osession
@@ -183,18 +147,6 @@
 
 (defn upsert-buffer [m buffer-id buffer]
   (-> m
-      (update :session
-              (fn [session]
-                (let [total-time (-> session session/get-game :total-time)
-                      buffer (assoc buffer :last-update total-time)]
-                  (if-let [existing-buffer (clara/query session ::session/get-buffer :?id buffer-id)]
-                    (-> session
-                        (clarax/merge existing-buffer buffer)
-                        clara/fire-rules)
-                    (-> session
-                        (clara/insert (session/map->Buffer buffer))
-                        (clara/insert (session/map->Minimap {:buffer-id buffer-id}))
-                        clara/fire-rules)))))
       (update :osession
               (fn [osession]
                 (-> osession
@@ -207,10 +159,7 @@
                         buffer)))))))
 
 (defn remove-buffer [session buffer-id]
-  (let [buffer (clara/query session ::session/get-buffer :?id buffer-id)]
-    (-> session
-        (cond-> buffer (clara/retract buffer))
-        clara/fire-rules)))
+  session)
 
 (defn- mouse->cursor-position [buffer mouse font-size-multiplier text-box constants window]
   (let [text-top ((:top text-box) (:height window) font-size-multiplier)
@@ -229,16 +178,16 @@
   (let [mouse (session/get-mouse osession)
         current-tab (session/get-current-tab osession)
         buffer-id (:buffer-id (session/get-current-buffer osession))
-        buffer (session/get-buffer m buffer-id)]
+        buffer (session/get-buffer osession buffer-id)]
     (when (= :left button)
       (let [{:keys [target]} mouse]
         (if (constants/tab? target)
-          (new-tab! game osession target)
+          (new-tab! (::command-chan game) osession target)
           (case target
             ::session/font-dec (swap! session/*session font-dec)
             ::session/font-inc (swap! session/*session font-inc)
             ::session/reload-file (when (and buffer (reload-file! buffer (::pipes game) (:id current-tab)))
-                                    (new-tab! game osession ::session/repl-in))
+                                    (new-tab! (::command-chan game) osession ::session/repl-in))
             :text (when buffer
                     (let [text-box (session/get-text-box osession (:id current-tab))
                           window (session/get-window osession)
@@ -252,7 +201,7 @@
   (let [current-tab (session/get-current-tab osession)
         tab (session/get-tab osession (:id current-tab))
         buffer-id (:buffer-id (session/get-current-buffer osession))
-        buffer (session/get-buffer m buffer-id)]
+        buffer (session/get-buffer osession buffer-id)]
     (when buffer
       (swap! session/*session upsert-buffer buffer-id (scroll/start-scrolling-camera buffer xoffset yoffset)))))
 
@@ -466,21 +415,11 @@
   (gl game enable (gl game BLEND))
   (gl game blendFunc (gl game SRC_ALPHA) (gl game ONE_MINUS_SRC_ALPHA))
   ;; initialize session
-  (session/def-queries
-    (swap! session/*session assoc :session
-            (clara/insert @session/*initial-session
-              (session/map->Game game)
-              (session/->Window (utils/get-width game) (utils/get-height game))
-              (session/->CurrentTab ::session/files)
-              (session/->Tab ::session/files nil)
-              (session/->Tab ::session/repl-in nil)
-              (session/->Tab ::session/repl-out nil)
-              (session/->Font 0) ;; initialized in the font rule
-              (session/->FontMultiplier constants/default-font-multiplier))))
   (swap! session/*session assoc :osession
-         (-> @session/*initial-osession
+         (-> @session/*initial-session
              (o/insert ::session/global {::session/command-chan (::command-chan game)
-                                         ::session/single-command-chan (::single-command-chan game)})
+                                         ::session/single-command-chan (::single-command-chan game)
+                                         ::session/poll-input! (:poll-input! game)})
              (o/insert ::session/vim {::session/mode 'NORMAL
                                       ::session/ascii nil
                                       ::session/control? false
@@ -524,20 +463,11 @@
                                         session
                                         bounding-box))
                                     $
-                                    bounding-boxes))))
-                   (swap! session/*session update :session
-                          (fn [session]
-                            (as-> session $
-                                  (reduce-kv
-                                    (fn [session id text-box]
-                                      (clara/insert session (session/map->TextBox (assoc text-box :id id))))
-                                    $
-                                    text-boxes)))))]
+                                    bounding-boxes)))))]
     (if-let [entities @*entity-cache]
       (callback entities)
       (init-entities game callback)))
   ;; fire rules
-  (swap! session/*session update :session clara/fire-rules)
   (swap! session/*session update :osession o/fire-rules)
   ;; init vim
   ;; this should never be nil, but it could be after
@@ -554,7 +484,7 @@
 
 (defn render-buffer [game {:keys [session osession] :as m} constants font-size-multiplier game-width game-height current-tab buffer-ptr show-cursor? show-minimap?]
   (when-let [{:keys [rects-entity text-entity parinfer-text-entity camera]
-              :as buffer} (session/get-buffer m buffer-ptr)]
+              :as buffer} (session/get-buffer osession buffer-ptr)]
     (when-let [text-box (session/get-text-box osession current-tab)]
       (let [text-top ((:top text-box) game-height font-size-multiplier)]
         (when (and rects-entity show-cursor?)
@@ -598,7 +528,7 @@
                 o/fire-rules)))
         current-tab (:id (session/get-current-tab osession))
         current-buffer (:buffer-id (session/get-current-buffer osession))
-        buffer (session/get-buffer m current-buffer)
+        buffer (session/get-buffer osession current-buffer)
         font-size-multiplier (:multiplier (session/get-font osession))
         {game-width :width game-height :height :as window} (session/get-window osession)
         {:keys [base-rect-entity base-rects-entity
@@ -684,22 +614,12 @@
                            (t/translate 0 (- game-height (* font-size-multiplier font-height)))
                            (t/scale font-size-multiplier font-size-multiplier)))))
     ;; update the game record
-    (let [game' (session/get-game session)
-          ;; read from command chan and update game record if necessary
-          poll-input! (::poll-input! game)
-          game (if poll-input!
-                 (poll-input! game)
-                 ;; if `game` has no poll-input, use the one from the session.
-                 ;; this would only happen in old versions of the play-cljc template
-                 ;; because it wasn't passing the latest game map to this function.
-                 ((::poll-input! game') (merge game' game)))]
-      ;; put new game record in the session
-      (swap! session/*session update :session
-        (fn [session]
-          (when session ;; this could be momentarily nil while reloading the paravim.session ns
-            (-> session
-                (clarax/merge game' game)
-                clara/fire-rules))))
+    (let [poll-input! (or (::poll-input! game)
+                          ;; if `game` has no poll-input, use the one from the session.
+                          ;; this would only happen in old versions of the play-cljc template
+                          ;; because it wasn't passing the latest game map to this function.
+                          (:poll-input! (session/get-globals osession)))
+          game (poll-input! game)]
       ;; return new game record
       game)))
 
