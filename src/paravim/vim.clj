@@ -78,8 +78,8 @@
       (swap! session/*session
              (fn [m]
                (-> m
-                   (c/upsert-buffer {:id current-buffer
-                                     :needs-parinfer? false})
+                   (c/upsert-buffer current-buffer
+                                    {:needs-parinfer? false})
                    (c/insert-buffer-refresh current-buffer)))))))
 
 (defn read-text-resource [path]
@@ -96,7 +96,7 @@
   ;; FIXME: temporary hack
   (let [ascii-key (keyword "paravim.session" ascii-name)]
     (-> m
-        (c/upsert-buffer (c/->ascii ascii-key constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
+        (c/upsert-buffer ascii-key (c/->ascii ascii-key constants (read-text-resource (str "ascii/" ascii-name ".txt"))))
         (update :osession
                 (fn [osession]
                   (c/new-tab! (session/get-game (:session m)) osession ::session/files)
@@ -161,7 +161,7 @@
 (defn update-buffer [m buffer-ptr cursor-line cursor-column]
   (if-let [buffer (session/get-buffer m buffer-ptr)]
     (-> m
-        (c/upsert-buffer (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
+        (c/upsert-buffer (:id buffer) (assoc buffer :cursor-line cursor-line :cursor-column cursor-column))
         (c/insert-buffer-refresh buffer-ptr))
     m))
 
@@ -300,7 +300,7 @@
             (-> m
                 (c/update-tab current-tab buffer-ptr)
                 (c/update-current-tab current-tab)
-                (c/upsert-buffer buffer)
+                (c/upsert-buffer (:id buffer) buffer)
                 (c/insert-buffer-refresh buffer-ptr)))))
       (do
         (when *update-window?*

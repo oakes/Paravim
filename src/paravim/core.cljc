@@ -181,24 +181,24 @@
   (let [font-size (:multiplier (session/get-font (:osession m)))]
     (change-font-size m (- (* font-size n) font-size))))
 
-(defn upsert-buffer [m buffer]
+(defn upsert-buffer [m buffer-id buffer]
   (-> m
       (update :session
               (fn [session]
                 (let [total-time (-> session session/get-game :total-time)
                       buffer (assoc buffer :last-update total-time)]
-                  (if-let [existing-buffer (clara/query session ::session/get-buffer :?id (:id buffer))]
+                  (if-let [existing-buffer (clara/query session ::session/get-buffer :?id buffer-id)]
                     (-> session
                         (clarax/merge existing-buffer buffer)
                         clara/fire-rules)
                     (-> session
                         (clara/insert (session/map->Buffer buffer))
-                        (clara/insert (session/map->Minimap {:buffer-id (:id buffer)}))
+                        (clara/insert (session/map->Minimap {:buffer-id buffer-id}))
                         clara/fire-rules)))))
       (update :osession
               (fn [osession]
                 (-> osession
-                    (o/insert (:id buffer)
+                    (o/insert buffer-id
                       (reduce-kv
                         (fn [m k v]
                           ;; FIXME: temporary hack
@@ -257,7 +257,7 @@
         buffer-id (:buffer-id (session/get-current-buffer osession))
         buffer (session/get-buffer m buffer-id)]
     (when buffer
-      (swap! session/*session upsert-buffer (merge buffer (scroll/start-scrolling-camera buffer xoffset yoffset))))))
+      (swap! session/*session upsert-buffer buffer-id (scroll/start-scrolling-camera buffer xoffset yoffset)))))
 
 (defn get-mode []
   (:mode (session/get-vim (:osession @session/*session))))
