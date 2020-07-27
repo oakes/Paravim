@@ -268,7 +268,30 @@
                 :when (not= v (get buffer k))]
           ;; FIXME: temporary hack
           (o/insert! id (keyword "paravim.session" (name k)) v))
-        (async/put! single-command-chan [:resize-window]))]}))
+        (async/put! single-command-chan [:resize-window]))]
+     ::move-camera-to-target
+     [:what
+      [::time ::delta delta-time]
+      [::window ::width window-width]
+      [::window ::height window-height]
+      [::font ::multiplier multiplier]
+      [id ::tab-id tab-id]
+      [id ::camera-x camera-x {:then false}]
+      [id ::camera-y camera-y {:then false}]
+      [id ::camera-target-x camera-target-x {:then false}]
+      [id ::camera-target-y camera-target-y {:then false}]
+      :when
+      (or (not (== camera-x camera-target-x))
+          (not (== camera-y camera-target-y)))
+      :then
+      (let [buffer (get-buffer' o/*session* id)
+            text-box (get-text-box o/*session* tab-id)
+            window {:width window-width :height window-height}
+            new-buffer (scroll/animate-camera buffer multiplier text-box window delta-time)]
+        (doseq [[k v] new-buffer
+                :when (not= v (get buffer k))]
+          ;; FIXME: temporary hack
+          (o/insert! id (keyword "paravim.session" (name k)) v)))]}))
 
 (def queries
   '{::get-game

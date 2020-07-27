@@ -83,12 +83,11 @@
         new-speed-y (if (== new-y camera-target-y)
                       0
                       (decelerate scroll-speed-y))]
-    (assoc buffer
-      :camera (t/translate constants/orig-camera new-x new-y)
-      :camera-x new-x
-      :camera-y new-y
-      :scroll-speed-x new-speed-x
-      :scroll-speed-y new-speed-y)))
+    {:camera (t/translate constants/orig-camera new-x new-y)
+     :camera-x new-x
+     :camera-y new-y
+     :scroll-speed-x new-speed-x
+     :scroll-speed-y new-speed-y}))
 
 (defn move-camera-to-cursor [buffer font-size text-box window {:keys [left top width height] :as cursor-entity}]
   (let [{:keys [camera camera-x camera-y]} buffer

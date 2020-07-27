@@ -694,7 +694,11 @@
             (-> session
                 (clarax/merge game' game)
                 clara/fire-rules))))
-      (swap! session/*session update :osession o/fire-rules)
+      (swap! session/*session update :osession
+             (fn [osession]
+               (-> osession
+                   (o/insert ::session/time ::session/delta (:delta-time game))
+                   o/fire-rules)))
       ;; return new game record
       game)))
 
