@@ -213,7 +213,6 @@
      [:what
       [::constant ::font-height font-height]
       [::font ::size size]
-      [::font ::multiplier multiplier {:then false}]
       :when
       (pos? size)
       :then
