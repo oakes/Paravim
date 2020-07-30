@@ -377,8 +377,7 @@
      :clojure? clojure?
      :cursor-line 0
      :cursor-column 0
-     :show-minimap? false
-     :last-update 0}))
+     :show-minimap? false}))
 
 (defn ->ascii [id {:keys [base-font-entity base-text-entity font-height] :as constants} lines]
   {:tab-id ::constants/files
@@ -402,6 +401,5 @@
    :clojure? false
    :cursor-line 0
    :cursor-column 0
-   :show-minimap? false
-   :last-update 0})
+   :show-minimap? false})
 
