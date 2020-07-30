@@ -114,34 +114,39 @@
     (change-font-size session (- (* font-size n) font-size))))
 
 (defn remove-buffer [session buffer-id]
-  (if-not (session/get-buffer session buffer-id)
-    session
-    (reduce
-      (fn [session attr]
-        (o/retract session buffer-id attr))
-      session
-      [::session/tab-id
-       ::session/text-entity
-       ::session/parinfer-text-entity
-       ::session/rects-entity
-       ::session/parsed-code
-       ::session/needs-parinfer?
-       ::session/needs-parinfer-init?
-       ::session/needs-clojure-refresh?
-       ::session/camera
-       ::session/camera-x
-       ::session/camera-y
-       ::session/camera-target-x
-       ::session/camera-target-y
-       ::session/scroll-speed-x
-       ::session/scroll-speed-y
-       ::session/path
-       ::session/file-name
-       ::session/lines
-       ::session/clojure?
-       ::session/cursor-line
-       ::session/cursor-column
-       ::session/show-minimap?])))
+  (cond->> []
+           (session/get-buffer session buffer-id)
+           (into [::session/tab-id
+                  ::session/text-entity
+                  ::session/parinfer-text-entity
+                  ::session/rects-entity
+                  ::session/parsed-code
+                  ::session/needs-parinfer?
+                  ::session/needs-parinfer-init?
+                  ::session/needs-clojure-refresh?
+                  ::session/camera
+                  ::session/camera-x
+                  ::session/camera-y
+                  ::session/camera-target-x
+                  ::session/camera-target-y
+                  ::session/scroll-speed-x
+                  ::session/scroll-speed-y
+                  ::session/path
+                  ::session/file-name
+                  ::session/lines
+                  ::session/clojure?
+                  ::session/cursor-line
+                  ::session/cursor-column
+                  ::session/show-minimap?])
+           (session/get-minimap session buffer-id)
+           (into [:paravim.minimap/show?
+                  :paravim.minimap/rects-entity
+                  :paravim.minimap/text-entity])
+           true
+           (reduce
+             (fn [session attr]
+               (o/retract session buffer-id attr))
+             session)))
 
 (defn- mouse->cursor-position [buffer mouse font-size-multiplier text-box constants window]
   (let [text-top ((:top text-box) (:height window) font-size-multiplier)
