@@ -70,7 +70,7 @@
                 :remove
                 (v/input vim "<Del>")
                 :insert
-                (v/input vim (str ch)))))
+                (v/input-unicode vim (str ch)))))
           ;; go back to the original position
           (v/set-cursor-position vim cursor-line cursor-column)
           (v/input vim "<Esc>")))
@@ -138,7 +138,7 @@
             (dotimes [_ (- (count command-text) first-part)]
               (v/input vim "<BS>"))
             (doseq [ch command-completion]
-              (v/input vim (str ch)))))
+              (v/input-unicode vim (str ch)))))
         ("<Right>" "<Left>" "<Up>" "<Down>")
         nil
         "<Enter>"
@@ -150,7 +150,10 @@
                  (not (seq (some-> command-text str/trim))))
           nil ;; disable shell commands for now
           (v/input vim s))))
-    (v/input vim s)))
+    (if (and (str/starts-with? s "<")
+             (str/ends-with? s ">"))
+      (v/input vim s)
+      (v/input-unicode vim s))))
 
 (defn update-buffer [session buffer-ptr cursor-line cursor-column]
   (if-let [buffer (session/get-buffer session buffer-ptr)]
@@ -225,7 +228,7 @@
     (when (and limit-line-length?
                (>= (v/get-cursor-column vim) max-line-length))
       (v/input vim "<Enter>"))
-    (v/input vim (str ch)))
+    (v/input-unicode vim (str ch)))
   (v/execute vim "set nopaste")
   (swap! session/*session update-after-input vim nil))
 

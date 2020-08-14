@@ -1,7 +1,7 @@
 {:paths ["src" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.10.1"}
         play-cljc {:mvn/version "0.9.2"}
-        libvim-clj {:mvn/version "0.8.3"}
+        libvim-clj {:local/root "../libvim-clj"}
         parinferish {:mvn/version "0.7.0"}
         net.sekao/odoyle-rules {:mvn/version "0.3.0"}
         com.rpl/specter {:mvn/version "1.1.3"}
