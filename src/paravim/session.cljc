@@ -76,16 +76,6 @@
   ([session id attr value]
    (o/insert session id (keyword "paravim.session" (name attr)) value)))
 
-(defn insert!
-  ([id attr->value]
-   (o/insert! id (reduce-kv
-                   (fn [m k v]
-                     (assoc m (keyword "paravim.session" (name k)) v))
-                   {}
-                   attr->value)))
-  ([id attr value]
-   (o/insert! id (keyword "paravim.session" (name attr)) value)))
-
 (def queries
   (o/ruleset
     {::get-constants
@@ -207,7 +197,9 @@
       :when
       (== 0 size)
       :then
-      (o/insert! ::font ::size (* multiplier font-height))]
+      (-> o/*session*
+          (o/insert ::font ::size (* multiplier font-height))
+          o/reset!)]
      
      ::update-font-multiplier
      [:what
@@ -216,7 +208,9 @@
       :when
       (pos? size)
       :then
-      (o/insert! ::font ::multiplier (/ size font-height))]
+      (-> o/*session*
+          (o/insert ::font ::multiplier (/ size font-height))
+          o/reset!)]
      
      ::mouse-hovers-over-text
      [:what
@@ -236,8 +230,10 @@
           mouse-y
           (bottom window-height font-multiplier))
       :then
-      (o/insert! ::mouse {::target :text
-                          ::cursor :ibeam})]
+      (-> o/*session*
+          (o/insert ::mouse {::target :text
+                             ::cursor :ibeam})
+          o/reset!)]
      
      ::mouse-hovers-over-bounding-box
      [:what
@@ -262,8 +258,10 @@
         (and (<= x1 mouse-x x2)
              (<= y1 mouse-y y2)))
       :then
-      (o/insert! ::mouse {::target id
-                          ::cursor :hand})]
+      (-> o/*session*
+          (o/insert ::mouse {::target id
+                             ::cursor :hand})
+          o/reset!)]
      
      ::update-buffer-when-font-changes-or-window-resizes
      [:what
@@ -289,7 +287,9 @@
                           (paravim.buffers/update-highlight constants)
                           (paravim.buffers/update-selection constants visual-range)
                           (paravim.buffers/update-search-highlights constants show-search? highlights))]
-        (insert! id new-buffer)
+        (-> o/*session*
+            (insert id new-buffer)
+            o/reset!)
         (async/put! single-command-chan [:resize-window]))]
      
      ::move-camera-to-target
@@ -310,7 +310,9 @@
                          camera-target-x camera-target-y
                          scroll-speed-x scroll-speed-y
                          delta-time)]
-        (insert! id new-buffer))]
+        (-> o/*session*
+            (insert id new-buffer)
+            o/reset!))]
      
      ::rubber-band-effect
      [:what
@@ -333,7 +335,9 @@
                          camera-target-x camera-target-y
                          scroll-speed-x scroll-speed-y
                          multiplier text-box constants window)]
-        (insert! id new-buffer))]
+        (-> o/*session*
+            (insert id new-buffer)
+            o/reset!))]
      
      ::minimap
      [:what
@@ -358,9 +362,11 @@
                           constants multiplier
                           window-width window-height text-box)
             show? (::minimap/show? new-minimap)]
-        (o/insert! id new-minimap)
-        (when (not= show? show-minimap?)
-          (o/insert! id ::show-minimap? show?)))]}))
+        (-> o/*session*
+            (o/insert id new-minimap)
+            (cond-> (not= show? show-minimap?)
+                    (o/insert id ::show-minimap? show?))
+            o/reset!))]}))
 
 (defn reload! [callback]
   (reset! *initial-session
