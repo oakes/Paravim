@@ -341,15 +341,14 @@
      
      ::minimap
      [:what
-      [::time ::delta delta-time]
       [::font ::multiplier multiplier]
       [::window ::width window-width]
       [::window ::height window-height]
       [id ::tab-id tab-id]
       [id ::text-entity text-entity]
       [id ::lines lines]
-      [id ::camera-x camera-x {:then false}]
-      [id ::camera-y camera-y {:then false}]
+      [id ::camera-x camera-x]
+      [id ::camera-y camera-y]
       [id ::show-minimap? show-minimap? {:then false}]
       :when
       ;; ignore ascii buffers
