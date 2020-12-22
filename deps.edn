@@ -1,8 +1,8 @@
 {:paths ["src" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.10.1"}
-        play-cljc {:mvn/version "0.9.4"}
-        libvim-clj {:mvn/version "0.9.0"}
-        parinferish {:mvn/version "0.8.0"}
+        play-cljc/play-cljc {:mvn/version "0.9.4"}
+        libvim-clj/libvim-clj {:mvn/version "0.9.0"}
+        parinferish/parinferish {:mvn/version "0.8.0"}
         net.sekao/odoyle-rules {:mvn/version "0.6.0"}
         com.rpl/specter {:mvn/version "1.1.3"}
         org.clojure/core.rrb-vector {:mvn/version "0.1.1"}
@@ -23,10 +23,10 @@
         org.lwjgl/lwjgl-glfw$natives-windows {:mvn/version "3.2.3"}
         org.lwjgl/lwjgl-opengl$natives-windows {:mvn/version "3.2.3"}
         org.lwjgl/lwjgl-stb$natives-windows {:mvn/version "3.2.3"}}
- :aliases {:dev {:extra-deps {orchestra {:mvn/version "2018.12.06-2"}
-                              expound {:mvn/version "0.7.2"}}
+ :aliases {:dev {:extra-deps {orchestra/orchestra {:mvn/version "2018.12.06-2"}
+                              expound/expound {:mvn/version "0.7.2"}}
                  :main-opts ["dev.clj"]}
-           :prod {:extra-deps {leiningen {:mvn/version "2.9.0"}}
+           :prod {:extra-deps {leiningen/leiningen {:mvn/version "2.9.0"}}
                   :main-opts ["prod.clj"]}
            :test {:extra-paths ["test"]
                   :main-opts ["test.clj"]}

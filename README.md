@@ -16,13 +16,13 @@ See [the website](https://sekao.net/paravim/) for more info and join the discuss
 The easiest way to run it is with the [Clojure CLI tool](https://clojure.org/guides/getting_started#_clojure_installer_and_cli_tools). On Windows or Linux, run this in any directory you want:
 
 ```
-clojure -Sdeps "{:deps {paravim {:mvn/version \""RELEASE\""}}}" -m paravim.start
+clojure -Sdeps "{:deps {paravim/paravim {:mvn/version \""RELEASE\""}}}" -m paravim.start
 ```
 
 On Mac OS, you need to add a special flag:
 
 ```
-clojure -Sdeps "{:deps {paravim {:mvn/version \""RELEASE\""}}}" -J-XstartOnFirstThread -m paravim.start
+clojure -Sdeps "{:deps {paravim/paravim {:mvn/version \""RELEASE\""}}}" -J-XstartOnFirstThread -m paravim.start
 ```
 
 For Leiningen users, see [this sample project.clj](https://gist.github.com/oakes/d85d6f9013d063b07896ffd8f6733a19).
@@ -31,11 +31,11 @@ NOTE: On Linux, there have been some `UnsatisfiedLinkError`s due to `libtinfo.so
 
 ## Development
 
-* To develop: `clj -A:dev native`
-  * On Mac OS, you'll need to run `clj -A:dev:macos native`
-* To run the tests: `clj -A:test`
-  * On Mac OS, you'll need to run `clj -A:test:macos`
-* To install the release version: `clj -A:prod install`
+* To develop: `clj -M:dev native`
+  * On Mac OS, you'll need to run `clj -M:dev:macos native`
+* To run the tests: `clj -M:test`
+  * On Mac OS, you'll need to run `clj -M:test:macos`
+* To install the release version: `clj -M:prod install`
 
 ## Licensing
 
