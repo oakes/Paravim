@@ -3,7 +3,7 @@
             [paravim.scroll :as scroll]
             [paravim.constants :as constants]
             [paravim.minimap :as minimap]
-            [odoyle.rules :as o #?(:clj :refer :cljs :refer-macros) [ruleset]]
+            [odoyle.rules :as o]
             [clojure.string :as str]
             [clojure.core.async :as async]))
 
