@@ -6,6 +6,7 @@
 
 (defn start []
   (st/instrument)
+  (st/unstrument 'odoyle.rules/insert) ;; don't require specs for attributes
   (set! s/*explain-out* expound/printer)
   (start/-main))
 
