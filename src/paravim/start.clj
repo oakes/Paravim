@@ -112,8 +112,9 @@
     (when (or press? release?)
       (swap! session/*session o/insert
              ::session/vim
-             ::session/control? (or (and control? (not control-key?))
-                                    (and press? control-key?))))
+             ::session/control? (boolean
+                                  (or (and control? (not control-key?))
+                                      (and press? control-key?)))))
     (when (or press? repeat?)
       (when-let [session @session/*session]
         (let [{:keys [mode]} (session/get-vim session)

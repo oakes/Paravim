@@ -100,7 +100,7 @@
 (defn dissoc-ascii [session ascii-name]
   (-> session
       (c/remove-buffer ascii-name)
-      (o/insert ::session/vim ::session/ascii false)))
+      (o/insert ::session/vim ::session/ascii nil)))
 
 (defn change-ascii [session constants s]
   (let [{:keys [mode ascii command-text command-start]} (session/get-vim session)]

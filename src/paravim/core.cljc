@@ -410,11 +410,13 @@
   (when @session/*reload?
     (reset! session/*reload? false)
     (init game))
-  (let [session (swap! session/*session
-                  (fn [session]
-                    (-> session
-                        (o/insert ::session/time ::session/delta (:delta-time game))
-                        o/fire-rules)))
+  (let [session (if-let [delta (:delta-time game)]
+                  (swap! session/*session
+                    (fn [session]
+                      (-> session
+                          (o/insert ::session/time ::session/delta delta)
+                          o/fire-rules)))
+                  @session/*session)
         current-tab (:id (session/get-current-tab session))
         current-buffer (:buffer-id (session/get-current-buffer session))
         buffer (session/get-buffer session current-buffer)

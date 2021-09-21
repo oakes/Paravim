@@ -5,7 +5,9 @@
             [paravim.minimap :as minimap]
             [odoyle.rules :as o]
             [clojure.string :as str]
-            [clojure.core.async :as async]))
+            [clojure.core.async :as async]
+            [clojure.spec.alpha :as s]
+            [libvim-clj.constants :as vim-const]))
 
 (defonce *initial-session (atom nil))
 (defonce *session (atom nil))
@@ -50,7 +52,7 @@
 (defn get-buffer [session buffer-id]
   (some (fn [buffer]
           (when (= buffer-id (:id buffer))
-            buffer))
+            (dissoc buffer :id)))
         (o/query-all session ::get-buffer)))
 
 (defn get-current-buffer [session]
@@ -393,3 +395,89 @@
 ;; create initial session
 (reload! identity)
 
+;; specs
+
+(s/def ::base-rect-entity map?)
+(s/def ::base-rects-entity map?)
+(s/def ::font-width number?)
+(s/def ::font-height number?)
+(s/def ::base-font-entity map?)
+(s/def ::base-text-entity map?)
+(s/def ::roboto-font-entity map?)
+(s/def ::roboto-text-entity map?)
+(s/def ::toolbar-text-entities map?)
+(s/def ::highlight-text-entities map?)
+
+(s/def ::start-line integer?)
+(s/def ::start-column integer?)
+(s/def ::end-line integer?)
+(s/def ::end-column integer?)
+
+(s/def ::mode (-> vim-const/modes vals set))
+(s/def ::ascii (s/nilable keyword?))
+(s/def ::control? boolean?)
+(s/def ::show-search? boolean?)
+(s/def ::visual-range (s/nilable (s/keys :req-un [::start-line ::start-column ::end-line ::end-column])))
+(s/def ::highlights (s/coll-of (s/keys :req-un [::start-line ::start-column ::end-line ::end-column])))
+(s/def ::message (s/nilable string?))
+(s/def ::command-start (s/nilable string?))
+(s/def ::command-text (s/nilable string?))
+(s/def ::command-completion (s/nilable string?))
+(s/def ::command-text-entity (s/nilable map?))
+(s/def ::command-cursor-entity (s/nilable map?))
+
+(s/def ::size number?)
+(s/def ::multiplier number?)
+(s/def ::width number?)
+(s/def ::height number?)
+(s/def ::current constants/tab?)
+
+(s/def ::x number?)
+(s/def ::y number?)
+(s/def ::target (s/nilable keyword?))
+(s/def ::cursor (s/nilable keyword?))
+
+(s/def ::left number?)
+(s/def ::right number?)
+(s/def ::top fn?)
+(s/def ::bottom fn?)
+
+(s/def ::x1 number?)
+(s/def ::y1 number?)
+(s/def ::x2 number?)
+(s/def ::y2 number?)
+(s/def ::align #{:left :right})
+
+(s/def ::tab-id constants/tab?)
+(s/def ::text-entity map?)
+(s/def ::parinfer-text-entity (s/nilable map?))
+(s/def ::rects-entity (s/nilable map?))
+(s/def ::parsed-code (s/nilable vector?))
+(s/def ::needs-parinfer? boolean?)
+(s/def ::needs-parinfer-init? boolean?)
+(s/def ::needs-clojure-refresh? boolean?)
+(s/def ::camera map?)
+(s/def ::camera-x number?)
+(s/def ::camera-y number?)
+(s/def ::camera-target-x number?)
+(s/def ::camera-target-y number?)
+(s/def ::scroll-speed-x number?)
+(s/def ::scroll-speed-y number?)
+(s/def ::path (s/nilable string?))
+(s/def ::file-name (s/nilable string?))
+(s/def ::lines (s/coll-of string?))
+(s/def ::clojure? boolean?)
+(s/def ::cursor-line integer?)
+(s/def ::cursor-column integer?)
+(s/def ::show-minimap? boolean?)
+
+(s/def ::buffer-id (s/nilable integer?))
+
+(s/def ::minimap/show? boolean?)
+(s/def ::minimap/rects-entity map?)
+(s/def ::minimap/text-entity map?)
+
+(s/def :paravim.start/command-chan any?)
+(s/def :paravim.start/single-command-chan any?)
+
+(s/def ::delta number?)

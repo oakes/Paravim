@@ -351,11 +351,12 @@
   (-> path get-extension clojure-exts))
 
 (defn ->buffer [id {:keys [base-font-entity base-text-entity font-height]} path file-name lines current-tab]
-  (let [clojure? (or (= current-tab ::constants/repl-in)
-                     (and (clojure-path? path)
-                          ;; disable clojure support in large files for now,
-                          ;; because it will be too slow to type
-                          (< (count lines) constants/max-clojure-lines)))]
+  (let [clojure? (boolean
+                   (or (= current-tab ::constants/repl-in)
+                       (and (clojure-path? path)
+                            ;; disable clojure support in large files for now,
+                            ;; because it will be too slow to type
+                            (< (count lines) constants/max-clojure-lines))))]
     {:tab-id current-tab
      :text-entity (assoc-lines base-text-entity base-font-entity font-height lines)
      :parinfer-text-entity nil
